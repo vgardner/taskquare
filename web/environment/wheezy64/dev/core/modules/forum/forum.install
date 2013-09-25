@@ -1,0 +1,413 @@
+<?php
+
+/**
+ * @file
+ * Install, update, and uninstall functions for the Forum module.
+ */
+
+use Drupal\Core\Language\Language;
+
+/**
+ * Implements hook_install().
+ */
+function forum_install() {
+  // Set the weight of the forum.module to 1 so it is loaded after the taxonomy.module.
+  module_set_weight('forum', 1);
+  // Do not allow to delete the forum's node type machine name.
+  $locked = Drupal::state()->get('node.type.locked');
+  $locked['forum'] = 'forum';
+  Drupal::state()->set('node.type.locked', $locked);
+}
+
+/**
+ * Implements hook_enable().
+ */
+function forum_enable() {
+  // Create the forum vocabulary if it does not exist.
+  // @todo Change Forum module so forum.settings can contain the vocabulary's
+  //   machine name.
+  $config = Drupal::config('forum.settings');
+  // If the module was disabled only, the current config may contain a valid
+  // vocabulary ID already.
+  $vocabulary = entity_load('taxonomy_vocabulary', $config->get('vocabulary'));
+  if (!$vocabulary) {
+    // If the module was installed and uninstalled previously, the vocabulary
+    // with machine name 'forums' might still exist.
+    $vocabulary = entity_load('taxonomy_vocabulary', 'forums');
+    if (!$vocabulary) {
+      // Otherwise, installing from scratch; create the vocabulary.
+      $vocabulary = entity_create('taxonomy_vocabulary', array(
+        'name' => t('Forums'),
+        'vid' => 'forums',
+        'langcode' => language_default()->id,
+        'description' => t('Forum navigation vocabulary'),
+        'hierarchy' => 1,
+        'module' => 'forum',
+        'weight' => -10,
+      ));
+      $vocabulary->save();
+    }
+    $config->set('vocabulary', $vocabulary->id())->save();
+  }
+
+  // Create the 'taxonomy_forums' field if it doesn't already exist. If forum
+  // is being enabled at the same time as taxonomy after both modules have been
+  // enabled, the field might exist but still be marked inactive.
+  if (!field_read_field('node', 'taxonomy_forums', array('include_inactive' => TRUE))) {
+    entity_create('field_entity', array(
+      'name' => 'taxonomy_forums',
+      'entity_type' => 'node',
+      'type' => 'taxonomy_term_reference',
+      'settings' => array(
+        'allowed_values' => array(
+          array(
+            'vocabulary' => $vocabulary->id(),
+            'parent' => 0,
+          ),
+        ),
+      ),
+    ))->save();
+
+    // Create a default forum so forum posts can be created.
+    $term = entity_create('taxonomy_term', array(
+      'name' => t('General discussion'),
+      'langcode' => language_default()->id,
+      'description' => '',
+      'parent' => array(0),
+      'vid' => $vocabulary->id(),
+      'forum_container' => 0,
+    ));
+    $term->save();
+
+    // Create the instance on the bundle.
+    entity_create('field_instance', array(
+      'field_name' => 'taxonomy_forums',
+      'entity_type' => 'node',
+      'label' => $vocabulary->name,
+      'bundle' => 'forum',
+      'required' => TRUE,
+    ))->save();
+
+    // Assign form display settings for the 'default' form mode.
+    entity_get_form_display('node', 'forum', 'default')
+      ->setComponent('taxonomy_forums', array(
+        'type' => 'options_select',
+      ))
+      ->save();
+
+    // Assign display settings for the 'default' and 'teaser' view modes.
+    entity_get_display('node', 'forum', 'default')
+      ->setComponent('taxonomy_forums', array(
+        'type' => 'taxonomy_term_reference_link',
+        'weight' => 10,
+      ))
+      ->save();
+    entity_get_display('node', 'forum', 'teaser')
+      ->setComponent('taxonomy_forums', array(
+        'type' => 'taxonomy_term_reference_link',
+        'weight' => 10,
+      ))
+      ->save();
+  }
+}
+
+/**
+ * Implements hook_modules_preinstall().
+ */
+function forum_modules_preinstall($modules) {
+  $list_boolean = Drupal::service('plugin.manager.entity.field.field_type')->getDefinition('list_boolean');
+  if (empty($list_boolean) && in_array('forum', $modules)) {
+    // Make sure that the list_boolean field type is available before our
+    // default config is installed.
+    field_info_cache_clear();
+  }
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function forum_uninstall() {
+  // Load the dependent Taxonomy module, in case it has been disabled.
+  drupal_load('module', 'taxonomy');
+
+  if ($field = field_info_field('node', 'taxonomy_forums')) {
+    $field->delete();
+  }
+
+  if ($field = field_info_field('taxonomy_term', 'forum_container')) {
+    $field->delete();
+  }
+
+  // Purge field data now to allow taxonomy and options module to be uninstalled
+  // if this is the only field remaining. We need to run it twice because
+  // field_purge_batch() will not remove the instance and the field in the same
+  // pass.
+  field_purge_batch(10);
+  field_purge_batch(10);
+  // Allow to delete a forum's node type.
+  $locked = Drupal::state()->get('node.type.locked');
+  unset($locked['forum']);
+  Drupal::state()->set('node.type.locked', $locked);
+}
+
+/**
+ * Implements hook_schema().
+ */
+function forum_schema() {
+  $schema['forum'] = array(
+    'description' => 'Stores the relationship of nodes to forum terms.',
+    'fields' => array(
+      'nid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'The {node}.nid of the node.',
+      ),
+      'vid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'Primary Key: The {node}.vid of the node.',
+      ),
+      'tid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'The {taxonomy_term_data}.tid of the forum term assigned to the node.',
+      ),
+    ),
+    'indexes' => array(
+      'forum_topic' => array('nid', 'tid'),
+      'tid' => array('tid'),
+    ),
+    'primary key' => array('vid'),
+    'foreign keys' => array(
+      'forum_node' => array(
+        'table' => 'node',
+        'columns' => array(
+          'nid' => 'nid',
+          'vid' => 'vid',
+        ),
+      ),
+    ),
+  );
+
+  $schema['forum_index'] = array(
+    'description' => 'Maintains denormalized information about node/term relationships.',
+    'fields' => array(
+      'nid' => array(
+        'description' => 'The {node}.nid this record tracks.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'title' => array(
+        'description' => 'The title of this node, always treated as non-markup plain text.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'tid' => array(
+         'description' => 'The term ID.',
+         'type' => 'int',
+         'unsigned' => TRUE,
+         'not null' => TRUE,
+         'default' => 0,
+      ),
+      'sticky' => array(
+        'description' => 'Boolean indicating whether the node is sticky.',
+        'type' => 'int',
+        'not null' => FALSE,
+        'default' => 0,
+        'size' => 'tiny',
+      ),
+      'created' => array(
+        'description' => 'The Unix timestamp when the node was created.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default'=> 0,
+      ),
+      'last_comment_timestamp' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'The Unix timestamp of the last comment that was posted within this node, from {comment}.timestamp.',
+      ),
+      'comment_count' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'The total number of comments on this node.',
+      ),
+    ),
+    'indexes' => array(
+      'forum_topics' => array('nid', 'tid', 'sticky', 'last_comment_timestamp'),
+      'created' => array('created'),
+      'last_comment_timestamp' => array('last_comment_timestamp'),
+    ),
+    'foreign keys' => array(
+      'tracked_node' => array(
+        'table' => 'node',
+        'columns' => array('nid' => 'nid'),
+      ),
+      'term' => array(
+        'table' => 'taxonomy_term_data',
+        'columns' => array(
+          'tid' => 'tid',
+        ),
+      ),
+    ),
+  );
+
+
+  return $schema;
+}
+
+/**
+ * Implements hook_update_last_removed().
+ */
+function forum_update_last_removed() {
+  return 7003;
+}
+
+/**
+ * Moves forum settings from variable to config.
+ *
+ * @ingroup config_upgrade
+ */
+function forum_update_8000() {
+  $map = db_query('SELECT vid, machine_name FROM {taxonomy_vocabulary}')->fetchAllKeyed();
+  $forum_vid = update_variable_get('forum_nav_vocabulary', FALSE);
+  if (!empty($map[$forum_vid])) {
+    // Update the variable to reference the machine name instead of the vid.
+    update_variable_set('forum_nav_vocabulary', $map[$forum_vid]);
+  }
+  update_variables_to_config('forum.settings', array(
+    'forum_hot_topic' => 'topics.hot_threshold',
+    'forum_per_page' => 'topics.page_limit',
+    'forum_order' => 'topics.order',
+    'forum_nav_vocabulary' => 'vocabulary',
+    'forum_block_num_active' => 'block.active.limit',
+    'forum_block_num_new' => 'block.new.limit',
+  ));
+}
+
+/**
+ * Implements hook_update_dependencies().
+ */
+function forum_update_dependencies() {
+  // Convert containers to field after the fields and instances are converted to
+  // ConfigEntities.
+  $dependencies['forum'][8001] = array(
+    'field' => 8003,
+    'taxonomy' => 8007,
+  );
+  return $dependencies;
+}
+
+/**
+ * Adds the forum_container field and copies the values over.
+ */
+function forum_update_8001() {
+  $vocabulary = config('forum.settings')->get('vocabulary');
+  // Create the field and instance.
+  $field = array(
+    'id' => 'taxonomy_term.forum_container',
+    'name' => 'forum_container',
+    'entity_type' => 'taxonomy_term',
+    'module' => 'options',
+    'type' => 'list_boolean',
+    'cardinality' => 1,
+    'locked' => TRUE,
+    'indexes' => array(),
+    'settings' => array(
+      'allowed_values' => array('', ''),
+      'allowed_values_function' => '',
+    ),
+    'schema' => array(
+      'columns' => array(
+        'value' => array(
+          'type' => 'int',
+          'not null' => FALSE,
+        ),
+      ),
+      'indexes' => array(),
+      'foreign keys' => array(),
+    ),
+  );
+  _update_8003_field_create_field($field);
+
+  $instance = array(
+    'id' => 'taxonomy_term.' . $vocabulary . '.forum_container',
+    'entity_type' => 'taxonomy_term',
+    'label' => 'Container',
+    'bundle' => $vocabulary,
+    'description' => '',
+    'required' => TRUE,
+    'settings' => array(),
+    'default_value' => array('value' => 0),
+  );
+  _update_8003_field_create_instance($field, $instance);
+}
+
+/**
+ * Migrate forum containers from variable to field values.
+ */
+function forum_update_8002(&$sandbox) {
+  // Initialize total values to process.
+  if (!isset($sandbox['total'])) {
+    $containers = update_variable_get('forum_containers', array());
+    $vocabulary = config('forum.settings')->get('vocabulary');
+    $sandbox['containers'] = $containers;
+    $sandbox['vocabulary'] = $vocabulary;
+    $sandbox['total'] = count($containers);
+    $sandbox['processed'] = 0;
+  }
+
+  if ($sandbox['total']) {
+    // Retrieve next 20 containers to migrate.
+    $containers = array_splice($containers, $sandbox['processed'], 20);
+    foreach ($containers as $tid) {
+      // Add a row to the field data and revision tables.
+      db_insert('taxonomy_term__forum_container')
+        ->fields(array(
+          'bundle' => $sandbox['vocabulary'],
+          'entity_id' => $tid,
+          'revision_id' => $tid,
+          'langcode' => Language::LANGCODE_NOT_SPECIFIED,
+          'delta' => 0,
+          'forum_container_value' => 1,
+        ))
+        ->execute();
+      db_insert('taxonomy_term_revision__forum_container')
+        ->fields(array(
+          'bundle' => $vocabulary,
+          'entity_id' => $tid,
+          'revision_id' => $tid,
+          'langcode' => Language::LANGCODE_NOT_SPECIFIED,
+          'delta' => 0,
+          'forum_container_value' => 1,
+        ))
+        ->execute();
+    }
+
+    // Report status.
+    $sandbox['processed'] += count($containers);
+  }
+  $sandbox['#finished'] = $sandbox['total'] ? $sandbox['processed'] / $sandbox['total'] : 1;
+
+}
+
+/**
+ * Remove the forum_containers variable.
+ */
+function forum_update_8003() {
+  update_variable_del('forum_containers');
+}

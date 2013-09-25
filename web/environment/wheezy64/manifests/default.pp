@@ -44,7 +44,9 @@ package { [
     'build-essential',
     'vim',
     'curl',
-    'git-core'
+    'git-core',
+    'varnish',
+    'memcached'
   ]:
   ensure  => 'installed',
 }
@@ -62,18 +64,18 @@ apache::vhost { 'taskquare.dev':
   serveraliases => [
     'taskquare.dev'
   ],
-  docroot       => '/var/www/',
+  docroot       => '/var/www/dev',
   port          => '80',
   env_variables => [
 ],
   priority      => '1',
 }
-apache::vhost { 'tasksquare.api':
-  server_name   => 'tasksquare.api',
+apache::vhost { 'taskquare.api':
+  server_name   => 'taskquare.api',
   serveraliases => [
-    'tasksquare.api'
+    'taskquare.api'
   ],
-  docroot       => '/var/www/',
+  docroot       => '/var/www/api',
   port          => '80',
   env_variables => [
 ],
@@ -172,7 +174,7 @@ puphpet::ini { 'xdebug':
 
 puphpet::ini { 'php':
   value   => [
-    'date.timezone = "America/Chicago"'
+    'date.timezone = "UTC"'
   ],
   ini     => '/etc/php5/conf.d/zzz_php.ini',
   notify  => Service['apache'],
@@ -198,9 +200,10 @@ mysql::db { 'tasksquare':
   grant    => [
     'ALL'
   ],
-  user     => 'admin',
-  password => 'admin',
+  user     => 'drupal',
+  password => 'drupal',
   host     => 'localhost',
+  sql      => '/var/www/sql/taskquare.sql',
   charset  => 'utf8',
   require  => Class['mysql::server'],
 }

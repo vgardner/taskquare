@@ -92,7 +92,8 @@
                 "php5-cli",
                 "php5-curl",
                 "php5-intl",
-                "php5-mcrypt"
+                "php5-mcrypt",
+                "php5-gd"
             ],
             "pear": {
                 "installed": "1"
@@ -107,7 +108,19 @@
         "inilist": {
             "xdebug": "xdebug.default_enable = 1,xdebug.remote_autostart = 0,xdebug.remote_connect_back = 1,xdebug.remote_enable = 1,xdebug.remote_handler = dbgp,xdebug.remote_port = 9000",
             "php": {
-                "date.timezone": "UTC"
+                "date.timezone": "UTC",
+                "session.cache_limiter" : "nocache",
+                "session.auto_start" : "0",
+                "expose_php" : "off",
+                "allow_url_fopen" : "off",
+                "magic_quotes_gpc" : "off",
+                "magic_quotes_runtime" : "off",
+                "register_globals" : "off",
+                "display_errors" : "off",
+                "memory_limit" : "64M",
+                "max_execution_time" : "60",
+                "max_input_time" : "60",
+                "safe_mode" : "off"
             },
             "custom": "display_errors = On,error_reporting = -1"
         }

@@ -120,9 +120,10 @@
                 "memory_limit" : "64M",
                 "max_execution_time" : "60",
                 "max_input_time" : "60",
-                "safe_mode" : "off"
+                "safe_mode" : "off",
+                "error_reporting" : "E_ALL & ~E_DEPRECATED"
             },
-            "custom": "display_errors = On,error_reporting = -1"
+            "custom": "display_errors = On"
         }
     },
     "database": "mysql",

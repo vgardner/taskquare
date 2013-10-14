@@ -1,0 +1,4 @@
+taskquare_hello:
+    resource: "@TaskquareHelloBundle/Resources/config/routing.yml"
+    prefix:   /
+

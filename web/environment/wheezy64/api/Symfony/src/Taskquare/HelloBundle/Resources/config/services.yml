@@ -1,0 +1,7 @@
+parameters:
+#    taskquare_hello.example.class: Taskquare\HelloBundle\Example
+
+services:
+#    taskquare_hello.example:
+#        class: %taskquare_hello.example.class%
+#        arguments: [@service_id, "plain_value", %parameter%]

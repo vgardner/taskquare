@@ -1,0 +1,3 @@
+taskquare_hello_homepage:
+    pattern:  /hello/{name}/{last_name}
+    defaults: { _controller: TaskquareHelloBundle:Hello:index, last_name: 'Gardner' }

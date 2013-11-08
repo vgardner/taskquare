@@ -114,6 +114,7 @@
 		FEBAB45B182D72C1006ADC3D /* Taskquare */ = {
 			isa = PBXGroup;
 			children = (
+				FEBAB48D182DA714006ADC3D /* iPad */,
 				FEBAB464182D72C1006ADC3D /* TASAppDelegate.h */,
 				FEBAB465182D72C1006ADC3D /* TASAppDelegate.m */,
 				FEBAB467182D72C1006ADC3D /* Main_iPhone.storyboard */,
@@ -153,6 +154,13 @@
 				FEBAB480182D72C1006ADC3D /* InfoPlist.strings */,
 			);
 			name = "Supporting Files";
+			sourceTree = "<group>";
+		};
+		FEBAB48D182DA714006ADC3D /* iPad */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = iPad;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -396,7 +404,9 @@
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "Taskquare/Taskquare-Prefix.pch";
 				INFOPLIST_FILE = "Taskquare/Taskquare-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				TARGETED_DEVICE_FAMILY = "1,2";
 				WRAPPER_EXTENSION = app;
 			};
 			name = Debug;
@@ -409,7 +419,9 @@
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "Taskquare/Taskquare-Prefix.pch";
 				INFOPLIST_FILE = "Taskquare/Taskquare-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				TARGETED_DEVICE_FAMILY = "1,2";
 				WRAPPER_EXTENSION = app;
 			};
 			name = Release;

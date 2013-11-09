@@ -4,7 +4,7 @@
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="3746"/>
     </dependencies>
     <scenes>
-        <!--View Controller-->
+        <!--View Controller - Add task-->
         <scene sceneID="ufC-wZ-h7g">
             <objects>
                 <viewController id="vXZ-lx-hvc" customClass="TASViewController" sceneMemberID="viewController">
@@ -30,7 +30,7 @@
                             <constraint firstItem="lmN-Pg-kLJ" firstAttribute="top" secondItem="xvk-wl-3z2" secondAttribute="bottom" constant="205" id="aGJ-z7-ci3"/>
                         </constraints>
                     </view>
-                    <navigationItem key="navigationItem" id="v32-LG-4LH">
+                    <navigationItem key="navigationItem" title="Add task" id="v32-LG-4LH">
                         <barButtonItem key="leftBarButtonItem" systemItem="cancel" id="ps0-GZ-JmJ"/>
                         <barButtonItem key="rightBarButtonItem" systemItem="done" id="CxG-ks-KmC"/>
                     </navigationItem>
@@ -189,10 +189,10 @@
             </objects>
             <point key="canvasLocation" x="381" y="-23"/>
         </scene>
-        <!--Navigation Controller - My list-->
+        <!--Navigation Controller - Add to-to item-->
         <scene sceneID="tCN-Is-vbn">
             <objects>
-                <navigationController title="My list" automaticallyAdjustsScrollViewInsets="NO" id="icy-WC-6Pp" sceneMemberID="viewController">
+                <navigationController title="Add to-to item" automaticallyAdjustsScrollViewInsets="NO" id="icy-WC-6Pp" sceneMemberID="viewController">
                     <toolbarItems/>
                     <navigationBar key="navigationBar" contentMode="scaleToFill" id="qgm-yY-fHz">
                         <rect key="frame" x="0.0" y="0.0" width="320" height="44"/>
@@ -207,10 +207,10 @@
             </objects>
             <point key="canvasLocation" x="-145" y="-23"/>
         </scene>
-        <!--Navigation Controller-->
+        <!--Navigation Controller - Add taskquare item-->
         <scene sceneID="p0X-sp-ysX">
             <objects>
-                <navigationController automaticallyAdjustsScrollViewInsets="NO" id="PW9-2s-Ea9" sceneMemberID="viewController">
+                <navigationController title="Add taskquare item" automaticallyAdjustsScrollViewInsets="NO" id="PW9-2s-Ea9" sceneMemberID="viewController">
                     <toolbarItems/>
                     <navigationBar key="navigationBar" contentMode="scaleToFill" id="ueP-Si-Tmu">
                         <rect key="frame" x="0.0" y="0.0" width="320" height="44"/>

@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FE257532182E828C00CE14B2 /* TASAddTaskItemViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = FE257531182E828C00CE14B2 /* TASAddTaskItemViewController.m */; };
+		FE257535182E8BCF00CE14B2 /* TASTaskListViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = FE257534182E8BCF00CE14B2 /* TASTaskListViewController.m */; };
+		FE257538182FA86100CE14B2 /* TASTaskItem.m in Sources */ = {isa = PBXBuildFile; fileRef = FE257537182FA86100CE14B2 /* TASTaskItem.m */; };
 		FEBAB456182D72C1006ADC3D /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FEBAB455182D72C1006ADC3D /* Foundation.framework */; };
 		FEBAB458182D72C1006ADC3D /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FEBAB457182D72C1006ADC3D /* CoreGraphics.framework */; };
 		FEBAB45A182D72C1006ADC3D /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FEBAB459182D72C1006ADC3D /* UIKit.framework */; };
@@ -35,6 +38,12 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		FE257530182E828C00CE14B2 /* TASAddTaskItemViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TASAddTaskItemViewController.h; sourceTree = "<group>"; };
+		FE257531182E828C00CE14B2 /* TASAddTaskItemViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TASAddTaskItemViewController.m; sourceTree = "<group>"; };
+		FE257533182E8BCF00CE14B2 /* TASTaskListViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TASTaskListViewController.h; sourceTree = "<group>"; };
+		FE257534182E8BCF00CE14B2 /* TASTaskListViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TASTaskListViewController.m; sourceTree = "<group>"; };
+		FE257536182FA86100CE14B2 /* TASTaskItem.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TASTaskItem.h; sourceTree = "<group>"; };
+		FE257537182FA86100CE14B2 /* TASTaskItem.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TASTaskItem.m; sourceTree = "<group>"; };
 		FEBAB452182D72C1006ADC3D /* Taskquare.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Taskquare.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FEBAB455182D72C1006ADC3D /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		FEBAB457182D72C1006ADC3D /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
@@ -114,10 +123,16 @@
 		FEBAB45B182D72C1006ADC3D /* Taskquare */ = {
 			isa = PBXGroup;
 			children = (
+				FE257536182FA86100CE14B2 /* TASTaskItem.h */,
+				FE257537182FA86100CE14B2 /* TASTaskItem.m */,
 				FEBAB48D182DA714006ADC3D /* iPad */,
 				FEBAB464182D72C1006ADC3D /* TASAppDelegate.h */,
 				FEBAB465182D72C1006ADC3D /* TASAppDelegate.m */,
 				FEBAB467182D72C1006ADC3D /* Main_iPhone.storyboard */,
+				FE257533182E8BCF00CE14B2 /* TASTaskListViewController.h */,
+				FE257534182E8BCF00CE14B2 /* TASTaskListViewController.m */,
+				FE257530182E828C00CE14B2 /* TASAddTaskItemViewController.h */,
+				FE257531182E828C00CE14B2 /* TASAddTaskItemViewController.m */,
 				FEBAB46A182D72C1006ADC3D /* Main_iPad.storyboard */,
 				FEBAB46D182D72C1006ADC3D /* TASViewController.h */,
 				FEBAB46E182D72C1006ADC3D /* TASViewController.m */,
@@ -262,9 +277,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FE257538182FA86100CE14B2 /* TASTaskItem.m in Sources */,
 				FEBAB462182D72C1006ADC3D /* main.m in Sources */,
 				FEBAB466182D72C1006ADC3D /* TASAppDelegate.m in Sources */,
 				FEBAB46F182D72C1006ADC3D /* TASViewController.m in Sources */,
+				FE257535182E8BCF00CE14B2 /* TASTaskListViewController.m in Sources */,
+				FE257532182E828C00CE14B2 /* TASAddTaskItemViewController.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -487,6 +505,7 @@
 				FEBAB489182D72C1006ADC3D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		FEBAB48A182D72C1006ADC3D /* Build configuration list for PBXNativeTarget "TaskquareTests" */ = {
 			isa = XCConfigurationList;
@@ -495,6 +514,7 @@
 				FEBAB48C182D72C1006ADC3D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

@@ -7,12 +7,25 @@
 //
 
 #import "TASTaskListViewController.h"
+#import "TASTaskItem.h"
 
 @interface TASTaskListViewController ()
+
+@property NSMutableArray *taskItems;
 
 @end
 
 @implementation TASTaskListViewController
+
+- (void)loadInitialData
+{
+    TASTaskItem *itemOne = [[TASTaskItem alloc]init];
+    itemOne.itemName = @"I am the first item";
+    [self.taskItems addObject:itemOne];
+    TASTaskItem *itemTwo = [[TASTaskItem alloc]init];
+    itemTwo.itemName = @"I am the second item";
+    [self.taskItems addObject:itemTwo];
+}
 
 - (IBAction)unwindToList:(UIStoryboardSegue *)segue
 {
@@ -31,7 +44,8 @@
 - (void)viewDidLoad
 {
     [super viewDidLoad];
-
+    self.taskItems = [[NSMutableArray alloc] init];
+    [self loadInitialData];
     // Uncomment the following line to preserve selection between presentations.
     // self.clearsSelectionOnViewWillAppear = NO;
  

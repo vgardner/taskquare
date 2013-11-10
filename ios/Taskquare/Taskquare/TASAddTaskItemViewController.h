@@ -7,7 +7,10 @@
 //
 
 #import <UIKit/UIKit.h>
+#import "TASTaskItem.h"
 
 @interface TASAddTaskItemViewController : UIViewController
+
+@property TASTaskItem *taskItem;
 
 @end

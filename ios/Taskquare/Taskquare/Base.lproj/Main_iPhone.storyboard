@@ -31,11 +31,20 @@
                         </constraints>
                     </view>
                     <navigationItem key="navigationItem" title="Add task" id="v32-LG-4LH">
-                        <barButtonItem key="leftBarButtonItem" systemItem="cancel" id="ps0-GZ-JmJ"/>
-                        <barButtonItem key="rightBarButtonItem" systemItem="done" id="CxG-ks-KmC"/>
+                        <barButtonItem key="leftBarButtonItem" systemItem="cancel" id="ps0-GZ-JmJ">
+                            <connections>
+                                <segue destination="01P-9D-qYx" kind="unwind" unwindAction="unwindToList:" id="Zes-ni-3sl"/>
+                            </connections>
+                        </barButtonItem>
+                        <barButtonItem key="rightBarButtonItem" systemItem="done" id="CxG-ks-KmC">
+                            <connections>
+                                <segue destination="01P-9D-qYx" kind="unwind" unwindAction="unwindToList:" id="G65-Oz-enf"/>
+                            </connections>
+                        </barButtonItem>
                     </navigationItem>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="x5A-6p-PRh" sceneMemberID="firstResponder"/>
+                <exit id="01P-9D-qYx" userLabel="Exit" sceneMemberID="exit"/>
             </objects>
             <point key="canvasLocation" x="1336" y="-23"/>
         </scene>

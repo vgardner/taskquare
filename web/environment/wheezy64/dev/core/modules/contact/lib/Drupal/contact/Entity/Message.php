@@ -7,9 +7,7 @@
 
 namespace Drupal\contact\Entity;
 
-use Drupal\Core\Entity\Annotation\EntityType;
-use Drupal\Core\Annotation\Translation;
-use Drupal\Core\Entity\EntityNG;
+use Drupal\Core\Entity\ContentEntityBase;
 use Drupal\contact\MessageInterface;
 
 /**
@@ -18,10 +16,9 @@ use Drupal\contact\MessageInterface;
  * @EntityType(
  *   id = "contact_message",
  *   label = @Translation("Contact message"),
- *   module = "contact",
  *   controllers = {
- *     "storage" = "Drupal\Core\Entity\DatabaseStorageControllerNG",
- *     "render" = "Drupal\contact\MessageRenderController",
+ *     "storage" = "Drupal\Core\Entity\FieldableDatabaseStorageController",
+ *     "view_builder" = "Drupal\contact\MessageViewBuilder",
  *     "form" = {
  *       "default" = "Drupal\contact\MessageFormController"
  *     }
@@ -29,14 +26,17 @@ use Drupal\contact\MessageInterface;
  *   entity_keys = {
  *     "bundle" = "category"
  *   },
- *   route_base_path = "admin/structure/contact/manage/{bundle}",
+ *   bundle_entity_type = "contact_category",
  *   fieldable = TRUE,
  *   bundle_keys = {
  *     "bundle" = "id"
+ *   },
+ *   links = {
+ *     "admin-form" = "contact.category_edit"
  *   }
  * )
  */
-class Message extends EntityNG implements MessageInterface {
+class Message extends ContentEntityBase implements MessageInterface {
 
   /**
    * Overrides Drupal\Core\Entity\Entity::id().

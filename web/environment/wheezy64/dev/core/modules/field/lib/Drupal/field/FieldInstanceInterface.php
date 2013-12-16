@@ -8,12 +8,12 @@
 namespace Drupal\field;
 
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
-use Drupal\Core\Entity\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\FieldDefinitionInterface;
 
 /**
  * Provides an interface defining a field instance entity.
  */
-interface FieldInstanceInterface extends ConfigEntityInterface, FieldDefinitionInterface, \ArrayAccess {
+interface FieldInstanceInterface extends ConfigEntityInterface, FieldDefinitionInterface {
 
   /**
    * Returns the field entity for this instance.

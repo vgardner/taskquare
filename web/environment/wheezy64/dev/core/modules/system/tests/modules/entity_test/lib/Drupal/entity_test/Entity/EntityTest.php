@@ -7,7 +7,7 @@
 
 namespace Drupal\entity_test\Entity;
 
-use Drupal\Core\Entity\EntityNG;
+use Drupal\Core\Entity\ContentEntityBase;
 use Drupal\Core\Entity\Annotation\EntityType;
 use Drupal\Core\Annotation\Translation;
 use Drupal\Core\Language\Language;
@@ -18,15 +18,15 @@ use Drupal\Core\Language\Language;
  * @EntityType(
  *   id = "entity_test",
  *   label = @Translation("Test entity"),
- *   module = "entity_test",
  *   controllers = {
  *     "storage" = "Drupal\entity_test\EntityTestStorageController",
  *     "list" = "Drupal\entity_test\EntityTestListController",
+ *     "view_builder" = "Drupal\entity_test\EntityTestViewBuilder",
  *     "access" = "Drupal\entity_test\EntityTestAccessController",
  *     "form" = {
  *       "default" = "Drupal\entity_test\EntityTestFormController"
  *     },
- *     "translation" = "Drupal\content_translation\ContentTranslationControllerNG"
+ *     "translation" = "Drupal\content_translation\ContentTranslationController"
  *   },
  *   base_table = "entity_test",
  *   fieldable = TRUE,
@@ -35,44 +35,49 @@ use Drupal\Core\Language\Language;
  *     "id" = "id",
  *     "uuid" = "uuid",
  *     "bundle" = "type",
+ *     "label" = "name"
  *   },
- *   menu_base_path = "entity-test/manage/%entity_test"
+ *   links = {
+ *     "canonical" = "entity_test.render",
+ *     "edit-form" = "entity_test.edit_entity_test",
+ *     "admin-form" = "entity_test.admin_entity_test"
+ *   }
  * )
  */
-class EntityTest extends EntityNG {
+class EntityTest extends ContentEntityBase {
 
   /**
    * The entity ID.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $id;
 
   /**
    * The entity UUID.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $uuid;
 
   /**
    * The bundle of the test entity.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $type;
 
   /**
    * The name of the test entity.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $name;
 
   /**
    * The associated user.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $user_id;
 
@@ -92,8 +97,11 @@ class EntityTest extends EntityNG {
   /**
    * Overrides Drupal\entity\Entity::label().
    */
-  public function label($langcode = Language::LANGCODE_DEFAULT) {
+  public function label($langcode = NULL) {
     $info = $this->entityInfo();
+    if (!isset($langcode)) {
+      $langcode = $this->activeLangcode;
+    }
     if (isset($info['entity_keys']['label']) && $info['entity_keys']['label'] == 'name') {
       return $this->getTranslation($langcode)->name->value;
     }

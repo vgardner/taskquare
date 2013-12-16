@@ -37,21 +37,21 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *
  *   // Correct procedural code.
  *   function hook_do_stuff() {
- *     $lock = Drupal::lock()->acquire('stuff_lock');
+ *     $lock = \Drupal::lock()->acquire('stuff_lock');
  *     // ...
  *   }
  *
  *   // The preferred way: dependency injected code.
  *   function hook_do_stuff() {
  *     // Move the actual implementation to a class and instantiate it.
- *     $instance = new StuffDoingClass(Drupal::lock());
+ *     $instance = new StuffDoingClass(\Drupal::lock());
  *     $instance->doStuff();
  *
  *     // Or, even better, rely on the service container to avoid hard coding a
  *     // specific interface implementation, so that the actual logic can be
  *     // swapped. This might not always make sense, but in general it is a good
  *     // practice.
- *     Drupal::service('stuff.doing')->doStuff();
+ *     \Drupal::service('stuff.doing')->doStuff();
  *   }
  *
  *   interface StuffDoingInterface {
@@ -75,6 +75,16 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * @see \Drupal\Core\DrupalKernel
  */
 class Drupal {
+
+  /**
+   * The current system version.
+   */
+  const VERSION = '8.0-dev';
+
+  /**
+   * Core API compatibility.
+   */
+  const CORE_COMPATIBILITY = '8.x';
 
   /**
    * The currently active container object.
@@ -159,7 +169,7 @@ class Drupal {
   /**
    * Retrieves the entity manager service.
    *
-   * @return \Drupal\Core\Entity\EntityManager
+   * @return \Drupal\Core\Entity\EntityManagerInterface
    *   The entity manager service.
    */
   public static function entityManager() {
@@ -234,14 +244,14 @@ class Drupal {
   /**
    * Returns a queue for the given queue name.
    *
-   * The following variables can be set by variable_set or $conf overrides:
-   * - queue_class_$name: The class to be used for the queue $name.
-   * - queue_default_class: The class to use when queue_class_$name is not
-   *   defined. Defaults to \Drupal\Core\Queue\System, a reliable backend using
-   *   SQL.
-   * - queue_default_reliable_class: The class to use when queue_class_$name is
-   *   not defined and the queue_default_class is not reliable. Defaults to
-   *   \Drupal\Core\Queue\System.
+   * The following values can be set in your settings.php file's $settings
+   * array to define which services are used for queues:
+   * - queue_reliable_service_$name: The container service to use for the
+   *   reliable queue $name.
+   * - queue_service_$name: The container service to use for the
+   *   queue $name.
+   * - queue_default: The container service to use by default for queues
+   *   without overrides. This defaults to 'queue.database'.
    *
    * @param string $name
    *   The name of the queue to work with.
@@ -387,9 +397,9 @@ class Drupal {
    * substituted for them in the pattern. Extra params are added as query
    * strings to the URL.
    *
-   * @param string $name
+   * @param string $route_name
    *   The name of the route
-   * @param array  $parameters
+   * @param array $route_parameters
    *   An associative array of parameter names and values.
    * @param array $options
    *   (optional) An associative array of additional options, with the following
@@ -422,7 +432,7 @@ class Drupal {
    *
    * @see \Drupal\Core\Routing\UrlGeneratorInterface::generateFromRoute()
    */
-  public static function url($route_name, $rotue_parameters = array(), $options = array()) {
+  public static function url($route_name, $route_parameters = array(), $options = array()) {
     return static::$container->get('url_generator')->generateFromRoute($route_name, $route_parameters, $options);
   }
 
@@ -445,7 +455,7 @@ class Drupal {
    * However, for links enclosed in translatable text you should use t() and
    * embed the HTML anchor tag directly in the translated string. For example:
    * @code
-   * t('Visit the <a href="@url">content types</a> page', array('@url' => Drupal::url('node_overview_types')));
+   * t('Visit the <a href="@url">content types</a> page', array('@url' => \Drupal::url('node.overview_types')));
    * @endcode
    * This keeps the context of the link title ('settings' in the example) for
    * translators.
@@ -535,6 +545,16 @@ class Drupal {
    */
   public static function transliteration() {
     return static::$container->get('transliteration');
+  }
+
+  /**
+   * Returns the form builder service.
+   *
+   * @return \Drupal\Core\Form\FormBuilderInterface
+   *   The form builder.
+   */
+  public static function formBuilder() {
+    return static::$container->get('form_builder');
   }
 
 }

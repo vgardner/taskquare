@@ -72,7 +72,6 @@ abstract class ActionFormControllerBase extends EntityFormController {
 
     $form['id'] = array(
       '#type' => 'machine_name',
-      '#title' => $this->t('Machine name'),
       '#default_value' => $this->entity->id(),
       '#disabled' => !$this->entity->isNew(),
       '#maxlength' => 64,
@@ -150,7 +149,9 @@ abstract class ActionFormControllerBase extends EntityFormController {
     $this->entity->save();
     drupal_set_message($this->t('The action has been successfully saved.'));
 
-    $form_state['redirect'] = 'admin/config/system/actions';
+    $form_state['redirect_route'] = array(
+      'route_name' => 'action.admin',
+    );
   }
 
 }

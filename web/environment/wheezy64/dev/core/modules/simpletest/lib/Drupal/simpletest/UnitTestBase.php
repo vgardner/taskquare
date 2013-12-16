@@ -15,7 +15,7 @@ use Drupal\Core\Database\ConnectionNotDefinedException;
  *
  * These tests can not access the database nor files. Calling any Drupal
  * function that needs the database will throw exceptions. These include
- * watchdog(), Drupal::moduleHandler()->getImplementations(), module_invoke_all() etc.
+ * watchdog(), \Drupal::moduleHandler()->getImplementations(), module_invoke_all() etc.
  */
 abstract class UnitTestBase extends TestBase {
 
@@ -66,9 +66,6 @@ abstract class UnitTestBase extends TestBase {
     if (!$this->setupDatabasePrefix) {
       return FALSE;
     }
-
-    // Set user agent to be consistent with WebTestBase.
-    $_SERVER['HTTP_USER_AGENT'] = $this->databasePrefix;
 
     $this->setup = TRUE;
   }

@@ -46,7 +46,7 @@ class BanDelete extends ConfirmFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'ban_ip_delete_form';
   }
 
@@ -67,8 +67,10 @@ class BanDelete extends ConfirmFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getCancelPath() {
-    return 'admin/config/people/ban';
+  public function getCancelRoute() {
+    return array(
+      'route_name' => 'ban.admin_page',
+    );
   }
 
   /**
@@ -91,7 +93,7 @@ class BanDelete extends ConfirmFormBase {
     $this->ipManager->unbanIp($this->banIp);
     watchdog('user', 'Deleted %ip', array('%ip' => $this->banIp));
     drupal_set_message($this->t('The IP address %ip was deleted.', array('%ip' => $this->banIp)));
-    $form_state['redirect'] = 'admin/config/people/ban';
+    $form_state['redirect_route']['route_name'] = 'ban.admin_page';
   }
 
 }

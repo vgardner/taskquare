@@ -22,22 +22,21 @@ abstract class UnitTestCase extends \PHPUnit_Framework_TestCase {
   protected $randomGenerator;
 
   /**
-   * This method exists to support the simpletest UI runner.
-   *
-   * It should eventually be replaced with something native to phpunit.
-   *
-   * Also, this method is empty because you can't have an abstract static
-   * method. Sub-classes should always override it.
+   * Provides meta information about this test case, such as test name.
    *
    * @return array
-   *   An array describing the test like so:
-   *   array(
-   *     'name' => 'Something Test',
-   *     'description' => 'Tests Something',
-   *     'group' => 'Something',
-   *   )
+   *   An array of untranslated strings with the following keys:
+   *   - name: An overview of what is tested by the class; for example, "User
+   *     access rules".
+   *   - description: One sentence describing the test, starting with a verb.
+   *   - group: The human-readable name of the module ("Node", "Statistics"), or
+   *     the human-readable name of the Drupal facility tested (e.g. "Form API"
+   *     or "XML-RPC").
    */
   public static function getInfo() {
+    // PHP does not allow us to declare this method as abstract public static,
+    // so we simply throw an exception here if this has not been implemented by
+    // a child class.
     throw new \RuntimeException("Sub-class must implement the getInfo method!");
   }
 
@@ -79,12 +78,12 @@ abstract class UnitTestCase extends \PHPUnit_Framework_TestCase {
    * @param array $configs
    *   An associative array of configuration settings whose keys are configuration
    *   object names and whose values are key => value arrays for the configuration
-   *   object in question.
+   *   object in question. Defaults to an empty array.
    *
    * @return \PHPUnit_Framework_MockObject_MockBuilder
    *   A MockBuilder object for the ConfigFactory with the desired return values.
    */
-  public function getConfigFactoryStub($configs) {
+  public function getConfigFactoryStub(array $configs = array()) {
     $config_map = array();
     // Construct the desired configuration object stubs, each with its own
     // desired return map.
@@ -175,12 +174,10 @@ abstract class UnitTestCase extends \PHPUnit_Framework_TestCase {
    *   A MockBuilder of \Drupal\Core\StringTranslation\TranslationInterface
    */
   public function getStringTranslationStub() {
-    $translation = $this->getMockBuilder('Drupal\Core\StringTranslation\TranslationManager')
-      ->disableOriginalConstructor()
-      ->getMock();
+    $translation = $this->getMock('Drupal\Core\StringTranslation\TranslationInterface');
     $translation->expects($this->any())
       ->method('translate')
-      ->will($this->returnArgument(0));
+      ->will($this->returnCallback(function ($string, array $args = array()) { return strtr($string, $args); }));
     return $translation;
   }
 

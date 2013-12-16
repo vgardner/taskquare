@@ -18,10 +18,8 @@ use Drupal\picture\PictureMappingInterface;
  * @EntityType(
  *   id = "picture_mapping",
  *   label = @Translation("Picture mapping"),
- *   module = "picture",
  *   controllers = {
  *     "storage" = "Drupal\Core\Config\Entity\ConfigStorageController",
- *     "access" = "Drupal\picture\PictureMappingAccessController",
  *     "list" = "Drupal\picture\PictureMappingListController",
  *     "form" = {
  *       "edit" = "Drupal\picture\PictureMappingFormController",
@@ -31,11 +29,15 @@ use Drupal\picture\PictureMappingInterface;
  *     }
  *   },
  *   list_path = "admin/config/media/picturemapping",
+ *   admin_permission = "administer pictures",
  *   config_prefix = "picture.mappings",
  *   entity_keys = {
  *     "id" = "id",
  *     "label" = "label",
  *     "uuid" = "uuid"
+ *   },
+ *   links = {
+ *     "edit-form" = "picture.mapping_page_edit"
  *   }
  * )
  */
@@ -126,7 +128,7 @@ class PictureMapping extends ConfigEntityBase implements PictureMappingInterface
     $loaded_mappings = $this->mappings;
     $this->mappings = array();
     if ($this->breakpointGroup) {
-      foreach ($this->breakpointGroup->breakpoints as $breakpoint_id => $breakpoint) {
+      foreach ($this->breakpointGroup->getBreakpoints() as $breakpoint_id => $breakpoint) {
         // Get the mapping for the default multiplier.
         $this->mappings[$breakpoint_id]['1x'] = '';
         if (isset($loaded_mappings[$breakpoint_id]['1x'])) {
@@ -161,18 +163,5 @@ class PictureMapping extends ConfigEntityBase implements PictureMappingInterface
       }
     }
     return $mapping_found;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function uri() {
-    return array(
-      'path' => 'admin/config/media/picturemapping/' . $this->id(),
-      'options' => array(
-        'entity_type' => $this->entityType,
-        'entity' => $this,
-      ),
-    );
   }
 }

@@ -7,84 +7,32 @@
 
 namespace Drupal\user\Plugin\Block;
 
+use Drupal\Core\Session\AccountInterface;
 use Drupal\block\BlockBase;
-use Drupal\block\Annotation\Block;
-use Drupal\Core\Annotation\Translation;
-use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
-use Drupal\user\Form\UserLoginForm;
-use Symfony\Component\DependencyInjection\ContainerInterface;
-use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Provides a 'User login' block.
  *
  * @Block(
  *   id = "user_login_block",
- *   admin_label = @Translation("User login")
+ *   admin_label = @Translation("User login"),
+ *   category = @Translation("Forms")
  * )
  */
-class UserLoginBlock extends BlockBase implements ContainerFactoryPluginInterface {
-
-  /**
-   * The DI Container.
-   *
-   * @var \Symfony\Component\DependencyInjection\ContainerInterface
-   */
-  protected $container;
-
-  /**
-   * The request object.
-   *
-   * @var \Symfony\Component\HttpFoundation\Request
-   */
-  protected $request;
-
-  /**
-   * Constructs a new UserLoginBlock.
-   *
-   * @param array $configuration
-   *   A configuration array containing information about the plugin instance.
-   * @param string $plugin_id
-   *   The plugin ID for the plugin instance.
-   * @param array $plugin_definition
-   *   The plugin implementation definition.
-   * @param \Symfony\Component\DependencyInjection\ContainerInterface $container
-   *   The DI Container.
-   * @param \Symfony\Component\HttpFoundation\Request $request
-   *   The request object.
-   */
-  public function __construct(array $configuration, $plugin_id, array $plugin_definition, ContainerInterface $container, Request $request) {
-    parent::__construct($configuration, $plugin_id, $plugin_definition);
-
-    $this->container = $container;
-    $this->request = $request;
-  }
+class UserLoginBlock extends BlockBase {
 
   /**
    * {@inheritdoc}
    */
-  public static function create(ContainerInterface $container, array $configuration, $plugin_id, array $plugin_definition) {
-    return new static(
-      $configuration,
-      $plugin_id,
-      $plugin_definition,
-      $container,
-      $container->get('request')
-    );
-  }
-
-  /**
-   * Overrides \Drupal\block\BlockBase::access().
-   */
-  public function access() {
-    return (!$GLOBALS['user']->id() && !(arg(0) == 'user' && !is_numeric(arg(1))));
+  public function access(AccountInterface $account) {
+    return (!$account->id() && !(arg(0) == 'user' && !is_numeric(arg(1))));
   }
 
   /**
    * {@inheritdoc}
    */
   public function build() {
-    $form = drupal_get_form(UserLoginForm::create($this->container), $this->request);
+    $form = drupal_get_form('Drupal\user\Form\UserLoginForm');
     unset($form['name']['#attributes']['autofocus']);
     unset($form['name']['#description']);
     unset($form['pass']['#description']);

@@ -19,14 +19,14 @@ use Drupal\entity\EntityDisplayInterface;
  * @EntityType(
  *   id = "entity_display",
  *   label = @Translation("Entity display"),
- *   module = "entity",
  *   controllers = {
  *     "storage" = "Drupal\Core\Config\Entity\ConfigStorageController"
  *   },
  *   config_prefix = "entity.display",
  *   entity_keys = {
  *     "id" = "id",
- *     "uuid" = "uuid"
+ *     "uuid" = "uuid",
+ *     "status" = "status"
  *   }
  * )
  */

@@ -8,13 +8,13 @@
 namespace Drupal\custom_block;
 
 use Drupal\Core\Datetime\DrupalDateTime;
-use Drupal\Core\Entity\EntityFormControllerNG;
+use Drupal\Core\Entity\ContentEntityFormController;
 use Drupal\Core\Language\Language;
 
 /**
  * Form controller for the custom block edit forms.
  */
-class CustomBlockFormController extends EntityFormControllerNG {
+class CustomBlockFormController extends ContentEntityFormController {
 
   /**
    * Overrides \Drupal\Core\Entity\EntityFormController::prepareEntity().
@@ -183,15 +183,19 @@ class CustomBlockFormController extends EntityFormControllerNG {
       $form_state['values']['id'] = $block->id->value;
       $form_state['id'] = $block->id->value;
       if ($insert) {
-        if ($theme = $block->getTheme()) {
-          $form_state['redirect'] = 'admin/structure/block/add/custom_block:' . $block->uuid->value . '/' . $theme;
+        if (!$theme = $block->getTheme()) {
+          $theme = $this->config('system.theme')->get('default');
         }
-        else {
-          $form_state['redirect'] = 'admin/structure/block/add/custom_block:' . $block->uuid->value . '/' . \Drupal::config('system.theme')->get('default');
-        }
+        $form_state['redirect_route'] = array(
+          'route_name' => 'block.admin_add',
+          'route_parameters' => array(
+            'plugin_id' => 'custom_block:' . $block->uuid(),
+            'theme' => $theme,
+          ),
+        );
       }
       else {
-        $form_state['redirect'] = 'admin/structure/custom-blocks';
+        $form_state['redirect_route']['route_name'] = 'custom_block.list';
       }
     }
     else {
@@ -215,8 +219,15 @@ class CustomBlockFormController extends EntityFormControllerNG {
       $destination = drupal_get_destination();
       $query->remove('destination');
     }
-    $block = $this->buildEntity($form, $form_state);
-    $form_state['redirect'] = array('block/' . $block->id() . '/delete', array('query' => $destination));
+    $form_state['redirect_route'] = array(
+      'route_name' => 'custom_block.delete',
+      'route_parameters' => array(
+        'custom_block' => $this->entity->id(),
+      ),
+      'options' => array(
+        'query' => $destination,
+      ),
+    );
   }
 
   /**

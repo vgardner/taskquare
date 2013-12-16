@@ -8,6 +8,7 @@
 use Drupal\Component\Utility\Xss;
 use Drupal\Core\Language\Language;
 use Drupal\Core\Template\Attribute;
+use Drupal\views\Form\ViewsForm;
 use Drupal\views\ViewExecutable;
 
 /**
@@ -99,7 +100,7 @@ function template_preprocess_views_view(&$variables) {
     // with its HTML, because one view may appear several times on the page. So
     // we set up a hash with the current time, $dom_id, to issue a "unique"
     // identifier for each view. This identifier is written to both
-    // Drupal.settings and the DIV wrapper.
+    // drupalSettings and the DIV wrapper.
     $variables['dom_id'] = $view->dom_id;
     $variables['attributes']['class'][] = 'view-dom-id-' . $variables['dom_id'];
   }
@@ -134,7 +135,10 @@ function template_preprocess_views_view(&$variables) {
     $rows = $variables['rows'];
     $rows = drupal_render($rows);
     $output = !empty($rows) ? $rows : $variables['empty'];
-    $form = drupal_get_form(views_form_id($view), $view, $output);
+
+    $container = \Drupal::getContainer();
+    $form_object = new ViewsForm($container->get('controller_resolver'), $container->get('url_generator'), $container->get('request'), $view->storage->id(), $view->current_display);
+    $form = \Drupal::formBuilder()->getForm($form_object, $view, $output);
     // The form is requesting that all non-essential views elements be hidden,
     // usually because the rendered step is not a view result.
     if ($form['show_view_elements']['#value'] == FALSE) {
@@ -180,7 +184,7 @@ function template_preprocess_views_view_fields(&$variables) {
     $empty = $field->isValueEmpty($field_output, $field->options['empty_zero']);
     if (empty($field->options['exclude']) && (!$empty || (empty($field->options['hide_empty']) && empty($variables['options']['hide_empty'])))) {
       $object = new stdClass();
-      $object->handler = &$view->field[$id];
+      $object->handler = $view->field[$id];
       $object->inline = !empty($variables['options']['inline'][$id]);
 
       $object->element_type = $object->handler->elementType(TRUE, !$variables['options']['default_field_elements'], $object->inline);
@@ -958,14 +962,13 @@ function template_preprocess_views_view_list(&$variables) {
  *   An associative array containing:
  *   - view: A ViewExecutable object.
  *   - rows: The raw row data.
-*/
+ */
 function template_preprocess_views_view_rss(&$variables) {
-  $view = $variables['view'];
+  $view  = $variables['view'];
   $items = $variables['rows'];
-
   $style = $view->style_plugin;
 
-  $config = Drupal::config('system.site');
+  $config = \Drupal::config('system.site');
 
   // The RSS 2.0 "spec" doesn't indicate HTML can be used in the description.
   // We strip all HTML tags, but need to prevent double encoding from properly
@@ -1183,16 +1186,16 @@ function template_preprocess_views_mini_pager(&$variables) {
  * The default style for all views is views-view-unformatted.html.twig.
  *
  * Many styles will then farm out the actual display of each row to a row
- * style; the default row style is views-view-fields.tpl.php.
+ * style; the default row style is views-view-fields.html.twig.
  *
  * Here is an example of all the templates that will be tried in the following
  * case:
  *
  * View, named foobar. Style: unformatted. Row style: Fields. Display: Page.
  *
- * - views-view--foobar--page.tpl.php
- * - views-view--page.tpl.php
- * - views-view--foobar.tpl.php
+ * - views-view--foobar--page.html.twig
+ * - views-view--page.html.twig
+ * - views-view--foobar.html.twig
  * - views-view.html.twig
  *
  * - views-view-unformatted--foobar--page.html.twig
@@ -1200,10 +1203,10 @@ function template_preprocess_views_mini_pager(&$variables) {
  * - views-view-unformatted--foobar.html.twig
  * - views-view-unformatted.html.twig
  *
- * - views-view-fields--foobar--page.tpl.php
- * - views-view-fields--page.tpl.php
- * - views-view-fields--foobar.tpl.php
- * - views-view-fields.tpl.php
+ * - views-view-fields--foobar--page.html.twig
+ * - views-view-fields--page.html.twig
+ * - views-view-fields--foobar.html.twig
+ * - views-view-fields.html.twig
  *
  * Important! When adding a new template to your theme, be sure to flush the
  * theme registry cache!

@@ -11,14 +11,24 @@ namespace Drupal\Core\Entity;
  * Defines a common interface for entity controller classes.
  *
  * All entity controller classes specified via the "controllers['storage']" key
- * returned by \Drupal\Core\Entity\EntityManager or hook_entity_info_alter()
- * have to implement this interface.
+ * returned by \Drupal\Core\Entity\EntityManagerInterface or
+ * hook_entity_info_alter() have to implement this interface.
  *
  * Most simple, SQL-based entity controllers will do better by extending
  * Drupal\Core\Entity\DatabaseStorageController instead of implementing this
  * interface directly.
  */
 interface EntityStorageControllerInterface {
+
+  /**
+   * Load the most recent version of an entity's field data.
+   */
+  const FIELD_LOAD_CURRENT = 'FIELD_LOAD_CURRENT';
+
+  /**
+   * Load the version of an entity's field data specified in the entity.
+   */
+  const FIELD_LOAD_REVISION = 'FIELD_LOAD_REVISION';
 
   /**
    * Resets the internal, static entity cache.
@@ -142,23 +152,5 @@ interface EntityStorageControllerInterface {
    * @return string
    */
   public function getQueryServicename();
-
-  /**
-   * Invokes a method on the Field objects within an entity.
-   *
-   * @param string $method
-   *   The method name.
-   * @param \Drupal\Core\Entity\EntityInterface $entity
-   *   The entity object.
-   */
-  public function invokeFieldMethod($method, EntityInterface $entity);
-
-  /**
-   * Invokes the prepareCache() method on all the relevant FieldItem objects.
-   *
-   * @param \Drupal\Core\Entity\EntityInterface $entity
-   *   The entity object.
-   */
-  public function invokeFieldItemPrepareCache(EntityInterface $entity);
 
 }

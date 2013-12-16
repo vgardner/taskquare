@@ -9,6 +9,7 @@ namespace Drupal\node;
 
 use Drupal\Core\Entity\EntityFormController;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Drupal\Component\Utility\String;
 
 /**
  * Form controller for node type forms.
@@ -23,10 +24,10 @@ class NodeTypeFormController extends EntityFormController {
 
     $type = $this->entity;
     if ($this->operation == 'add') {
-      drupal_set_title(t('Add content type'));
+      $form['#title'] = String::checkPlain($this->t('Add content type'));
     }
     elseif ($this->operation == 'edit') {
-      drupal_set_title(t('Edit %label content type', array('%label' => $type->label())), PASS_THROUGH);
+      $form['#title'] = $this->t('Edit %label content type', array('%label' => $type->label()));
     }
 
     $node_settings = $type->getModuleSettings('node');
@@ -235,14 +236,19 @@ class NodeTypeFormController extends EntityFormController {
       watchdog('node', 'Added content type %name.', $t_args, WATCHDOG_NOTICE, l(t('view'), 'admin/structure/types'));
     }
 
-    $form_state['redirect'] = 'admin/structure/types';
+    $form_state['redirect_route']['route_name'] = 'node.overview_types';
   }
 
   /**
    * {@inheritdoc}
    */
   public function delete(array $form, array &$form_state) {
-    $form_state['redirect'] = 'admin/structure/types/manage/' . $this->entity->id() . '/delete';
+    $form_state['redirect_route'] = array(
+      'route_name' => 'node.type_delete_confirm',
+      'route_parameters' => array(
+        'node_type' => $this->entity->id(),
+      ),
+    );
   }
 
 }

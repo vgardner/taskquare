@@ -7,7 +7,7 @@
 
 namespace Drupal\taxonomy\Tests;
 
-use Drupal\Core\Language\Language;
+use Drupal\Core\Field\FieldDefinitionInterface;
 
 /**
  * Tests the rendering of term reference fields in RSS feeds.
@@ -41,7 +41,7 @@ class RssTest extends TaxonomyTestBase {
       'name' => $this->field_name,
       'entity_type' => 'node',
       'type' => 'taxonomy_term_reference',
-      'cardinality' => FIELD_CARDINALITY_UNLIMITED,
+      'cardinality' => FieldDefinitionInterface::CARDINALITY_UNLIMITED,
       'settings' => array(
         'allowed_values' => array(
           array(
@@ -83,21 +83,20 @@ class RssTest extends TaxonomyTestBase {
     $edit = array(
       "display_modes_custom[rss]" => '1',
     );
-    $this->drupalPost(NULL, $edit, t('Save'));
+    $this->drupalPostForm(NULL, $edit, t('Save'));
 
     // Change the format to 'RSS category'.
     $this->drupalGet("admin/structure/types/manage/article/display/rss");
     $edit = array(
       "fields[taxonomy_" . $this->vocabulary->id() . "][type]" => 'taxonomy_term_reference_rss_category',
     );
-    $this->drupalPost(NULL, $edit, t('Save'));
+    $this->drupalPostForm(NULL, $edit, t('Save'));
 
     // Post an article.
     $edit = array();
-    $langcode = Language::LANGCODE_NOT_SPECIFIED;
     $edit["title"] = $this->randomName();
-    $edit[$this->field_name . '[' . $langcode . '][]'] = $term1->id();
-    $this->drupalPost('node/add/article', $edit, t('Save'));
+    $edit[$this->field_name . '[]'] = $term1->id();
+    $this->drupalPostForm('node/add/article', $edit, t('Save'));
 
     // Check that the term is displayed when the RSS feed is viewed.
     $this->drupalGet('rss.xml');

@@ -10,7 +10,7 @@ namespace Drupal\aggregator;
 use Drupal\aggregator\Entity\Item;
 use Drupal\Core\Database\Query\PagerSelectExtender;
 use Drupal\Core\Database\Query\SelectInterface;
-use Drupal\Core\Entity\DatabaseStorageControllerNG;
+use Drupal\Core\Entity\FieldableDatabaseStorageController;
 
 /**
  * Controller class for aggregators items.
@@ -18,7 +18,7 @@ use Drupal\Core\Entity\DatabaseStorageControllerNG;
  * This extends the Drupal\Core\Entity\DatabaseStorageController class, adding
  * required special handling for feed item entities.
  */
-class ItemStorageController extends DatabaseStorageControllerNG implements ItemStorageControllerInterface {
+class ItemStorageController extends FieldableDatabaseStorageController implements ItemStorageControllerInterface {
 
   /**
    * Overrides Drupal\Core\Entity\DataBaseStorageController::attachLoad().
@@ -50,7 +50,7 @@ class ItemStorageController extends DatabaseStorageControllerNG implements ItemS
    * {@inheritdoc}
    */
   public function saveCategories(Item $item) {
-    $result = $this->database->query('SELECT cid FROM {aggregator_category_feed} WHERE fid = :fid', array(':fid' => $item->fid->value));
+    $result = $this->database->query('SELECT cid FROM {aggregator_category_feed} WHERE fid = :fid', array(':fid' => $item->getFeedId()));
     foreach ($result as $category) {
       $this->database->merge('aggregator_category_item')
         ->key(array(

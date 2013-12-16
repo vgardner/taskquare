@@ -96,16 +96,13 @@ class DefaultPluginManager extends PluginManagerBase implements PluginManagerInt
    * @param \Traversable $namespaces
    *   An object that implements \Traversable which contains the root paths
    *   keyed by the corresponding namespace to look for plugin implementations.
-   * @param array $annotation_namespaces
-   *   (optional) The namespaces of classes that can be used as annotations.
-   *   Defaults to an empty array.
    * @param string $plugin_definition_annotation_name
    *   (optional) The name of the annotation that contains the plugin definition.
    *   Defaults to 'Drupal\Component\Annotation\Plugin'.
    */
-  public function __construct($subdir, \Traversable $namespaces, $annotation_namespaces = array(), $plugin_definition_annotation_name = 'Drupal\Component\Annotation\Plugin') {
+  public function __construct($subdir, \Traversable $namespaces, $plugin_definition_annotation_name = 'Drupal\Component\Annotation\Plugin') {
     $this->subdir = $subdir;
-    $this->discovery = new AnnotatedClassDiscovery($subdir, $namespaces, $annotation_namespaces, $plugin_definition_annotation_name);
+    $this->discovery = new AnnotatedClassDiscovery($subdir, $namespaces, $plugin_definition_annotation_name);
     $this->discovery = new ContainerDerivativeDiscoveryDecorator($this->discovery);
     $this->factory = new ContainerFactory($this);
   }
@@ -124,8 +121,13 @@ class DefaultPluginManager extends PluginManagerBase implements PluginManagerInt
    *   Cache key prefix to use, the language code will be appended
    *   automatically.
    * @param array $cache_tags
-   *   (optional) When providing a list of cache tags, the cached definitions
-   *   are tagged and are used to clear the cache.
+   *   (optional) When providing a list of cache tags, the cached plugin
+   *   definitions are tagged with the provided cache tags. These cache tags can
+   *   then be used to clear the corresponding cached plugin definitions. Note
+   *   that this should be used with care! For clearing all cached plugin
+   *   definitions of a plugin manager, call that plugin manager's
+   *   clearCachedDefinitions() method. Only use cache tags when cached plugin
+   *   definitions should be cleared along with other, related cache entries.
    */
   public function setCacheBackend(CacheBackendInterface $cache_backend, LanguageManager $language_manager, $cache_key_prefix, array $cache_tags = array()) {
     $this->languageManager = $language_manager;
@@ -199,7 +201,7 @@ class DefaultPluginManager extends PluginManagerBase implements PluginManagerInt
   /**
    * Returns the cached plugin definitions of the decorated discovery class.
    *
-   * @return array|NULL
+   * @return array|null
    *   On success this will return an array of plugin definitions. On failure
    *   this should return NULL, indicating to other methods that this has not
    *   yet been defined. Success with no values should return as an empty array

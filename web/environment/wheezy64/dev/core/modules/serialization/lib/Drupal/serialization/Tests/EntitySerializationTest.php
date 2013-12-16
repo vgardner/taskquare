@@ -29,12 +29,12 @@ class EntitySerializationTest extends NormalizerTestBase {
   /**
    * The test entity.
    *
-   * @var \Drupal\Core\Entity\EntityNG
+   * @var \Drupal\Core\Entity\ContentEntityBase
    */
   protected $entity;
 
   /**
-   * The serializer serivce.
+   * The serializer service.
    *
    * @var \Symfony\Component\Serializer\Serializer.
    */

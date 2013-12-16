@@ -14,6 +14,7 @@ use Drupal\Core\DependencyInjection\Compiler\ModifyServiceDefinitionsPass;
 use Drupal\Core\DependencyInjection\Compiler\RegisterKernelListenersPass;
 use Drupal\Core\DependencyInjection\Compiler\RegisterAccessChecksPass;
 use Drupal\Core\DependencyInjection\Compiler\RegisterPathProcessorsPass;
+use Drupal\Core\DependencyInjection\Compiler\RegisterRouteProcessorsPass;
 use Drupal\Core\DependencyInjection\Compiler\RegisterRouteFiltersPass;
 use Drupal\Core\DependencyInjection\Compiler\RegisterRouteEnhancersPass;
 use Drupal\Core\DependencyInjection\Compiler\RegisterParamConvertersPass;
@@ -50,6 +51,7 @@ class CoreServiceProvider implements ServiceProviderInterface  {
     $container->addScope(new Scope('request'));
     $this->registerTwig($container);
     $this->registerModuleHandler($container);
+    $this->registerUuid($container);
 
     $container->addCompilerPass(new RegisterRouteFiltersPass());
     // Add a compiler pass for registering event subscribers.
@@ -62,6 +64,7 @@ class CoreServiceProvider implements ServiceProviderInterface  {
     $container->addCompilerPass(new RegisterServicesForDestructionPass());
     // Add the compiler pass that will process the tagged services.
     $container->addCompilerPass(new RegisterPathProcessorsPass());
+    $container->addCompilerPass(new RegisterRouteProcessorsPass());
     $container->addCompilerPass(new ListCacheBinsPass());
     // Add the compiler pass for appending string translators.
     $container->addCompilerPass(new RegisterStringTranslatorsPass());
@@ -131,6 +134,33 @@ class CoreServiceProvider implements ServiceProviderInterface  {
       // @todo Figure out what to do about debugging functions.
       // @see http://drupal.org/node/1804998
       ->addMethodCall('addExtension', array(new Definition('Twig_Extension_Debug')));
+  }
+
+  /**
+   * Determines and registers the UUID service.
+   *
+   * @param \Symfony\Component\DependencyInjection\ContainerBuilder $container
+   *   The container.
+   *
+   * @return string
+   *   Class name for the UUID service.
+   */
+  public static function registerUuid(ContainerBuilder $container) {
+    $uuid_class = 'Drupal\Component\Uuid\Php';
+
+    // Debian/Ubuntu uses the (broken) OSSP extension as their UUID
+    // implementation. The OSSP implementation is not compatible with the
+    // PECL functions.
+    if (function_exists('uuid_create') && !function_exists('uuid_make')) {
+      $uuid_class = 'Drupal\Component\Uuid\Pecl';
+    }
+    // Try to use the COM implementation for Windows users.
+    elseif (function_exists('com_create_guid')) {
+      $uuid_class = 'Drupal\Component\Uuid\Com';
+    }
+
+    $container->register('uuid', $uuid_class);
+    return $uuid_class;
   }
 
 }

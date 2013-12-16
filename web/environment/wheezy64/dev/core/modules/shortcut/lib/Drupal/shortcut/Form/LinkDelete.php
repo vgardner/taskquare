@@ -25,7 +25,7 @@ class LinkDelete extends ConfirmFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'shortcut_link_delete';
   }
 
@@ -39,8 +39,13 @@ class LinkDelete extends ConfirmFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getCancelPath() {
-    return 'admin/config/user-interface/shortcut/manage/' . $this->menuLink->menu_name;
+  public function getCancelRoute() {
+    return array(
+      'route_name' => 'shortcut.set_customize',
+      'route_parameters' => array(
+        'shortcut_set' => str_replace('shortcut-', '', $this->menuLink->menu_name),
+      ),
+    );
   }
 
   /**
@@ -65,7 +70,12 @@ class LinkDelete extends ConfirmFormBase {
   public function submitForm(array &$form, array &$form_state) {
     menu_link_delete($this->menuLink->mlid);
     $set_name = str_replace('shortcut-', '' , $this->menuLink->menu_name);
-    $form_state['redirect'] = 'admin/config/user-interface/shortcut/manage/' . $set_name;
+    $form_state['redirect_route'] = array(
+      'route_name' => 'shortcut.set_customize',
+      'route_parameters' => array(
+        'shortcut_set' => $set_name,
+      ),
+    );
     drupal_set_message(t('The shortcut %title has been deleted.', array('%title' => $this->menuLink->link_title)));
   }
 

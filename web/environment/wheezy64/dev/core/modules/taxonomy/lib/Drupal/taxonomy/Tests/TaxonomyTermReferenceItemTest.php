@@ -7,9 +7,10 @@
 
 namespace Drupal\taxonomy\Tests;
 
+use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\FieldItemListInterface;
+use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Language\Language;
-use Drupal\Core\Entity\Field\FieldInterface;
-use Drupal\Core\Entity\Field\FieldItemInterface;
 use Drupal\field\Tests\FieldUnitTestBase;
 
 /**
@@ -48,7 +49,7 @@ class TaxonomyTermReferenceItemTest extends FieldUnitTestBase {
       'name' => 'field_test_taxonomy',
       'entity_type' => 'entity_test',
       'type' => 'taxonomy_term_reference',
-      'cardinality' => FIELD_CARDINALITY_UNLIMITED,
+      'cardinality' => FieldDefinitionInterface::CARDINALITY_UNLIMITED,
       'settings' => array(
         'allowed_values' => array(
           array(
@@ -83,7 +84,7 @@ class TaxonomyTermReferenceItemTest extends FieldUnitTestBase {
     $entity->save();
 
     $entity = entity_load('entity_test', $entity->id());
-    $this->assertTrue($entity->field_test_taxonomy instanceof FieldInterface, 'Field implements interface.');
+    $this->assertTrue($entity->field_test_taxonomy instanceof FieldItemListInterface, 'Field implements interface.');
     $this->assertTrue($entity->field_test_taxonomy[0] instanceof FieldItemInterface, 'Field item implements interface.');
     $this->assertEqual($entity->field_test_taxonomy->target_id, $this->term->id());
     $this->assertEqual($entity->field_test_taxonomy->entity->name->value, $this->term->name->value);

@@ -16,15 +16,16 @@ use Drupal\Core\Annotation\Translation;
  *
  * @Block(
  *   id = "book_navigation",
- *   admin_label = @Translation("Book navigation")
+ *   admin_label = @Translation("Book navigation"),
+ *   category = @Translation("Menus")
  * )
  */
 class BookNavigationBlock extends BlockBase {
 
   /**
-   * Overrides \Drupal\block\BlockBase::settings().
+   * {@inheritdoc}
    */
-  public function settings() {
+  public function defaultConfiguration() {
     return array(
       'cache' => DRUPAL_CACHE_PER_PAGE | DRUPAL_CACHE_PER_ROLE,
       'block_mode' => "all pages",

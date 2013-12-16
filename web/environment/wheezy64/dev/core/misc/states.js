@@ -18,17 +18,17 @@ var states = Drupal.states = {
  */
 Drupal.behaviors.states = {
   attach: function (context, settings) {
-    var $context = $(context);
-    for (var selector in settings.states) {
-      if (settings.states.hasOwnProperty(selector)) {
-        for (var state in settings.states[selector]) {
-          if (settings.states[selector].hasOwnProperty(state)) {
-            new states.Dependent({
-              element: $context.find(selector),
-              state: states.State.sanitize(state),
-              constraints: settings.states[selector][state]
-            });
-          }
+    var $states = $(context).find('[data-drupal-states]');
+    var config, state;
+    for (var i = 0, il = $states.length; i < il; i += 1) {
+      config = JSON.parse($states[i].getAttribute('data-drupal-states'));
+      for (state in config) {
+        if (config.hasOwnProperty(state)) {
+          new states.Dependent({
+            element: $($states[i]),
+            state: states.State.sanitize(state),
+            constraints: config[state]
+          });
         }
       }
     }
@@ -517,10 +517,14 @@ $(document).bind('state:disabled', function(e) {
 $(document).bind('state:required', function(e) {
   if (e.trigger) {
     if (e.value) {
-      $(e.target).closest('.form-item, .form-wrapper').find('label').append('<abbr class="form-required" title="' + Drupal.t('This field is required.') + '">*</abbr>');
+      var $label = $(e.target).attr({ 'required': 'required', 'aria-required': 'aria-required' }).closest('.form-item, .form-wrapper').find('label');
+      // Avoids duplicate required markers on initialization.
+      if (!$label.find('.form-required').length) {
+        $label.append(Drupal.theme('requiredMarker'));
+      }
     }
     else {
-      $(e.target).closest('.form-item, .form-wrapper').find('label .form-required').remove();
+      $(e.target).removeAttr('required aria-required').closest('.form-item, .form-wrapper').find('label .form-required').remove();
     }
   }
 });
@@ -565,5 +569,11 @@ function invert (a, invertState) {
 function compare (a, b) {
   return (a === b) ? (typeof a === 'undefined' ? a : true) : (typeof a === 'undefined' || typeof b === 'undefined');
 }
+
+$.extend(Drupal.theme, {
+  requiredMarker: function () {
+    return '<abbr class="form-required" title="' + Drupal.t('This field is required.') + '">*</abbr>';
+  }
+});
 
 })(jQuery);

@@ -76,7 +76,7 @@ class ConfigEntityListTest extends WebTestBase {
     $actual_operations = $controller->getOperations($entity);
     // Sort the operations to normalize link order.
     uasort($actual_operations, 'drupal_sort_weight');
-    $this->assertIdentical($expected_operations, $actual_operations);
+    $this->assertIdentical($expected_operations, $actual_operations, 'The operations are identical.');
 
     // Test buildHeader() method.
     $expected_items = array(
@@ -149,7 +149,7 @@ class ConfigEntityListTest extends WebTestBase {
     $actual_operations = $controller->getOperations($entity);
     // Sort the operations to normalize link order.
     uasort($actual_operations, 'drupal_sort_weight');
-    $this->assertIdentical($expected_operations, $actual_operations);
+    $this->assertIdentical($expected_operations, $actual_operations, 'The operations are identical.');
   }
 
   /**
@@ -199,7 +199,7 @@ class ConfigEntityListTest extends WebTestBase {
       'id' => 'antelope',
       'weight' => 1,
     );
-    $this->drupalPost(NULL, $edit, t('Save'));
+    $this->drupalPostForm(NULL, $edit, t('Save'));
 
     // Ensure that the entity's sort method was called.
     $this->assertTrue(\Drupal::state()->get('config_entity_sort'), 'ConfigTest::sort() was called.');
@@ -216,7 +216,7 @@ class ConfigEntityListTest extends WebTestBase {
     $this->assertResponse(200);
     $this->assertTitle('Edit Antelope | Drupal');
     $edit = array('label' => 'Albatross', 'id' => 'albatross');
-    $this->drupalPost(NULL, $edit, t('Save'));
+    $this->drupalPostForm(NULL, $edit, t('Save'));
 
     // Confirm that the user is returned to the listing, and verify that the
     // text of the label and machine name appears in the list (versus elsewhere
@@ -229,7 +229,7 @@ class ConfigEntityListTest extends WebTestBase {
     $this->clickLink('Delete', 1);
     $this->assertResponse(200);
     $this->assertTitle('Are you sure you want to delete Albatross | Drupal');
-    $this->drupalPost(NULL, array(), t('Delete'));
+    $this->drupalPostForm(NULL, array(), t('Delete'));
 
     // Verify that the text of the label and machine name does not appear in
     // the list (though it may appear elsewhere on the page).
@@ -240,7 +240,7 @@ class ConfigEntityListTest extends WebTestBase {
     $this->clickLink('Delete');
     $this->assertResponse(200);
     $this->assertTitle('Are you sure you want to delete Default | Drupal');
-    $this->drupalPost(NULL, array(), t('Delete'));
+    $this->drupalPostForm(NULL, array(), t('Delete'));
 
     // Verify that the text of the label and machine name does not appear in
     // the list (though it may appear elsewhere on the page).

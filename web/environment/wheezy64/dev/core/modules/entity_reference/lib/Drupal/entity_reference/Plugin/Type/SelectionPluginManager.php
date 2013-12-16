@@ -11,7 +11,7 @@ use Drupal\Component\Plugin\Exception\PluginException;
 use Drupal\Component\Plugin\Factory\ReflectionFactory;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Entity\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Language\LanguageManager;
 use Drupal\Core\Plugin\DefaultPluginManager;
@@ -27,15 +27,14 @@ class SelectionPluginManager extends DefaultPluginManager {
    * {@inheritdoc}
    */
   public function __construct(\Traversable $namespaces, CacheBackendInterface $cache_backend, LanguageManager $language_manager, ModuleHandlerInterface $module_handler) {
-    $annotation_namespaces = array('Drupal\entity_reference\Annotation' => $namespaces['Drupal\entity_reference']);
-    $this->discovery = new AnnotatedClassDiscovery('Plugin/entity_reference/selection', $namespaces, $annotation_namespaces, 'Drupal\entity_reference\Annotation\EntityReferenceSelection');
+    $this->discovery = new AnnotatedClassDiscovery('Plugin/entity_reference/selection', $namespaces, 'Drupal\entity_reference\Annotation\EntityReferenceSelection');
 
     // We're not using the parent constructor because we use a different factory
     // method and don't need the derivative discovery decorator.
     $this->factory = new ReflectionFactory($this);
 
     $this->alterInfo($module_handler, 'entity_reference_selection');
-    $this->setCacheBackend($cache_backend, $language_manager, 'entity_reference_selection');
+    $this->setCacheBackend($cache_backend, $language_manager, 'entity_reference_selection_plugins');
   }
 
   /**
@@ -94,7 +93,7 @@ class SelectionPluginManager extends DefaultPluginManager {
   /**
    * Gets the selection handler for a given entity_reference field.
    *
-   * @param \Drupal\Core\Entity\Field\FieldDefinitionInterface $field_definition
+   * @param \Drupal\Core\Field\FieldDefinitionInterface $field_definition
    *   The field definition for the operation.
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity for the operation.

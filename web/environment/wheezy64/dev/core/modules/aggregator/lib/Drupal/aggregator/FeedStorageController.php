@@ -7,17 +7,16 @@
 
 namespace Drupal\aggregator;
 
-use Drupal\Core\Entity\DatabaseStorageControllerNG;
-use Drupal\aggregator\Entity\Feed;
-use Drupal\Core\Entity\EntityInterface;
+use Drupal\aggregator\FeedInterface;
+use Drupal\Core\Entity\FieldableDatabaseStorageController;
 
 /**
- * Controller class for aggregators feeds.
+ * Controller class for aggregator's feeds.
  *
  * This extends the Drupal\Core\Entity\DatabaseStorageController class, adding
  * required special handling for feed entities.
  */
-class FeedStorageController extends DatabaseStorageControllerNG implements FeedStorageControllerInterface {
+class FeedStorageController extends FieldableDatabaseStorageController implements FeedStorageControllerInterface {
 
   /**
    * Overrides Drupal\Core\Entity\DataBaseStorageController::attachLoad().
@@ -39,7 +38,7 @@ class FeedStorageController extends DatabaseStorageControllerNG implements FeedS
   /**
    * {@inheritdoc}
    */
-  public function saveCategories(Feed $feed, array $categories) {
+  public function saveCategories(FeedInterface $feed, array $categories) {
     foreach ($categories as $cid => $value) {
       if ($value) {
         $this->database->insert('aggregator_category_feed')
@@ -60,6 +59,20 @@ class FeedStorageController extends DatabaseStorageControllerNG implements FeedS
     $this->database->delete('aggregator_category_feed')
       ->condition('fid', array_keys($feeds))
       ->execute();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getFeedDuplicates(FeedInterface $feed) {
+    if ($feed->id()) {
+      $query = $this->database->query("SELECT title, url FROM {aggregator_feed} WHERE (title = :title OR url = :url) AND fid <> :fid", array(':title' => $feed->label(), ':url' => $feed->url->value, ':fid' => $feed->id()));
+    }
+    else {
+      $query = $this->database->query("SELECT title, url FROM {aggregator_feed} WHERE title = :title OR url = :url", array(':title' => $feed->label(), ':url' => $feed->url->value));
+    }
+
+    return $query->fetchAll();
   }
 
 }

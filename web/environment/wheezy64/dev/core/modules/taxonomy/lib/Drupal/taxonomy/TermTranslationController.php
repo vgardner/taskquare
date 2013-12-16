@@ -8,12 +8,12 @@
 namespace Drupal\taxonomy;
 
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\content_translation\ContentTranslationControllerNG;
+use Drupal\content_translation\ContentTranslationController;
 
 /**
  * Defines the translation controller class for terms.
  */
-class TermTranslationController extends ContentTranslationControllerNG {
+class TermTranslationController extends ContentTranslationController {
 
   /**
    * Overrides ContentTranslationController::entityFormAlter().
@@ -36,7 +36,8 @@ class TermTranslationController extends ContentTranslationControllerNG {
       // We need a redirect here, otherwise we would get an access denied page,
       // since the current URL would be preserved and we would try to add a
       // translation for a language that already has a translation.
-      $form_state['redirect'] = $this->getEditPath($entity);
+      $uri = $entity->uri('edit-form');
+      $form_state['redirect'] = $uri['path'];
     }
   }
 

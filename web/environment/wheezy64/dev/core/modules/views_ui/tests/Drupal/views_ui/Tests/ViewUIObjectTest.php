@@ -13,10 +13,6 @@ use Drupal\views\ViewExecutable;
 use Drupal\views_ui\ViewUI;
 use Symfony\Component\DependencyInjection\Container;
 
-if (!defined('DRUPAL_CORE_COMPATIBILITY')) {
-  define('DRUPAL_CORE_COMPATIBILITY', '8.x');
-}
-
 /**
  * Tests the ViewUI class.
  *
@@ -39,10 +35,8 @@ class ViewUIObjectTest extends UnitTestCase {
     $method_args = array();
     $method_args['setOriginalID'] = array(12);
     $method_args['setStatus'] = array(TRUE);
-    $method_args['setNewRevision'] = array(FALSE);
     $method_args['enforceIsNew'] = array(FALSE);
     $method_args['label'] = array(Language::LANGCODE_NOT_SPECIFIED);
-    $method_args['isDefaultRevision'] = array(TRUE);
 
     $reflection = new \ReflectionClass('Drupal\Core\Config\Entity\ConfigEntityInterface');
     $interface_methods = array();
@@ -51,7 +45,8 @@ class ViewUIObjectTest extends UnitTestCase {
 
       // EntityInterface::isNew() is missing from the list of methods, because it
       // calls id(), which breaks the ->expect($this->once()) call. Call it later.
-      if ($reflection_method->getName() != 'isNew') {
+      // EntityInterface::isSyncing() is only called during syncing process.
+      if ($reflection_method->getName() != 'isNew' && $reflection_method->getName() != 'isSyncing') {
         if (count($reflection_method->getParameters()) == 0) {
           $method_args[$reflection_method->getName()] = array();
         }

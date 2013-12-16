@@ -9,10 +9,10 @@ namespace Drupal\edit\Plugin\InPlaceEditor;
 
 use Drupal\edit\EditorBase;
 use Drupal\edit\Annotation\InPlaceEditor;
-use Drupal\Core\Entity\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\FieldDefinitionInterface;
 
 /**
- * Defines the form editor.
+ * Defines the form in-place editor.
  *
  * @InPlaceEditor(
  *   id = "form"
@@ -28,12 +28,12 @@ class FormEditor extends EditorBase {
   }
 
   /**
-   * Implements \Drupal\edit\EditPluginInterface::getAttachments().
+   * {@inheritdoc}
    */
   public function getAttachments() {
     return array(
       'library' => array(
-        array('edit', 'edit.editorWidget.form'),
+        array('edit', 'edit.inPlaceEditor.form'),
       ),
     );
   }

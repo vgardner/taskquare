@@ -13,7 +13,6 @@ use Drupal\Core\Cache\Cache;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Form\ConfirmFormBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Provides the comment multiple delete confirmation form.
@@ -56,7 +55,7 @@ class ConfirmDeleteMultiple extends ConfirmFormBase implements ContainerInjectio
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'comment_multiple_delete_confirm';
   }
 
@@ -70,8 +69,7 @@ class ConfirmDeleteMultiple extends ConfirmFormBase implements ContainerInjectio
   /**
    * {@inheritdoc}
    */
-  public function getCancelPath() {
-    return 'admin/content/comment';
+  public function getCancelRoute() {
   }
 
   /**
@@ -84,7 +82,7 @@ class ConfirmDeleteMultiple extends ConfirmFormBase implements ContainerInjectio
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, array &$form_state, Request $request = NULL) {
+  public function buildForm(array $form, array &$form_state) {
     $edit = $form_state['input'];
 
     $form['comments'] = array(
@@ -109,10 +107,14 @@ class ConfirmDeleteMultiple extends ConfirmFormBase implements ContainerInjectio
 
     if (!$comment_counter) {
       drupal_set_message($this->t('There do not appear to be any comments to delete, or your selected comment was deleted by another administrator.'));
-      $form_state['redirect'] = 'admin/content/comment';
+      $form_state['redirect_route']['route_name'] = 'comment.admin';
     }
 
-    return parent::buildForm($form, $form_state, $request);
+    $form = parent::buildForm($form, $form_state);
+
+    // @todo Convert to getCancelRoute() after http://drupal.org/node/1986606.
+    $form['actions']['cancel']['#href'] = 'admin/content/comment';
+    return $form;
   }
 
   /**
@@ -126,7 +128,7 @@ class ConfirmDeleteMultiple extends ConfirmFormBase implements ContainerInjectio
       watchdog('content', 'Deleted @count comments.', array('@count' => $count));
       drupal_set_message(format_plural($count, 'Deleted 1 comment.', 'Deleted @count comments.'));
     }
-    $form_state['redirect'] = 'admin/content/comment';
+    $form_state['redirect_route']['route_name'] = 'comment.admin';
   }
 
 }

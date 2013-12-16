@@ -49,10 +49,9 @@ class EntityDisplayModeController implements ContainerInjectionInterface {
    *   A list of entity types to add a view mode for.
    */
   public function viewModeTypeSelection() {
-    drupal_set_title(t('Choose view mode entity type'));
     $entity_types = array();
     foreach ($this->entityManager->getDefinitions() as $entity_type => $entity_info) {
-      if ($entity_info['fieldable'] && isset($entity_info['controllers']['render'])) {
+      if ($entity_info['fieldable'] && isset($entity_info['controllers']['view_builder'])) {
         $entity_types[$entity_type] = array(
           'title' => $entity_info['label'],
           'href' => 'admin/structure/display-modes/view/add/' . $entity_type,
@@ -73,7 +72,6 @@ class EntityDisplayModeController implements ContainerInjectionInterface {
    *   A list of entity types to add a form mode for.
    */
   public function formModeTypeSelection() {
-    drupal_set_title(t('Choose form mode entity type'));
     $entity_types = array();
     foreach ($this->entityManager->getDefinitions() as $entity_type => $entity_info) {
       if ($entity_info['fieldable'] && isset($entity_info['controllers']['form'])) {

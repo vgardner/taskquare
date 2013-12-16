@@ -21,12 +21,11 @@ use Drupal\Component\Plugin\ConfigurablePluginInterface;
  * @EntityType(
  *   id = "action",
  *   label = @Translation("Action"),
- *   module = "system",
  *   controllers = {
  *     "storage" = "Drupal\Core\Config\Entity\ConfigStorageController",
- *     "access" = "Drupal\action\ActionAccessController"
  *   },
- *   config_prefix = "action.action",
+ *   admin_permission = "administer actions",
+ *   config_prefix = "system.action",
  *   entity_keys = {
  *     "id" = "id",
  *     "label" = "label",
@@ -106,7 +105,7 @@ class Action extends ConfigEntityBase implements ActionConfigEntityInterface {
    */
   public function setPlugin($plugin_id) {
     $this->plugin = $plugin_id;
-    $this->pluginBag->addInstanceID($plugin_id);
+    $this->pluginBag->addInstanceId($plugin_id);
   }
 
   /**
@@ -140,19 +139,6 @@ class Action extends ConfigEntityBase implements ActionConfigEntityInterface {
   /**
    * {@inheritdoc}
    */
-  public function uri() {
-    return array(
-      'path' => 'admin/config/system/actions/configure/' . $this->id(),
-      'options' => array(
-        'entity_type' => $this->entityType,
-        'entity' => $this,
-      ),
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public static function sort($a, $b) {
     $a_type = $a->getType();
     $b_type = $b->getType();
@@ -178,10 +164,12 @@ class Action extends ConfigEntityBase implements ActionConfigEntityInterface {
     return $properties;
   }
 
-    /**
+  /**
    * {@inheritdoc}
    */
   public function preSave(EntityStorageControllerInterface $storage_controller) {
+    parent::preSave($storage_controller);
+
     $plugin = $this->getPlugin();
     // If this plugin has any configuration, ensure that it is set.
     if ($plugin instanceof ConfigurablePluginInterface) {

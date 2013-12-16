@@ -8,8 +8,6 @@
 namespace Drupal\views\Plugin\views\relationship;
 
 use Drupal\Core\Database\Query\AlterableInterface;
-use Drupal\views\ViewExecutable;
-use Drupal\Component\Annotation\PluginID;
 use Drupal\views\Views;
 
 /**
@@ -65,7 +63,7 @@ use Drupal\views\Views;
 class GroupwiseMax extends RelationshipPluginBase {
 
   /**
-   * Defines default values for options.
+   * {@inheritdoc}
    */
   protected function defineOptions() {
     $options = parent::defineOptions();
@@ -81,8 +79,7 @@ class GroupwiseMax extends RelationshipPluginBase {
   }
 
   /**
-   * Extends the relationship's basic options, allowing the user to pick
-   * a sort and an order for it.
+   * {@inheritdoc}
    */
   public function buildOptionsForm(&$form, &$form_state) {
     parent::buildOptionsForm($form, $form_state);
@@ -94,6 +91,8 @@ class GroupwiseMax extends RelationshipPluginBase {
     }
     $base_table_data = Views::viewsData()->get($this->definition['base']);
 
+    // Extends the relationship's basic options, allowing the user to pick a
+    // sort and an order for it.
     $form['subquery_sort'] = array(
       '#type' => 'select',
       '#title' => t('Representative sort criteria'),
@@ -218,8 +217,6 @@ class GroupwiseMax extends RelationshipPluginBase {
     $temp_view->args[] = '**CORRELATED**';
 
     // Add the base table ID field.
-    $views_data = Views::viewsData()->get($this->definition['base']);
-    $base_field = $views_data['table']['base']['field'];
     $temp_view->addItem('default', 'field', $this->definition['base'], $this->definition['field']);
 
     $relationship_id = NULL;
@@ -245,7 +242,7 @@ class GroupwiseMax extends RelationshipPluginBase {
 
     // Workaround until http://drupal.org/node/844910 is fixed:
     // Remove all fields from the SELECT except the base id.
-    $fields =& $subquery->getFields();
+    $fields = &$subquery->getFields();
     foreach (array_keys($fields) as $field_name) {
       // The base id for this subquery is stored in our definition.
       if ($field_name != $this->definition['field']) {
@@ -255,7 +252,7 @@ class GroupwiseMax extends RelationshipPluginBase {
 
     // Make every alias in the subquery safe within the outer query by
     // appending a namespace to it, '_inner' by default.
-    $tables =& $subquery->getTables();
+    $tables = &$subquery->getTables();
     foreach (array_keys($tables) as $table_name) {
       $tables[$table_name]['alias'] .= $this->subquery_namespace;
       // Namespace the join on every table.
@@ -269,13 +266,13 @@ class GroupwiseMax extends RelationshipPluginBase {
       $fields[$field_name]['alias'] .= $this->subquery_namespace;
     }
     // Namespace conditions.
-    $where =& $subquery->conditions();
+    $where = &$subquery->conditions();
     $this->alterSubqueryCondition($subquery, $where);
     // Not sure why, but our sort order clause doesn't have a table.
     // TODO: the call to add_item() above to add the sort handler is probably
     // wrong -- needs attention from someone who understands it.
     // In the meantime, this works, but with a leap of faith...
-    $orders =& $subquery->getOrderBy();
+    $orders = &$subquery->getOrderBy();
     foreach ($orders as $order_key => $order) {
       // But if we're using a whole view, we don't know what we have!
       if ($options['subquery_view']) {
@@ -317,7 +314,7 @@ class GroupwiseMax extends RelationshipPluginBase {
           $condition['field'] = $this->conditionNamespace($condition['field']);
         }
         elseif (is_object($condition['field'])) {
-          $sub_conditions =& $condition['field']->conditions();
+          $sub_conditions = &$condition['field']->conditions();
           $this->alterSubqueryCondition($query, $sub_conditions);
         }
       }
@@ -334,9 +331,7 @@ class GroupwiseMax extends RelationshipPluginBase {
   }
 
   /**
-   * Called to implement a relationship in a query.
-   * This is mostly a copy of our parent's query() except for this bit with
-   * the join class.
+   * {@inheritdoc}
    */
   public function query() {
     // Figure out what base table this relationship brings to the party.

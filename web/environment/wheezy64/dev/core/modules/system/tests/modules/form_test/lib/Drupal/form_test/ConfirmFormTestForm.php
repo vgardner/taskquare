@@ -17,7 +17,7 @@ class ConfirmFormTestForm extends ConfirmFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'form_test_confirm_test_form';
   }
 
@@ -31,8 +31,10 @@ class ConfirmFormTestForm extends ConfirmFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getCancelPath() {
-    return 'admin';
+  public function getCancelRoute() {
+    return array(
+      'route_name' => 'system.admin',
+    );
   }
 
   /**
@@ -70,7 +72,7 @@ class ConfirmFormTestForm extends ConfirmFormBase {
    */
   public function submitForm(array &$form, array &$form_state) {
     drupal_set_message($this->t('The ConfirmFormTestForm::submitForm() method was used for this form.'));
-    $form_state['redirect'] = '';
+    $form_state['redirect_route']['route_name'] = '<front>';
   }
 
 }

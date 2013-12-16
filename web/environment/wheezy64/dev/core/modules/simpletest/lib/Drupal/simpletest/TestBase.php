@@ -18,8 +18,7 @@ use Drupal\Core\Config\StorageInterface;
 use Drupal\Core\DrupalKernel;
 use Drupal\Core\Language\Language;
 use Drupal\Core\StreamWrapper\PublicStream;
-use ReflectionMethod;
-use ReflectionObject;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Base class for Drupal tests.
@@ -196,6 +195,30 @@ abstract class TestBase {
   public function __construct($test_id = NULL) {
     $this->testId = $test_id;
   }
+
+  /**
+   * Provides meta information about this test case, such as test name.
+   *
+   * @return array
+   *   An array of untranslated strings with the following keys:
+   *   - name: An overview of what is tested by the class; for example, "User
+   *     access rules".
+   *   - description: One sentence describing the test, starting with a verb.
+   *   - group: The human-readable name of the module ("Node", "Statistics"), or
+   *     the human-readable name of the Drupal facility tested (e.g. "Form API"
+   *     or "XML-RPC").
+   */
+  public static function getInfo() {
+    // PHP does not allow us to declare this method as abstract public static,
+    // so we simply throw an exception here if this has not been implemented by
+    // a child class.
+    throw new \RuntimeException("Sub-class must implement the getInfo method!");
+  }
+
+  /**
+   * Performs setup tasks before each individual test method is run.
+   */
+  abstract protected function setUp();
 
   /**
    * Checks the matching requirements for Test.
@@ -741,7 +764,7 @@ abstract class TestBase {
     }
     $missing_requirements = $this->checkRequirements();
     if (!empty($missing_requirements)) {
-      $missing_requirements_object = new ReflectionObject($this);
+      $missing_requirements_object = new \ReflectionObject($this);
       $caller = array(
         'file' => $missing_requirements_object->getFileName(),
       );
@@ -750,12 +773,15 @@ abstract class TestBase {
       }
     }
     else {
+      if (defined("$class::SORT_METHODS")) {
+        sort($class_methods);
+      }
       foreach ($class_methods as $method) {
         // If the current method starts with "test", run it - it's a test.
         if (strtolower(substr($method, 0, 4)) == 'test') {
           // Insert a fail record. This will be deleted on completion to ensure
           // that testing completed.
-          $method_info = new ReflectionMethod($class, $method);
+          $method_info = new \ReflectionMethod($class, $method);
           $caller = array(
             'file' => $method_info->getFileName(),
             'line' => $method_info->getStartLine(),
@@ -887,7 +913,7 @@ abstract class TestBase {
     $this->originalConf = $conf;
 
     // Backup statics and globals.
-    $this->originalContainer = clone drupal_container();
+    $this->originalContainer = clone \Drupal::getContainer();
     $this->originalLanguage = $language_interface;
     $this->originalConfigDirectories = $GLOBALS['config_directories'];
     if (isset($GLOBALS['theme_key'])) {
@@ -945,6 +971,13 @@ abstract class TestBase {
      // @todo Remove this once this class has no calls to t() and format_plural()
     $this->container->register('string_translation', 'Drupal\Core\StringTranslation\TranslationManager');
 
+    // Register info parser.
+    $this->container->register('info_parser', 'Drupal\Core\Extension\InfoParser');
+
+    $request = Request::create('/');
+    $this->container->set('request', $request);
+    $this->container->set('current_user', $GLOBALS['user']);
+
     \Drupal::setContainer($this->container);
 
     // Unset globals.
@@ -991,7 +1024,7 @@ abstract class TestBase {
   }
 
   /**
-   * Rebuild Drupal::getContainer().
+   * Rebuild \Drupal::getContainer().
    *
    * Use this to build a new kernel and service container. For example, when the
    * list of enabled modules is changed via the internal browser, in which case
@@ -1002,21 +1035,27 @@ abstract class TestBase {
    * @see TestBase::tearDown()
    *
    * @todo Fix http://drupal.org/node/1708692 so that module enable/disable
-   *   changes are immediately reflected in Drupal::getContainer(). Until then,
+   *   changes are immediately reflected in \Drupal::getContainer(). Until then,
    *   tests can invoke this workaround when requiring services from newly
    *   enabled modules to be immediately available in the same request.
    */
   protected function rebuildContainer() {
+    // Preserve the request object after the container rebuild.
+    $request = \Drupal::request();
+
     $this->kernel = new DrupalKernel('testing', drupal_classloader(), FALSE);
     $this->kernel->boot();
-    // DrupalKernel replaces the container in Drupal::getContainer() with a
+    // DrupalKernel replaces the container in \Drupal::getContainer() with a
     // different object, so we need to replace the instance on this test class.
     $this->container = \Drupal::getContainer();
     // The global $user is set in TestBase::prepareEnvironment().
-    $this->container->get('request')->attributes->set('_account', $GLOBALS['user']);
+    $this->container->set('request', $request);
+    $this->container->set('current_user', $GLOBALS['user']);
   }
 
   /**
+   * Performs cleanup tasks after each individual test method has been run.
+   *
    * Deletes created files, database tables, and reverts environment changes.
    *
    * This method needs to be invoked for both unit and integration tests.
@@ -1034,6 +1073,15 @@ abstract class TestBase {
     // In that case, all functions are still operating on the test environment,
     // which means they may need to access its filesystem and database.
     drupal_static_reset();
+
+    if ($this->container->has('state') && $state = $this->container->get('state')) {
+      $captured_emails = $state->get('system.test_email_collector') ?: array();
+      $emailCount = count($captured_emails);
+      if ($emailCount) {
+        $message = format_plural($emailCount, '1 e-mail was sent during this test.', '@count e-mails were sent during this test.');
+        $this->pass($message, t('E-mail'));
+      }
+    }
 
     // Ensure that TestBase::changeDatabasePrefix() has run and TestBase::$setup
     // was not tricked into TRUE, since the following code would delete the
@@ -1056,14 +1104,6 @@ abstract class TestBase {
     // In case a fatal error occurred that was not in the test process read the
     // log to pick up any fatal errors.
     simpletest_log_read($this->testId, $this->databasePrefix, get_class($this), TRUE);
-    if (($container = drupal_container()) && $container->has('keyvalue')) {
-      $captured_emails = \Drupal::state()->get('system.test_email_collector') ?: array();
-      $emailCount = count($captured_emails);
-      if ($emailCount) {
-        $message = format_plural($emailCount, '1 e-mail was sent during this test.', '@count e-mails were sent during this test.');
-        $this->pass($message, t('E-mail'));
-      }
-    }
 
     // Delete temporary files directory.
     file_unmanaged_delete_recursive($this->originalFileDirectory . '/simpletest/' . substr($this->databasePrefix, 10), array($this, 'filePreDeleteCallback'));
@@ -1359,7 +1399,8 @@ abstract class TestBase {
         $this->container->get('event_dispatcher'),
         $this->container->get('config.factory'),
         $this->container->get('entity.manager'),
-        $this->container->get('lock')
+        $this->container->get('lock'),
+        $this->container->get('uuid')
       );
     }
     // Always recalculate the changelist when called.

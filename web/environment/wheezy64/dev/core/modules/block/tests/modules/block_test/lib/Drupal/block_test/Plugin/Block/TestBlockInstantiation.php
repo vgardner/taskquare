@@ -10,6 +10,7 @@ namespace Drupal\block_test\Plugin\Block;
 use Drupal\block\BlockBase;
 use Drupal\block\Annotation\Block;
 use Drupal\Core\Annotation\Translation;
+use Drupal\Core\Session\AccountInterface;
 
 /**
  * Provides a basic block for testing block instantiation and configuration.
@@ -24,7 +25,7 @@ class TestBlockInstantiation extends BlockBase {
   /**
    * {@inheritdoc}
    */
-  public function settings() {
+  public function defaultConfiguration() {
     return array(
       'display_message' => 'no message set',
     );
@@ -33,8 +34,8 @@ class TestBlockInstantiation extends BlockBase {
   /**
    * {@inheritdoc}
    */
-  public function access() {
-    return user_access('access content');
+  public function access(AccountInterface $account) {
+    return $account->hasPermission('access content');
   }
 
   /**

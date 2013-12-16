@@ -59,7 +59,7 @@ class Config {
   /**
    * The storage used to load and save this configuration object.
    *
-   * @var Drupal\Core\Config\StorageInterface
+   * @var \Drupal\Core\Config\StorageInterface
    */
   protected $storage;
 
@@ -71,7 +71,7 @@ class Config {
   protected $context;
 
   /**
-   * Whether the config object has already been loaded.
+   * Whether the configuration object has already been loaded.
    *
    * @var bool
    */
@@ -97,7 +97,7 @@ class Config {
   /**
    * Initializes a configuration object.
    *
-   * @return Drupal\Core\Config\Config
+   * @return \Drupal\Core\Config\Config
    *   The configuration object.
    */
   public function init() {
@@ -113,7 +113,7 @@ class Config {
    * @param array $data
    *   Array of loaded data for this configuration object.
    *
-   * @return Drupal\Core\Config\Config
+   * @return \Drupal\Core\Config\Config
    *   The configuration object.
    */
   public function initWithData(array $data) {
@@ -139,7 +139,10 @@ class Config {
   /**
    * Sets the name of this configuration object.
    *
-   * @return Drupal\Core\Config\Config
+   * @param string $name
+   *  The name of the configuration object.
+   *
+   * @return \Drupal\Core\Config\Config
    *   The configuration object.
    */
   public function setName($name) {
@@ -149,6 +152,9 @@ class Config {
 
   /**
    * Validates the configuration object name.
+   *
+   * @param string $name
+   *  The name of the configuration object.
    *
    * @throws \Drupal\Core\Config\ConfigNameException
    *
@@ -182,7 +188,7 @@ class Config {
    * Returns whether this configuration object is new.
    *
    * @return bool
-   *   TRUE if this config object does not exist in storage.
+   *   TRUE if this configuration object does not exist in storage.
    */
   public function isNew() {
     if (!$this->isLoaded) {
@@ -192,11 +198,11 @@ class Config {
   }
 
   /**
-   * Gets data from this config object.
+   * Gets data from this configuration object.
    *
    * @param string $key
    *   A string that maps to a key within the configuration data.
-   *   For instance in the following configuation array:
+   *   For instance in the following configuration array:
    *   @code
    *   array(
    *     'foo' => array(
@@ -207,13 +213,6 @@ class Config {
    *   A key of 'foo.bar' would return the string 'baz'. However, a key of 'foo'
    *   would return array('bar' => 'baz').
    *   If no key is specified, then the entire data array is returned.
-   *
-   * The configuration system does not retain data types. Every saved value is
-   * casted to a string. In most cases this is not an issue; however, it can
-   * cause issues with Booleans, which are casted to "1" (TRUE) or "0" (FALSE).
-   * In particular, code relying on === or !== will no longer function properly.
-   *
-   * @see http://php.net/manual/language.operators.comparison.php
    *
    * @return mixed
    *   The data that was requested.
@@ -246,7 +245,7 @@ class Config {
    * @param array $data
    *   The new configuration data.
    *
-   * @return Drupal\Core\Config\Config
+   * @return \Drupal\Core\Config\Config
    *   The configuration object.
    */
   public function setData(array $data) {
@@ -266,7 +265,7 @@ class Config {
    * @param array $data
    *   The new configuration data.
    *
-   * @return Drupal\Core\Config\Config
+   * @return \Drupal\Core\Config\Config
    *   The configuration object.
    */
   protected function replaceData(array $data) {
@@ -283,7 +282,7 @@ class Config {
    * @param array $data
    *   The overridden values of the configuration data.
    *
-   * @return Drupal\Core\Config\Config
+   * @return \Drupal\Core\Config\Config
    *   The configuration object.
    */
   public function setOverride(array $data) {
@@ -297,7 +296,7 @@ class Config {
    *
    * Merges overridden configuration data into the original data.
    *
-   * @return Drupal\Core\Config\Config
+   * @return \Drupal\Core\Config\Config
    *   The configuration object.
    */
   protected function setOverriddenData() {
@@ -315,7 +314,7 @@ class Config {
    * This method should be called after the original data or the overridden data
    * has been changed.
    *
-   * @return Drupal\Core\Config\Config
+   * @return \Drupal\Core\Config\Config
    *   The configuration object.
    */
   protected function resetOverriddenData() {
@@ -324,22 +323,20 @@ class Config {
   }
 
   /**
-   * Sets value in this config object.
+   * Sets a value in this configuration object.
    *
    * @param string $key
-   *   Identifier to store value in config.
-   * @param string $value
+   *   Identifier to store value in configuration.
+   * @param mixed $value
    *   Value to associate with identifier.
    *
-   * @return Drupal\Core\Config\Config
+   * @return \Drupal\Core\Config\Config
    *   The configuration object.
    */
   public function set($key, $value) {
     if (!$this->isLoaded) {
       $this->load();
     }
-    // Type-cast value into a string.
-    $value = $this->castValue($value);
 
     // The dot/period is a reserved character; it may appear between keys, but
     // not within keys.
@@ -355,52 +352,12 @@ class Config {
   }
 
   /**
-   * Casts a saved value to a string.
-   *
-   * The configuration system only saves strings or arrays. Any scalar
-   * non-string value is cast to a string. The one exception is boolean FALSE
-   * which would normally become '' when cast to a string, but is manually
-   * cast to '0' here for convenience and consistency.
-   *
-   * Any non-scalar value that is not an array (aka objects) gets cast
-   * to an array.
-   *
-   * @param mixed $value
-   *   A value being saved into the configuration system.
-   *
-   * @return string
-   *   The value cast to a string or array.
-   */
-  public function castValue($value) {
-    if (is_scalar($value) || $value === NULL) {
-      // Handle special case of FALSE, which should be '0' instead of ''.
-      if ($value === FALSE) {
-        $value = '0';
-      }
-      else {
-        $value = (string) $value;
-      }
-    }
-    else {
-      // Any non-scalar value must be an array.
-      if (!is_array($value)) {
-        $value = (array) $value;
-      }
-      // Recurse into any nested keys.
-      foreach ($value as $key => $nested_value) {
-        $value[$key] = $this->castValue($nested_value);
-      }
-    }
-    return $value;
-  }
-
-  /**
-   * Unsets value in this config object.
+   * Unsets a value in this configuration object.
    *
    * @param string $key
    *   Name of the key whose value should be unset.
    *
-   * @return Drupal\Core\Config\Config
+   * @return \Drupal\Core\Config\Config
    *   The configuration object.
    */
   public function clear($key) {
@@ -421,7 +378,7 @@ class Config {
   /**
    * Loads configuration data into this object.
    *
-   * @return Drupal\Core\Config\Config
+   * @return \Drupal\Core\Config\Config
    *   The configuration object.
    */
   public function load() {
@@ -443,7 +400,7 @@ class Config {
   /**
    * Saves the configuration object.
    *
-   * @return Drupal\Core\Config\Config
+   * @return \Drupal\Core\Config\Config
    *   The configuration object.
    */
   public function save() {
@@ -461,7 +418,7 @@ class Config {
   /**
    * Deletes the configuration object.
    *
-   * @return Drupal\Core\Config\Config
+   * @return \Drupal\Core\Config\Config
    *   The configuration object.
    */
   public function delete() {
@@ -475,7 +432,7 @@ class Config {
   }
 
   /**
-   * Retrieve the storage used to load and save this configuration object.
+   * Retrieves the storage used to load and save this configuration object.
    *
    * @return \Drupal\Core\Config\StorageInterface
    *   The configuration storage object.
@@ -485,7 +442,10 @@ class Config {
   }
 
   /**
-   * Dispatch a config event.
+   * Dispatches a configuration event.
+   *
+   * @param string $config_event_name
+   *   The configuration event name.
    */
   protected function notify($config_event_name) {
     $this->context->notify($config_event_name, $this);
@@ -504,7 +464,7 @@ class Config {
     if (!$this->isLoaded) {
       $this->load();
     }
-    // Preserve integer keys so that config keys are not changed.
+    // Preserve integer keys so that configuration keys are not changed.
     $this->replaceData(NestedArray::mergeDeepArray(array($this->data, $data_to_merge), TRUE));
     return $this;
   }

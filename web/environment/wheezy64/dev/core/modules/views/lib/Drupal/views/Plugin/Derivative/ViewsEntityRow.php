@@ -7,8 +7,8 @@
 
 namespace Drupal\views\Plugin\Derivative;
 
+use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Plugin\Discovery\ContainerDerivativeInterface;
-use Drupal\Core\Entity\EntityManager;
 use Drupal\views\ViewsData;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -38,7 +38,7 @@ class ViewsEntityRow implements ContainerDerivativeInterface {
   /**
    * The entity manager.
    *
-   * @var \Drupal\Core\Entity\EntityManager
+   * @var \Drupal\Core\Entity\EntityManagerInterface
    */
   protected $entityManager;
 
@@ -50,16 +50,16 @@ class ViewsEntityRow implements ContainerDerivativeInterface {
   protected $viewsData;
 
   /**
-   * Constructs a ViewsBlock object.
+   * Constructs a ViewsEntityRow object.
    *
    * @param string $base_plugin_id
    *   The base plugin ID.
-   * @param \Drupal\Core\Entity\EntityManager $entity_manager
+   * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
    *   The entity manager.
    * @param \Drupal\views\ViewsData $views_data
    *   The views data service.
    */
-  public function __construct($base_plugin_id, EntityManager $entity_manager, ViewsData $views_data) {
+  public function __construct($base_plugin_id, EntityManagerInterface $entity_manager, ViewsData $views_data) {
     $this->basePluginId = $base_plugin_id;
     $this->entityManager = $entity_manager;
     $this->viewsData = $views_data;
@@ -93,10 +93,10 @@ class ViewsEntityRow implements ContainerDerivativeInterface {
   public function getDerivativeDefinitions(array $base_plugin_definition) {
     foreach ($this->entityManager->getDefinitions() as $entity_type => $entity_info) {
       // Just add support for entity types which have a views integration.
-      if (isset($entity_info['base_table']) && $this->viewsData->get($entity_info['base_table']) && $this->entityManager->hasController($entity_type, 'render')) {
+      if (isset($entity_info['base_table']) && $this->viewsData->get($entity_info['base_table']) && $this->entityManager->hasController($entity_type, 'view_builder')) {
         $this->derivatives[$entity_type] = array(
           'id' => 'entity:' . $entity_type,
-          'module' => 'views',
+          'provider' => 'views',
           'title' => $entity_info['label'],
           'help' => t('Display the @label', array('@label' => $entity_info['label'])),
           'base' => array($entity_info['base_table']),

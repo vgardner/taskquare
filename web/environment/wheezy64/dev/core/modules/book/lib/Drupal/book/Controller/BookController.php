@@ -61,8 +61,8 @@ class BookController implements ContainerInjectionInterface {
   /**
    * Returns an administrative overview of all books.
    *
-   * @return string
-   *   A HTML-formatted string with the administrative page content.
+   * @return array
+   *   A render array representing the administrative page content.
    *
    */
   public function adminOverview() {
@@ -77,7 +77,8 @@ class BookController implements ContainerInjectionInterface {
       $links = array();
       $links['edit'] = array(
         'title' => t('Edit order and titles'),
-        'href' => 'admin/structure/book/' . $book['nid'],
+        'route_name' => 'book.admin_edit',
+        'route_parameters' => array('node' => $book['nid']),
       );
       $row[] = array(
         'data' => array(
@@ -98,8 +99,8 @@ class BookController implements ContainerInjectionInterface {
   /**
    * Prints a listing of all books.
    *
-   * @return string
-   *   A HTML-formatted string with the listing of all books content.
+   * @return array
+   *   A render array representing the listing of all books content.
    */
   public function bookRender() {
     $book_list = array();

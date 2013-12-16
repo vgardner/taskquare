@@ -7,7 +7,7 @@
 
 namespace Drupal\edit;
 
-use Drupal\Core\Entity\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\FieldDefinitionInterface;
 
 /**
  * Interface for selecting an in-place editor (an Editor plugin) for a field.
@@ -19,12 +19,12 @@ interface EditorSelectorInterface {
    *
    * @param string $formatter_type
    *   The field's formatter type name.
-   * @param \Drupal\Core\Entity\Field\FieldDefinitionInterface $field_definition
+   * @param \Drupal\Core\Field\FieldDefinitionInterface $instance
    *   The field definition.
    * @param array $items
    *   The field's item values.
    *
-   * @return string|NULL
+   * @return string|null
    *   The editor to use, or NULL to not enable in-place editing.
    */
   public function getEditor($formatter_type, FieldDefinitionInterface $instance, array $items);

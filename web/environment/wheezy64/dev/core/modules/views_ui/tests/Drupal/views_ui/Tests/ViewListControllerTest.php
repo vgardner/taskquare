@@ -5,8 +5,7 @@
  * Contains \Drupal\views_ui\Tests\ViewListControllerTest
  */
 
-namespace Drupal\views_ui\Tests {
-
+namespace Drupal\views_ui\Tests;
 
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Tests\UnitTestCase;
@@ -77,9 +76,11 @@ class ViewListControllerTest extends UnitTestCase {
       array('initDisplay'),
       array(array(), 'default', $display_manager->getDefinition('default'))
     );
+    $route_provider = $this->getMock('Drupal\Core\Routing\RouteProviderInterface');
+    $state = $this->getMock('\Drupal\Core\KeyValueStore\KeyValueStoreInterface');
     $page_display = $this->getMock('Drupal\views\Plugin\views\display\Page',
       array('initDisplay', 'getPath'),
-      array(array(), 'default', $display_manager->getDefinition('page'))
+      array(array(), 'default', $display_manager->getDefinition('page'), $route_provider, $state)
     );
     $page_display->expects($this->any())
       ->method('getPath')
@@ -116,6 +117,7 @@ class ViewListControllerTest extends UnitTestCase {
     $executable_factory = new ViewExecutableFactory();
     $container->set('views.executable', $executable_factory);
     $container->set('plugin.manager.views.display', $display_manager);
+    $container->set('string_translation', $this->getStringTranslationStub());
     \Drupal::setContainer($container);
 
     $module_handler = $this->getMockBuilder('Drupal\Core\Extension\ModuleHandler')
@@ -137,15 +139,4 @@ class ViewListControllerTest extends UnitTestCase {
     $this->assertEquals($row['data']['path'], '/test_page', 'The path of the page display is not added.');
   }
 
-}
-
-}
-
-// @todo Remove this once t() is converted to a service.
-namespace {
-  if (!function_exists('t')) {
-    function t($string) {
-      return $string;
-    }
-  }
 }

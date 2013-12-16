@@ -7,6 +7,8 @@
 
 namespace Drupal\system\Tests\Ajax;
 
+use Drupal\Core\Field\FieldDefinitionInterface;
+
 /**
  * Tests Ajax-enabled forms functionality with multiple instances of the form.
  */
@@ -38,7 +40,7 @@ class MultiFormTest extends AjaxTestBase {
       'name' => $field_name,
       'entity_type' => 'node',
       'type' => 'text',
-      'cardinality' => FIELD_CARDINALITY_UNLIMITED,
+      'cardinality' => FieldDefinitionInterface::CARDINALITY_UNLIMITED,
     ))->save();
     entity_create('field_instance', array(
       'field_name' => $field_name,
@@ -75,7 +77,7 @@ class MultiFormTest extends AjaxTestBase {
     // of field items and "add more" button for the multi-valued field within
     // each form.
     $this->drupalGet('form-test/two-instances-of-same-form');
-    foreach ($field_xpaths as $form_html_id => $field_xpath) {
+    foreach ($field_xpaths as $field_xpath) {
       $this->assert(count($this->xpath($field_xpath . $field_items_xpath_suffix)) == 1, 'Found the correct number of field items on the initial page.');
       $this->assertFieldByXPath($field_xpath . $button_xpath_suffix, NULL, 'Found the "add more" button on the initial page.');
     }
@@ -85,7 +87,7 @@ class MultiFormTest extends AjaxTestBase {
     // page update, ensure the same as above.
     foreach ($field_xpaths as $form_html_id => $field_xpath) {
       for ($i = 0; $i < 2; $i++) {
-        $this->drupalPostAJAX(NULL, array(), array($button_name => $button_value), 'system/ajax', array(), array(), $form_html_id);
+        $this->drupalPostAjaxForm(NULL, array(), array($button_name => $button_value), 'system/ajax', array(), array(), $form_html_id);
         $this->assert(count($this->xpath($field_xpath . $field_items_xpath_suffix)) == $i+2, 'Found the correct number of field items after an AJAX submission.');
         $this->assertFieldByXPath($field_xpath . $button_xpath_suffix, NULL, 'Found the "add more" button after an AJAX submission.');
         $this->assertNoDuplicateIds(t('Updated page contains unique IDs'), 'Other');

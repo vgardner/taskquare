@@ -17,13 +17,6 @@ use Drupal\Component\Annotation\Plugin;
 class EntityType extends Plugin {
 
   /**
-   * The name of the module providing the type.
-   *
-   * @var string
-   */
-  public $module;
-
-  /**
    * The name of the entity type class.
    *
    * This is not provided manually, it will be added by the discovery mechanism.
@@ -57,7 +50,7 @@ class EntityType extends Plugin {
    * - list: The name of the class that provides listings of the entities. The
    *   class must implement \Drupal\Core\Entity\EntityListControllerInterface.
    * - render: The name of the class that is used to render the entities. The
-   *   class must implement \Drupal\Core\Entity\EntityRenderControllerInterface.
+   *   class must implement \Drupal\Core\Entity\EntityViewBuilderInterface.
    * - access: The name of the class that is used for access checks. The class
    *   must implement \Drupal\Core\Entity\EntityAccessControllerInterface.
    *   Defaults to \Drupal\Core\Entity\EntityAccessController.
@@ -73,6 +66,18 @@ class EntityType extends Plugin {
   public $controllers = array(
     'access' => 'Drupal\Core\Entity\EntityAccessController',
   );
+
+  /**
+   * The name of the default administrative permission.
+   *
+   * The default \Drupal\Core\Entity\EntityAccessController class checks this
+   * permission for all operations in its checkAccess() method. Entities with
+   * more complex permissions can extend this class to do their own access
+   * checks.
+   *
+   * @var string (optional)
+   */
+  public $admin_permission;
 
   /**
    * Boolean indicating whether fields can be attached to entities of this type.
@@ -136,6 +141,14 @@ class EntityType extends Plugin {
    * @var bool (optional)
    */
   public $static_cache = TRUE;
+
+  /**
+   * Boolean indicating whether the rendered output of entities should be
+   * cached.
+   *
+   * @var bool (optional)
+   */
+  public $render_cache = TRUE;
 
   /**
    * Boolean indicating whether entities of this type have multilingual support.
@@ -212,56 +225,11 @@ class EntityType extends Plugin {
   public $bundle_keys;
 
   /**
-   * The base router path for the entity type's field administration page.
-   *
-   * If the entity type has a bundle, include {bundle} in the path.
-   *
-   * For example, the node entity type specifies
-   * "admin/structure/types/manage/{bundle}" as its base field admin path.
+   * The name of the entity type which provides bundles.
    *
    * @var string (optional)
    */
-  public $route_base_path;
-
-  /**
-   * The prefix for the bundles of this entity type.
-   *
-   * For example, the comment bundle is prefixed with 'comment_node_'.
-   *
-   * @var string (optional)
-   */
-  public $bundle_prefix;
-
-  /**
-   * The base menu router path to which the entity admin user interface responds.
-   *
-   * It can be used to generate UI links and to attach additional router items
-   * to the entity UI in a generic fashion.
-   *
-   * @var string (optional)
-   */
-  public $menu_base_path;
-
-  /**
-   * The menu router path to be used to view the entity.
-   *
-   * @var string (optional)
-   */
-  public $menu_view_path;
-
-  /**
-   * The menu router path to be used to edit the entity.
-   *
-   * @var string (optional)
-   */
-  public $menu_edit_path;
-
-  /**
-   * A string identifying the menu loader in the router path.
-   *
-   * @var string (optional)
-   */
-  public $menu_path_wildcard;
+  public $bundle_entity_type = 'bundle';
 
   /**
    * Link templates using the URI template syntax.
@@ -294,9 +262,7 @@ class EntityType extends Plugin {
    *
    * @var array
    */
-  public $links = array(
-    'canonical' => '/entity/{entityType}/{id}',
-  );
+  public $links = array();
 
   /**
    * Specifies whether a module exposing permissions for the current entity type

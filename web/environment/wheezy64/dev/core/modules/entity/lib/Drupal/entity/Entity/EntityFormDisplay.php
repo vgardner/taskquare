@@ -19,14 +19,14 @@ use Drupal\entity\EntityFormDisplayInterface;
  * @EntityType(
  *   id = "entity_form_display",
  *   label = @Translation("Entity form display"),
- *   module = "entity",
  *   controllers = {
  *     "storage" = "Drupal\Core\Config\Entity\ConfigStorageController"
  *   },
  *   config_prefix = "entity.form_display",
  *   entity_keys = {
  *     "id" = "id",
- *     "uuid" = "uuid"
+ *     "uuid" = "uuid",
+ *     "status" = "status"
  *   }
  * )
  */

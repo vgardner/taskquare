@@ -17,7 +17,7 @@ class SimpletestTestForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'simpletest_test_form';
   }
 
@@ -96,12 +96,6 @@ class SimpletestTestForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function validateForm(array &$form, array &$form_state) {
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function submitForm(array &$form, array &$form_state) {
     // Get list of tests.
     $tests_list = array();
@@ -119,7 +113,12 @@ class SimpletestTestForm extends FormBase {
     }
     if (count($tests_list) > 0 ) {
       $test_id = simpletest_run_tests($tests_list, 'drupal');
-      $form_state['redirect'] = 'admin/config/development/testing/results/' . $test_id;
+      $form_state['redirect_route'] = array(
+        'route_name' => 'simpletest.result_form',
+        'route_parameters' => array(
+          'test_id' => $test_id,
+        ),
+      );
     }
     else {
       drupal_set_message($this->t('No test(s) selected.'), 'error');

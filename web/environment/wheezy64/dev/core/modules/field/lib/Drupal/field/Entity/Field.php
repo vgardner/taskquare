@@ -8,8 +8,6 @@
 namespace Drupal\field\Entity;
 
 use Drupal\Component\Utility\Unicode;
-use Drupal\Core\Entity\Annotation\EntityType;
-use Drupal\Core\Annotation\Translation;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\field\FieldException;
@@ -24,7 +22,6 @@ use Drupal\field\FieldInterface;
  * @EntityType(
  *   id = "field_entity",
  *   label = @Translation("Field"),
- *   module = "field",
  *   controllers = {
  *     "storage" = "Drupal\field\FieldStorageController"
  *   },
@@ -122,7 +119,8 @@ class Field extends ConfigEntityBase implements FieldInterface {
    * The field cardinality.
    *
    * The maximum number of values the field can hold. Possible values are
-   * positive integers or FIELD_CARDINALITY_UNLIMITED. Defaults to 1.
+   * positive integers or FieldDefinitionInterface::CARDINALITY_UNLIMITED.
+   * Defaults to 1.
    *
    * @var integer
    */
@@ -342,7 +340,7 @@ class Field extends ConfigEntityBase implements FieldInterface {
     }
 
     // Check that the field type is known.
-    $field_type = \Drupal::service('plugin.manager.entity.field.field_type')->getDefinition($this->type);
+    $field_type = \Drupal::service('plugin.manager.field.field_type')->getDefinition($this->type);
     if (!$field_type) {
       throw new FieldException(format_string('Attempt to create a field of unknown type %type.', array('%type' => $this->type)));
     }
@@ -457,7 +455,7 @@ class Field extends ConfigEntityBase implements FieldInterface {
   public function getSchema() {
     if (!isset($this->schema)) {
       // Get the schema from the field item class.
-      $definition = \Drupal::service('plugin.manager.entity.field.field_type')->getDefinition($this->type);
+      $definition = \Drupal::service('plugin.manager.field.field_type')->getDefinition($this->type);
       $class = $definition['class'];
       $schema = $class::schema($this);
       // Fill in default values for optional entries.
@@ -527,7 +525,7 @@ class Field extends ConfigEntityBase implements FieldInterface {
     //   maintains its own static cache. However, do some CPU and memory
     //   profiling to see if it's worth statically caching $field_type_info, or
     //   the default field and instance settings, within $this.
-    $field_type_info = \Drupal::service('plugin.manager.entity.field.field_type')->getDefinition($this->type);
+    $field_type_info = \Drupal::service('plugin.manager.field.field_type')->getDefinition($this->type);
 
     $settings = $this->settings + $field_type_info['settings'] + $field_type_info['instance_settings'];
     return $settings;
@@ -538,7 +536,7 @@ class Field extends ConfigEntityBase implements FieldInterface {
    */
   public function getFieldSetting($setting_name) {
     // @todo See getFieldSettings() about potentially statically caching this.
-    $field_type_info = \Drupal::service('plugin.manager.entity.field.field_type')->getDefinition($this->type);
+    $field_type_info = \Drupal::service('plugin.manager.field.field_type')->getDefinition($this->type);
 
     // We assume here that consecutive array_key_exists() is more efficient than
     // calling getFieldSettings() when all we need is a single setting.
@@ -548,8 +546,11 @@ class Field extends ConfigEntityBase implements FieldInterface {
     elseif (array_key_exists($setting_name, $field_type_info['settings'])) {
       return $field_type_info['settings'][$setting_name];
     }
-    else {
+    elseif (array_key_exists($setting_name, $field_type_info['instance_settings'])) {
       return $field_type_info['instance_settings'][$setting_name];
+    }
+    else {
+      return NULL;
     }
   }
 
@@ -599,59 +600,15 @@ class Field extends ConfigEntityBase implements FieldInterface {
   /**
    * {@inheritdoc}
    */
+  public function isFieldMultiple() {
+    $cardinality = $this->getFieldCardinality();
+    return ($cardinality == static::CARDINALITY_UNLIMITED) || ($cardinality > 1);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function getFieldDefaultValue(EntityInterface $entity) { }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function offsetExists($offset) {
-    return isset($this->{$offset}) || in_array($offset, array('columns', 'foreign keys', 'bundles', 'storage_details'));
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function &offsetGet($offset) {
-    switch ($offset) {
-      case 'id':
-        return $this->uuid;
-
-      case 'field_name':
-        return $this->name;
-
-      case 'columns':
-        $this->getSchema();
-        return $this->schema['columns'];
-
-      case 'foreign keys':
-        $this->getSchema();
-        return $this->schema['foreign keys'];
-
-      case 'bundles':
-        $bundles = $this->getBundles();
-        return $bundles;
-    }
-
-    return $this->{$offset};
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function offsetSet($offset, $value) {
-    if (!in_array($offset, array('columns', 'foreign keys', 'bundles', 'storage_details'))) {
-      $this->{$offset} = $value;
-    }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function offsetUnset($offset) {
-    if (!in_array($offset, array('columns', 'foreign keys', 'bundles', 'storage_details'))) {
-      unset($this->{$offset});
-    }
-  }
 
   /**
    * A list of columns that can not be used as field type columns.
@@ -716,6 +673,13 @@ class Field extends ConfigEntityBase implements FieldInterface {
     // Run the values from getExportProperties() through __construct().
     $values = array_intersect_key($this->getExportProperties(), get_object_vars($this));
     $this->__construct($values);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function isFieldConfigurable() {
+    return TRUE;
   }
 
 }

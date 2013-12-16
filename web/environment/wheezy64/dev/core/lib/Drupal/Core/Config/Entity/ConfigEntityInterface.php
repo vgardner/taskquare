@@ -20,7 +20,7 @@ interface ConfigEntityInterface extends EntityInterface {
    * @return string|null
    *   The original ID, if any.
    */
-  public function getOriginalID();
+  public function getOriginalId();
 
   /**
    * Sets the original ID.
@@ -28,9 +28,9 @@ interface ConfigEntityInterface extends EntityInterface {
    * @param string $id
    *   The new ID to set as original ID.
    *
-   * @return void
+   * @return self
    */
-  public function setOriginalID($id);
+  public function setOriginalId($id);
 
   /**
    * Enables the configuration entity.
@@ -60,6 +60,14 @@ interface ConfigEntityInterface extends EntityInterface {
   public function setStatus($status);
 
   /**
+   * Sets the status of the isSyncing flag.
+   *
+   * @param bool $status
+   *   The status of the sync flag.
+   */
+  public function setSyncing($status);
+
+  /**
    * Returns whether the configuration entity is enabled.
    *
    * Status implementations for configuration entities should follow these
@@ -74,6 +82,35 @@ interface ConfigEntityInterface extends EntityInterface {
    * @return bool
    */
   public function status();
+
+  /**
+   * Returns whether the configuration entity is created, updated or deleted
+   * through the import process.
+   *
+   * @return bool
+   */
+  public function isSyncing();
+
+  /**
+   * Returns the value of a property.
+   *
+   * @param string $property_name
+   *   The name of the property that should be returned.
+   *
+   * @return mixed
+   *   The property, if existing, NULL otherwise.
+   */
+  public function get($property_name);
+
+  /**
+   * Sets the value of a property.
+   *
+   * @param string $property_name
+   *   The name of the property that should be set.
+   * @param mixed $value
+   *   The value the property should be set to.
+   */
+  public function set($property_name, $value);
 
   /**
    * Retrieves the exportable properties of the entity.

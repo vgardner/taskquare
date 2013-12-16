@@ -7,7 +7,7 @@
 
 namespace Drupal\content_translation\Tests;
 
-use Drupal\Core\Entity\DatabaseStorageControllerNG;
+use Drupal\Core\Entity\FieldableDatabaseStorageController;
 use Drupal\Core\Language\Language;
 use Drupal\simpletest\WebTestBase;
 
@@ -125,12 +125,19 @@ abstract class ContentTranslationTestBase extends WebTestBase {
   }
 
   /**
+   * Returns an array of permissions needed for the administrator.
+   */
+  protected function getAdministratorPermissions() {
+    return array_merge($this->getEditorPermissions(), $this->getTranslatorPermissions(), array('administer content translation'));
+  }
+
+  /**
    * Creates and activates translator, editor and admin users.
    */
   protected function setupUsers() {
     $this->translator = $this->drupalCreateUser($this->getTranslatorPermissions(), 'translator');
     $this->editor = $this->drupalCreateUser($this->getEditorPermissions(), 'editor');
-    $this->administrator = $this->drupalCreateUser(array_merge($this->getEditorPermissions(), $this->getTranslatorPermissions()), 'administrator');
+    $this->administrator = $this->drupalCreateUser($this->getAdministratorPermissions(), 'administrator');
     $this->drupalLogin($this->translator);
   }
 
@@ -204,7 +211,7 @@ abstract class ContentTranslationTestBase extends WebTestBase {
       $entity_values[$info['entity_keys']['bundle']] = $bundle_name ?: $this->bundle;
     }
     $controller = $this->container->get('entity.manager')->getStorageController($this->entityType);
-    if (!($controller instanceof DatabaseStorageControllerNG)) {
+    if (!($controller instanceof FieldableDatabaseStorageController)) {
       foreach ($values as $property => $value) {
         if (is_array($value)) {
           $entity_values[$property] = array($langcode => $value);

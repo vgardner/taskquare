@@ -17,14 +17,14 @@ use Drupal\Core\Annotation\Translation;
  * @EntityType(
  *   id = "entity_test_mul",
  *   label = @Translation("Test entity - data table"),
- *   module = "entity_test",
  *   controllers = {
  *     "storage" = "Drupal\entity_test\EntityTestStorageController",
+ *     "view_builder" = "Drupal\entity_test\EntityTestViewBuilder",
  *     "access" = "Drupal\entity_test\EntityTestAccessController",
  *     "form" = {
  *       "default" = "Drupal\entity_test\EntityTestFormController"
  *     },
- *     "translation" = "Drupal\content_translation\ContentTranslationControllerNG"
+ *     "translation" = "Drupal\content_translation\ContentTranslationController"
  *   },
  *   base_table = "entity_test_mul",
  *   data_table = "entity_test_mul_property_data",
@@ -33,9 +33,14 @@ use Drupal\Core\Annotation\Translation;
  *   entity_keys = {
  *     "id" = "id",
  *     "uuid" = "uuid",
- *     "bundle" = "type"
+ *     "bundle" = "type",
+ *     "label" = "name"
  *   },
- *   menu_base_path = "entity_test_mul/manage/%entity_test_mul"
+ *   links = {
+ *     "canonical" = "entity_test.edit_entity_test_mul",
+ *     "edit-form" = "entity_test.edit_entity_test_mul",
+ *     "admin-form" = "entity_test.admin_entity_test_mul"
+ *   }
  * )
  */
 class EntityTestMul extends EntityTest {

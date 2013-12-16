@@ -7,11 +7,9 @@
 
 namespace Drupal\user\Entity;
 
+use Drupal\Core\Entity\ContentEntityBase;
 use Drupal\Core\Entity\EntityStorageControllerInterface;
 use Drupal\Core\Entity\EntityMalformedException;
-use Drupal\Core\Entity\EntityNG;
-use Drupal\Core\Entity\Annotation\EntityType;
-use Drupal\Core\Annotation\Translation;
 use Drupal\user\UserInterface;
 
 /**
@@ -20,20 +18,20 @@ use Drupal\user\UserInterface;
  * @EntityType(
  *   id = "user",
  *   label = @Translation("User"),
- *   module = "user",
  *   controllers = {
  *     "storage" = "Drupal\user\UserStorageController",
  *     "access" = "Drupal\user\UserAccessController",
- *     "render" = "Drupal\Core\Entity\EntityRenderController",
+ *     "view_builder" = "Drupal\Core\Entity\EntityViewBuilder",
  *     "form" = {
  *       "default" = "Drupal\user\ProfileFormController",
+ *       "cancel" = "Drupal\user\Form\UserCancelForm",
  *       "register" = "Drupal\user\RegisterFormController"
  *     },
  *     "translation" = "Drupal\user\ProfileTranslationController"
  *   },
+ *   admin_permission = "administer user",
  *   base_table = "users",
  *   uri_callback = "user_uri",
- *   route_base_path = "admin/config/people/accounts",
  *   label_callback = "user_label",
  *   fieldable = TRUE,
  *   translatable = TRUE,
@@ -42,12 +40,13 @@ use Drupal\user\UserInterface;
  *     "uuid" = "uuid"
  *   },
  *   links = {
- *     "canonical" = "/user/{user}",
- *     "edit-form" = "/user/{user}/edit"
+ *     "canonical" = "user.view",
+ *     "edit-form" = "user.edit",
+ *     "admin-form" = "user.account_settings"
  *   }
  * )
  */
-class User extends EntityNG implements UserInterface {
+class User extends ContentEntityBase implements UserInterface {
 
   /**
    * {@inheritdoc}
@@ -59,7 +58,16 @@ class User extends EntityNG implements UserInterface {
   /**
    * {@inheritdoc}
    */
+  public function isNew() {
+    return !empty($this->enforceIsNew) || $this->id() === NULL;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   static function preCreate(EntityStorageControllerInterface $storage_controller, array &$values) {
+    parent::preCreate($storage_controller, $values);
+
     if (!isset($values['created'])) {
       $values['created'] = REQUEST_TIME;
     }
@@ -71,6 +79,8 @@ class User extends EntityNG implements UserInterface {
    * {@inheritdoc}
    */
   public function preSave(EntityStorageControllerInterface $storage_controller) {
+    parent::preSave($storage_controller);
+
     // Update the user password if it has changed.
     if ($this->isNew() || ($this->pass->value && $this->pass->value != $this->original->pass->value)) {
       // Allow alternate password hashing schemes.
@@ -101,6 +111,8 @@ class User extends EntityNG implements UserInterface {
    * {@inheritdoc}
    */
   public function postSave(EntityStorageControllerInterface $storage_controller, $update = TRUE) {
+    parent::postSave($storage_controller, $update);
+
     if ($update) {
       // If the password has been changed, delete all open sessions for the
       // user and recreate the current one.
@@ -141,6 +153,8 @@ class User extends EntityNG implements UserInterface {
    * {@inheritdoc}
    */
   public static function postDelete(EntityStorageControllerInterface $storage_controller, array $entities) {
+    parent::postDelete($storage_controller, $entities);
+
     $uids = array_keys($entities);
     \Drupal::service('user.data')->delete(NULL, $uids);
     $storage_controller->deleteUserRoles($uids);

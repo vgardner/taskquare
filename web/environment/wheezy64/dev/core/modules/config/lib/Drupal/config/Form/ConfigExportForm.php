@@ -17,7 +17,7 @@ class ConfigExportForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'config_export_form';
   }
 
@@ -39,7 +39,7 @@ class ConfigExportForm extends FormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, array &$form_state) {
-    $form_state['redirect'] = 'admin/config/development/export-download';
+    $form_state['redirect_route']['route_name'] = 'config.export_download';
   }
 
 }

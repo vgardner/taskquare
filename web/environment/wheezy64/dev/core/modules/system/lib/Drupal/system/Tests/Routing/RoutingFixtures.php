@@ -15,7 +15,7 @@ class RoutingFixtures {
   /**
    * Create the tables required for the sample data.
    *
-   * @param Drupal\Core\Database\Connection $connection
+   * @param \Drupal\Core\Database\Connection $connection
    *   The connection to use to create the tables.
    */
   public function createTables(Connection $connection) {
@@ -31,7 +31,7 @@ class RoutingFixtures {
   /**
    * Drop the tables used for the sample data.
    *
-   * @param Drupal\Core\Database\Connection $connection
+   * @param \Drupal\Core\Database\Connection $connection
    *   The connection to use to drop the tables.
    */
   public function dropTables(Connection $connection) {
@@ -41,6 +41,44 @@ class RoutingFixtures {
     foreach ($tables as $name => $table) {
       $schema->dropTable($name);
     }
+  }
+
+  /**
+   * Returns a static version of the routes.
+   */
+  public function staticSampleRouteCollection() {
+    $routes = array();
+    $routes['route_a'] = array(
+      'path' => '/path/one',
+      'requirements' => array(
+        '_method' => 'GET',
+      ),
+    );
+    $routes['route_b'] = array(
+      'path' => '/path/one',
+      'requirements' => array(
+        '_method' => 'PUT',
+      ),
+    );
+    $routes['route_c'] = array(
+      'path' => '/path/two',
+      'requirements' => array(
+        '_method' => 'GET',
+        '_format' => 'json'
+      ),
+    );
+    $routes['route_d'] = array(
+      'path' => '/path/three',
+    );
+    $routes['route_e'] = array(
+      'path' => '/path/two',
+      'requirements' => array(
+        '_method' => 'GET|HEAD',
+        '_format' => 'html'
+      ),
+    );
+
+    return $routes;
   }
 
   /**
@@ -123,8 +161,8 @@ class RoutingFixtures {
           'not null' => TRUE,
           'default' => '',
         ),
-        'pattern' => array(
-          'description' => 'The path pattern for this URI',
+        'path' => array(
+          'description' => 'The path for this URI',
           'type' => 'varchar',
           'length' => 255,
           'not null' => TRUE,

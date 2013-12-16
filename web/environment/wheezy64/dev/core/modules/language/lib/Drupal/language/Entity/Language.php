@@ -20,21 +20,26 @@ use Drupal\language\LanguageInterface;
  * @EntityType(
  *   id = "language_entity",
  *   label = @Translation("Language"),
- *   module = "language",
  *   controllers = {
  *     "storage" = "Drupal\Core\Config\Entity\ConfigStorageController",
  *     "list" = "Drupal\language\LanguageListController",
  *     "access" = "Drupal\language\LanguageAccessController",
  *     "form" = {
+ *       "add" = "Drupal\language\Form\LanguageAddForm",
+ *       "edit" = "Drupal\language\Form\LanguageEditForm",
  *       "delete" = "Drupal\language\Form\LanguageDeleteForm"
  *     }
  *   },
+ *   admin_permission = "administer languages",
  *   config_prefix = "language.entity",
  *   entity_keys = {
  *     "id" = "id",
  *     "label" = "label",
  *     "weight" = "weight",
  *     "uuid" = "uuid"
+ *   },
+ *   links = {
+ *     "edit-form" = "language.edit"
  *   }
  * )
  */
@@ -93,19 +98,6 @@ class Language extends ConfigEntityBase implements LanguageInterface {
     // For the uncommon case of custom languages the label should be given in
     // English.
     $this->langcode = 'en';
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function uri() {
-    return array(
-      'path' => 'admin/config/regional/language/edit/' . $this->id(),
-      'options' => array(
-        'entity_type' => $this->entityType,
-        'entity' => $this,
-      ),
-    );
   }
 
 }

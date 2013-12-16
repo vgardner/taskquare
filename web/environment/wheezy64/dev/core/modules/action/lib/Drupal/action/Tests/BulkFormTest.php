@@ -49,6 +49,10 @@ class BulkFormTest extends WebTestBase {
 
     $this->drupalGet('test_bulk_form');
 
+    // Test that the views edit header appears first.
+    $first_form_element = $this->xpath('//form/div/div[1][@id = :id]', array(':id' => 'edit-header'));
+    $this->assertTrue($first_form_element, 'The views form edit header appears first.');
+
     $this->assertFieldById('edit-action', NULL, 'The action select field appears.');
 
     // Make sure a checkbox appears on all rows.
@@ -60,7 +64,7 @@ class BulkFormTest extends WebTestBase {
 
     // Set all nodes to sticky and check that.
     $edit += array('action' => 'node_make_sticky_action');
-    $this->drupalPost(NULL, $edit, t('Apply'));
+    $this->drupalPostForm(NULL, $edit, t('Apply'));
 
     foreach ($nodes as $node) {
       $changed_node = node_load($node->id());
@@ -74,7 +78,7 @@ class BulkFormTest extends WebTestBase {
     $this->assertTrue($node->isPublished(), 'The node is published.');
 
     $edit = array('action_bulk_form[0]' => TRUE, 'action' => 'node_unpublish_action');
-    $this->drupalPost(NULL, $edit, t('Apply'));
+    $this->drupalPostForm(NULL, $edit, t('Apply'));
 
     $this->assertText('Unpublish content was applied to 1 item.');
 
@@ -109,6 +113,21 @@ class BulkFormTest extends WebTestBase {
     $this->drupalGet('test_bulk_form');
     $this->assertNoOption('edit-action', 'node_make_sticky_action');
     $this->assertNoOption('edit-action', 'node_make_unsticky_action');
+
+    // Check the default title.
+    $this->drupalGet('test_bulk_form');
+    $result = $this->xpath('//label[@for="edit-action"]');
+    $this->assertEqual('With selection', (string) $result[0]);
+
+    // Setup up a different bulk form title.
+    $view = views_get_view('test_bulk_form');
+    $display = &$view->storage->getDisplay('default');
+    $display['display_options']['fields']['action_bulk_form']['action_title'] = 'Test title';
+    $view->save();
+
+    $this->drupalGet('test_bulk_form');
+    $result = $this->xpath('//label[@for="edit-action"]');
+    $this->assertEqual('Test title', (string) $result[0]);
   }
 
 }

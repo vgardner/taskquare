@@ -20,11 +20,14 @@
 
 "use strict";
 
-var options = $.extend({
-  strings: {
-    quickEdit: Drupal.t('Quick edit')
+var options = $.extend(drupalSettings.edit,
+  // Merge strings on top of drupalSettings so that they are not mutable.
+  {
+    strings: {
+      quickEdit: Drupal.t('Quick edit')
+    }
   }
-}, drupalSettings.edit);
+);
 
 /**
  * Tracks fields without metadata. Contains objects with the following keys:
@@ -61,7 +64,7 @@ Drupal.behaviors.edit = {
     // immediately. New fields will be unable to be processed immediately, but
     // will instead be queued to have their metadata fetched, which occurs below
     // in fetchMissingMetaData().
-    $(context).find('[data-edit-id]').once('edit').each(function (index, fieldElement) {
+    $(context).find('[data-edit-field-id]').once('edit').each(function (index, fieldElement) {
       processField(fieldElement);
     });
 
@@ -116,9 +119,9 @@ Drupal.edit = {
  * processed.
  */
 $(document).on('drupalContextualLinkAdded', function (event, data) {
-  if (data.$region.is('[data-edit-entity]')) {
+  if (data.$region.is('[data-edit-entity-id]')) {
     var contextualLink = {
-      entityID: data.$region.attr('data-edit-entity'),
+      entityID: data.$region.attr('data-edit-entity-id'),
       el: data.$el[0],
       region: data.$region[0]
     };
@@ -166,11 +169,11 @@ function initEdit (bodyElement) {
  * Fetch the field's metadata; queue or initialize it (if EntityModel exists).
  *
  * @param DOM fieldElement
- *   A Drupal Field API field's DOM element with a data-edit-id attribute.
+ *   A Drupal Field API field's DOM element with a data-edit-field-id attribute.
  */
 function processField (fieldElement) {
   var metadata = Drupal.edit.metadata;
-  var fieldID = fieldElement.getAttribute('data-edit-id');
+  var fieldID = fieldElement.getAttribute('data-edit-field-id');
   var entityID = extractEntityID(fieldID);
 
   // Early-return if metadata for this field is missing.
@@ -382,16 +385,20 @@ function initializeEntityContextualLink (contextualLink) {
     });
     fieldsAvailableQueue = _.difference(fieldsAvailableQueue, fields);
 
-    // Set up contextual link view after loading any missing in-place editors.
-    loadMissingEditors(function () {
+    // Initialization should only be called once. Use Underscore's once method
+    // to get a one-time use version of the function.
+    var initContextualLink = _.once(function () {
       var $links = $(contextualLink.el).find('.contextual-links');
       var contextualLinkView = new Drupal.edit.ContextualLinkView($.extend({
-        el: $('<li class="quick-edit"><a href=""></a></li>').prependTo($links),
+        el: $('<li class="quick-edit"><a href="" role="button" aria-pressed="false"></a></li>').prependTo($links),
         model: entityModel,
         appModel: Drupal.edit.app.model
       }, options));
       entityModel.set('contextualLinkView', contextualLinkView);
     });
+
+    // Set up ContextualLinkView after loading any missing in-place editors.
+    loadMissingEditors(initContextualLink);
 
     return true;
   }
@@ -421,7 +428,7 @@ function initializeEntityContextualLink (contextualLink) {
  *   The context within which to delete.
  */
 function deleteContainedModelsAndQueues($context) {
-  $context.find('[data-edit-entity]').addBack('[data-edit-entity]').each(function (index, entityElement) {
+  $context.find('[data-edit-entity-id]').addBack('[data-edit-entity-id]').each(function (index, entityElement) {
     // Delete entity model.
     // @todo change to findWhere() as soon as we have Backbone 1.0 in Drupal
     // core. @see https://drupal.org/node/1800022
@@ -443,7 +450,7 @@ function deleteContainedModelsAndQueues($context) {
     contextualLinksQueue = _.filter(contextualLinksQueue, hasOtherRegion);
   });
 
-  $context.find('[data-edit-id]').addBack('[data-edit-id]').each(function (index, fieldElement) {
+  $context.find('[data-edit-field-id]').addBack('[data-edit-field-id]').each(function (index, fieldElement) {
     // Delete field models.
     Drupal.edit.collections.fields.chain()
       .filter(function (fieldModel) { return fieldModel.get('el') === fieldElement; })

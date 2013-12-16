@@ -7,7 +7,7 @@
 
 namespace Drupal\aggregator\Entity;
 
-use Drupal\Core\Entity\EntityNG;
+use Drupal\Core\Entity\ContentEntityBase;
 use Drupal\Core\Entity\EntityStorageControllerInterface;
 use Drupal\Core\Entity\Annotation\EntityType;
 use Drupal\Core\Annotation\Translation;
@@ -19,10 +19,9 @@ use Drupal\aggregator\ItemInterface;
  * @EntityType(
  *   id = "aggregator_item",
  *   label = @Translation("Aggregator feed item"),
- *   module = "aggregator",
  *   controllers = {
  *     "storage" = "Drupal\aggregator\ItemStorageController",
- *     "render" = "Drupal\aggregator\ItemRenderController"
+ *     "view_builder" = "Drupal\aggregator\ItemViewBuilder"
  *   },
  *   base_table = "aggregator_item",
  *   fieldable = TRUE,
@@ -32,91 +31,7 @@ use Drupal\aggregator\ItemInterface;
  *   }
  * )
  */
-class Item extends EntityNG implements ItemInterface {
-
-  /**
-   * The feed item ID.
-   *
-   * @todo rename to id.
-   *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
-   */
-  public $iid;
-
-  /**
-   * The feed ID.
-   *
-   * @todo rename to feed_id.
-   *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
-   */
-  public $fid;
-
-  /**
-   * Title of the feed item.
-   *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
-   */
-  public $title;
-
-  /**
-   * The feed language code.
-   *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
-   */
-  public $langcode;
-
-  /**
-   * Link to the feed item.
-   *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
-   */
-  public $link;
-
-  /**
-   * Author of the feed item.
-   *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
-   */
-  public $author;
-
-  /**
-   * Body of the feed item.
-   *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
-   */
-  public $description;
-
-  /**
-   * Posted date of the feed item, as a Unix timestamp.
-   *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
-   */
-  public $timestamp;
-
-  /**
-   * Unique identifier for the feed item.
-   *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
-   */
-  public $guid;
-
-  /**
-   * Overrides Drupal\Core\Entity\EntityNG::init().
-   */
-  public function init() {
-    parent::init();
-
-    // We unset all defined properties, so magic getters apply.
-    unset($this->iid);
-    unset($this->fid);
-    unset($this->title);
-    unset($this->author);
-    unset($this->description);
-    unset($this->guid);
-    unset($this->link);
-    unset($this->timestamp);
-  }
+class Item extends ContentEntityBase implements ItemInterface {
 
   /**
    * Implements Drupal\Core\Entity\EntityInterface::id().
@@ -136,8 +51,10 @@ class Item extends EntityNG implements ItemInterface {
    * {@inheritdoc}
    */
   public function postCreate(EntityStorageControllerInterface $storage_controller) {
-    if (!isset($this->timestamp->value)) {
-      $this->timestamp->value = REQUEST_TIME;
+    parent::postCreate($storage_controller);
+
+    if ($this->getPostedTime() === NULL) {
+      $this->setPostedTime(REQUEST_TIME);
     }
   }
 
@@ -145,6 +62,8 @@ class Item extends EntityNG implements ItemInterface {
    * {@inheritdoc}
    */
   public function postSave(EntityStorageControllerInterface $storage_controller, $update = TRUE) {
+    parent::postSave($storage_controller, $update);
+
     $storage_controller->saveCategories($this);
   }
 
@@ -152,6 +71,8 @@ class Item extends EntityNG implements ItemInterface {
    * {@inheritdoc}
    */
   public static function preDelete(EntityStorageControllerInterface $storage_controller, array $entities) {
+    parent::preDelete($storage_controller, $entities);
+
     $storage_controller->deleteCategories($entities);
   }
 
@@ -206,5 +127,103 @@ class Item extends EntityNG implements ItemInterface {
       'type' => 'string_field',
     );
     return $fields;
+  }
+
+  /**
+   * @inheritdoc
+   */
+  public function getFeedId() {
+    return $this->get('fid')->value;
+  }
+
+  /**
+   * @inheritdoc
+   */
+  public function setFeedId($fid) {
+    return $this->set('fid', $fid);
+  }
+
+  /**
+   * @inheritdoc
+   */
+  public function getTitle() {
+    return $this->get('title')->value;
+  }
+
+  /**
+   * @inheritdoc
+   */
+  public function setTitle($title) {
+    return $this->set('title', $title);
+  }
+
+  /**
+   * @inheritdoc
+   */
+  public function  getLink() {
+    return $this->get('link')->value;
+  }
+
+  /**
+   * @inheritdoc
+   */
+  public function setLink($link) {
+    return $this->set('link', $link);
+  }
+
+  /**
+   * @inheritdoc
+   */
+  public function getAuthor() {
+    return $this->get('author')->value;
+  }
+
+  /**
+   * @inheritdoc
+   */
+  public function setAuthor($author) {
+    return $this->set('author', $author);
+  }
+
+  /**
+   * @inheritdoc
+   */
+  public function getDescription() {
+    return $this->get('description')->value;
+  }
+
+  /**
+   * @inheritdoc
+   */
+  public function setDescription($description) {
+    return $this->set('description', $description);
+  }
+
+  /**
+   * @inheritdoc
+   */
+  public function getPostedTime() {
+    return $this->get('timestamp')->value;
+  }
+
+  /**
+   * @inheritdoc
+   */
+  public function setPostedTime($timestamp) {
+    return $this->set('timestamp', $timestamp);
+  }
+
+  /**
+   * @inheritdoc
+   */
+  public function getGuid() {
+    return $this->get('guid')->value;
+  }
+
+  /**
+   * @inheritdoc
+   */
+  public function setGuid($guid) {
+    return $this->set('guid', $guid);
   }
 }

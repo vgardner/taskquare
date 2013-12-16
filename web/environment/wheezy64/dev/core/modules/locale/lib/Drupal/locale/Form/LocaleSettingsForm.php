@@ -6,17 +6,17 @@
 
 namespace Drupal\locale\Form;
 
-use Drupal\system\SystemConfigFormBase;
+use Drupal\Core\Form\ConfigFormBase;
 
 /**
  * Configure locale settings for this site.
  */
-class LocaleSettingsForm extends SystemConfigFormBase {
+class LocaleSettingsForm extends ConfigFormBase {
 
   /**
-   * Implements \Drupal\Core\Form\FormInterface::getFormID().
+   * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'locale_translate_settings';
   }
 
@@ -44,7 +44,7 @@ class LocaleSettingsForm extends SystemConfigFormBase {
       '#default_value' => $config->get('translation.check_disabled_modules'),
     );
 
-    if ($directory =\Drupal::config('locale.settings')->get('translation.path')) {
+    if ($directory = $config->get('translation.path')) {
       $description = t('Translation files are stored locally in the  %path directory. You can change this directory on the <a href="@url">File system</a> configuration page.', array('%path' => $directory, '@url' => url('admin/config/media/file-system')));
     }
     else {

@@ -8,12 +8,12 @@
 namespace Drupal\user;
 
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\content_translation\ContentTranslationControllerNG;
+use Drupal\content_translation\ContentTranslationController;
 
 /**
- * Defines the translation controller class for terms.
+ * Defines the translation controller class for users.
  */
-class ProfileTranslationController extends ContentTranslationControllerNG {
+class ProfileTranslationController extends ContentTranslationController {
 
   /**
    * Overrides ContentTranslationController::entityFormAlter().
@@ -36,7 +36,8 @@ class ProfileTranslationController extends ContentTranslationControllerNG {
       // We need a redirect here, otherwise we would get an access denied page
       // since the current URL would be preserved and we would try to add a
       // translation for a language that already has a translation.
-      $form_state['redirect'] = $this->getViewPath($entity);
+      $uri = $entity->uri();
+      $form_state['redirect'] = $uri['path'];
     }
   }
 }

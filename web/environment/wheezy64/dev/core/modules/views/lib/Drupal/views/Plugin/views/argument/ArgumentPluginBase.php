@@ -184,6 +184,8 @@ abstract class ArgumentPluginBase extends HandlerBase {
       '#markup' => '<div class="clearfix"></div>',
     );
     $form['default_action'] = array(
+      '#title' => t('Default actions'),
+      '#title_display' => 'invisible',
       '#type' => 'radios',
       '#process' => array(array($this, 'processContainerRadios')),
       '#default_value' => $this->options['default_action'],
@@ -428,7 +430,7 @@ abstract class ArgumentPluginBase extends HandlerBase {
     }
 
     // Clear out the content of title if it's not enabled.
-    $options =& $form_state['values']['options'];
+    $options = &$form_state['values']['options'];
     if (empty($options['title_enable'])) {
       $options['title'] = '';
     }

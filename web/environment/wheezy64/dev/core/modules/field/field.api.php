@@ -43,7 +43,7 @@ use Drupal\field\FieldUpdateForbiddenException;
  */
 function hook_field_extra_fields() {
   $extra = array();
-  $module_language_enabled = module_exists('language');
+  $module_language_enabled = \Drupal::moduleHandler()->moduleExists('language');
   $description = t('Node module element');
 
   foreach (node_type_get_types() as $bundle) {
@@ -153,10 +153,10 @@ function hook_field_info_alter(&$info) {
  * which widget to use.
  *
  * Widgets are Plugins managed by the
- * Drupal\field\Plugin\Type\Widget\WidgetPluginManager class. A widget is
+ * Drupal\Core\Field\WidgetPluginManager class. A widget is
  * implemented by providing a class that implements
- * Drupal\field\Plugin\Type\Widget\WidgetInterface (in most cases, by
- * subclassing Drupal\field\Plugin\Type\Widget\WidgetBase), and provides the
+ * Drupal\Core\Field\WidgetInterface (in most cases, by
+ * subclassing Drupal\Core\Field\WidgetBase), and provides the
  * proper annotation block.
  *
  * Widgets are @link forms_api_reference.html Form API @endlink
@@ -198,20 +198,19 @@ function hook_field_widget_info_alter(array &$info) {
  *   - form: The form structure to which widgets are being attached. This may be
  *     a full form structure, or a sub-element of a larger form.
  *   - widget: The widget plugin instance.
- *   - field_definition: The field definition.
- *   - entity: The entity.
- *   - langcode: The language associated with $items.
- *   - items: Array of default values for this field.
+ *   - items: The field values, as a
+ *     \Drupal\Core\Field\FieldItemListInterface object.
  *   - delta: The order of this item in the array of subelements (0, 1, 2, etc).
  *   - default: A boolean indicating whether the form is being shown as a dummy
  *     form to set default values.
  *
- * @see \Drupal\field\Plugin\Type\Widget\WidgetBase::formSingleElement()
+ * @see \Drupal\Core\Field\WidgetBase::formSingleElement()
  * @see hook_field_widget_WIDGET_TYPE_form_alter()
  */
 function hook_field_widget_form_alter(&$element, &$form_state, $context) {
   // Add a css class to widget form elements for all fields of type mytype.
-  if ($context['field']['type'] == 'mytype') {
+  $field_definition = $context['items']->getFieldDefinition();
+  if ($field_definition->getFieldType() == 'mytype') {
     // Be sure not to overwrite existing attributes.
     $element['#attributes']['class'][] = 'myclass';
   }
@@ -232,14 +231,14 @@ function hook_field_widget_form_alter(&$element, &$form_state, $context) {
  *   An associative array. See hook_field_widget_form_alter() for the structure
  *   and content of the array.
  *
- * @see \Drupal\field\Plugin\Type\Widget\WidgetBase::formSingleElement()
+ * @see \Drupal\Core\Field\WidgetBase::formSingleElement()
  * @see hook_field_widget_form_alter()
  */
 function hook_field_widget_WIDGET_TYPE_form_alter(&$element, &$form_state, $context) {
   // Code here will only act on widgets of type WIDGET_TYPE.  For example,
   // hook_field_widget_mymodule_autocomplete_form_alter() will only act on
   // widgets of type 'mymodule_autocomplete'.
-  $element['#autocomplete_path'] = 'mymodule/autocomplete_path';
+  $element['#autocomplete_route_name'] = 'mymodule.autocomplete_route';
 }
 
 /**
@@ -259,10 +258,10 @@ function hook_field_widget_WIDGET_TYPE_form_alter(&$element, &$form_state, $cont
  * choose which formatter to use.
  *
  * Formatters are Plugins managed by the
- * Drupal\field\Plugin\Type\Formatter\FormatterPluginManager class. A formatter
+ * Drupal\Core\Field\FormatterPluginManager class. A formatter
  * is implemented by providing a class that implements
- * Drupal\field\Plugin\Type\Formatter\FormatterInterface (in most cases, by
- * subclassing Drupal\field\Plugin\Type\Formatter\FormatterBase), and provides
+ * Drupal\Core\Field\FormatterInterface (in most cases, by
+ * subclassing Drupal\Core\Field\FormatterBase), and provides
  * the proper annotation block.
  *
  * @see field
@@ -416,27 +415,6 @@ function hook_field_attach_view_alter(&$output, $context) {
 }
 
 /**
- * Perform alterations on field_language() values.
- *
- * This hook is invoked to alter the array of display language codes for the
- * given entity.
- *
- * @param $display_langcode
- *   A reference to an array of language codes keyed by field name.
- * @param $context
- *   An associative array containing:
- *   - entity: The entity with fields to render.
- *   - langcode: The language code $entity has to be displayed in.
- */
-function hook_field_language_alter(&$display_langcode, $context) {
-  // Do not apply core language fallback rules if they are disabled or if Locale
-  // is not registered as a translation handler.
-  if (field_language_fallback_enabled() && field_has_translation_handler($context['entity']->entityType())) {
-    field_language_fallback($display_langcode, $context['entity'], $context['langcode']);
-  }
-}
-
-/**
  * Alter field_available_languages() values.
  *
  * This hook is invoked from field_available_languages() to allow modules to
@@ -572,33 +550,6 @@ function hook_field_purge_instance($instance) {
 /**
  * @} End of "addtogroup field_crud".
  */
-
-/**
- * Determine whether the user has access to a given field.
- *
- * This hook is invoked from field_access() to let modules block access to
- * operations on fields. If no module returns FALSE, the operation is allowed.
- *
- * @param $op
- *   The operation to be performed. Possible values: 'edit', 'view'.
- * @param \Drupal\field\FieldInterface $field
- *   The field on which the operation is to be performed.
- * @param $entity_type
- *   The type of $entity; for example, 'node' or 'user'.
- * @param $entity
- *   (optional) The entity for the operation.
- * @param $account
- *   (optional) The account to check; if not given use currently logged in user.
- *
- * @return
- *   TRUE if the operation is allowed, and FALSE if the operation is denied.
- */
-function hook_field_access($op, \Drupal\field\FieldInterface $field, $entity_type, $entity, $account) {
-  if ($field['field_name'] == 'field_of_interest' && $op == 'edit') {
-    return $account->hasPermission('edit field of interest');
-  }
-  return TRUE;
-}
 
 /**
  * @} End of "addtogroup hooks".

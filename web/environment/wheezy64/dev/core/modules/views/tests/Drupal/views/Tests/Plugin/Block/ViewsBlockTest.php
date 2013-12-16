@@ -12,9 +12,6 @@ use Drupal\views\Plugin\Block\ViewsBlock;
 use Drupal\block\Plugin\views\display\Block;
 
 // @todo Remove this once the constant got converted.
-if (!defined('DRUPAL_CORE_COMPATIBILITY')) {
-  define('DRUPAL_CORE_COMPATIBILITY', '8.x');
-}
 if (!defined('BLOCK_LABEL_VISIBLE')) {
   define('BLOCK_LABEL_VISIBLE', 'visible');
 }
@@ -153,13 +150,7 @@ class ViewsBlockTest extends UnitTestCase {
 
 }
 
-// @todo Remove this once https://drupal.org/node/2018411 is in.
 namespace {
-  if (!function_exists('t')) {
-    function t($string) {
-      return $string;
-    }
-  }
   // @todo replace views_add_contextual_links()
   if (!function_exists('views_add_contextual_links')) {
     function views_add_contextual_links() {

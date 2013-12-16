@@ -33,10 +33,9 @@ class CKEditorPluginManager extends DefaultPluginManager {
    *   The module handler to invoke the alter hook with.
    */
   public function __construct(\Traversable $namespaces, CacheBackendInterface $cache_backend, LanguageManager $language_manager, ModuleHandlerInterface $module_handler) {
-    $annotation_namespaces = array('Drupal\ckeditor\Annotation' => $namespaces['Drupal\ckeditor']);
-    parent::__construct('Plugin/CKEditorPlugin', $namespaces, $annotation_namespaces, 'Drupal\ckeditor\Annotation\CKEditorPlugin');
+    parent::__construct('Plugin/CKEditorPlugin', $namespaces, 'Drupal\ckeditor\Annotation\CKEditorPlugin');
     $this->alterInfo($module_handler, 'ckeditor_plugin_info');
-    $this->setCacheBackend($cache_backend, $language_manager, 'ckeditor_plugin');
+    $this->setCacheBackend($cache_backend, $language_manager, 'ckeditor_plugins');
   }
 
   /**
@@ -66,7 +65,14 @@ class CKEditorPluginManager extends DefaultPluginManager {
    */
   public function getEnabledPluginFiles(Editor $editor, $include_internal_plugins = FALSE) {
     $plugins = array_keys($this->getDefinitions());
-    $toolbar_buttons = array_unique(NestedArray::mergeDeepArray($editor->settings['toolbar']['buttons']));
+    // Flatten each row.
+    $toolbar_rows = array();
+    foreach ($editor->settings['toolbar']['rows'] as $row_number => $row) {
+      $toolbar_rows[] = array_reduce($editor->settings['toolbar']['rows'][$row_number], function (&$result, $button_group) {
+        return array_merge($result, $button_group['items']);
+      }, array());
+    }
+    $toolbar_buttons = array_unique(NestedArray::mergeDeepArray($toolbar_rows));
     $enabled_plugins = array();
     $additional_plugins = array();
 
@@ -111,7 +117,7 @@ class CKEditorPluginManager extends DefaultPluginManager {
    * Retrieves all available CKEditor buttons, keyed by plugin ID.
    *
    * @return array
-   *   All availble CKEditor buttons, with plugin IDs as keys and button
+   *   All available CKEditor buttons, with plugin IDs as keys and button
    *   metadata (as implemented by getButtons()) as values.
    *
    * @see CKEditorPluginButtonsInterface::getButtons()
@@ -151,7 +157,19 @@ class CKEditorPluginManager extends DefaultPluginManager {
           '#type' => 'details',
           '#title' => $definitions[$plugin_id]['label'],
           '#group' => 'editor][settings][plugin_settings',
+          '#attributes' => array(
+            'data-ckeditor-plugin-id' => $plugin_id,
+          ),
         );
+        // Provide enough metadata for the drupal.ckeditor.admin library to
+        // allow it to automatically show/hide the vertical tab containing the
+        // settings for this plugin. Only do this if it's a CKEditor plugin that
+        // just provides buttons, don't do this if it's a contextually enabled
+        // CKEditor plugin. After all, in the latter case, we can't know when
+        // its settings should be shown!
+        if ($plugin instanceof CKEditorPluginButtonsInterface and !$plugin instanceof CKEditorPluginContextualInterface) {
+          $form['plugins'][$plugin_id]['#attributes']['data-ckeditor-buttons'] = implode(' ', array_keys($plugin->getButtons()));
+        }
         $form['plugins'][$plugin_id] += $plugin->settingsForm($plugin_settings_form, $form_state, $editor);
       }
     }

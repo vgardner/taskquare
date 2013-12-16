@@ -20,7 +20,6 @@ use Drupal\Core\Annotation\Translation;
  * @EntityType(
  *   id = "date_format",
  *   label = @Translation("Date format"),
- *   module = "system",
  *   controllers = {
  *     "storage" = "Drupal\Core\Config\Entity\ConfigStorageController",
  *     "access" = "Drupal\system\DateFormatAccessController",
@@ -36,6 +35,9 @@ use Drupal\Core\Annotation\Translation;
  *     "id" = "id",
  *     "label" = "label",
  *     "uuid" = "uuid"
+ *   },
+ *   links = {
+ *     "edit-form" = "system.date_format_edit"
  *   }
  * )
  */
@@ -77,31 +79,12 @@ class DateFormat extends ConfigEntityBase implements DateFormatInterface {
   protected $locked = FALSE;
 
   /**
-   * @var array
-   */
-  protected $locales = array();
-
-  /**
-   * {@inheritdoc}
-   */
-  public function uri() {
-    return array(
-      'path' => 'admin/config/regional/date-time/formats/manage/' . $this->id(),
-      'options' => array(
-        'entity_type' => $this->entityType,
-        'entity' => $this,
-      ),
-    );
-  }
-
-  /**
    * {@inheritdoc}
    */
   public function getExportProperties() {
     $properties = parent::getExportProperties();
     $names = array(
       'locked',
-      'locales',
       'pattern',
     );
     foreach ($names as $name) {
@@ -128,74 +111,8 @@ class DateFormat extends ConfigEntityBase implements DateFormatInterface {
   /**
    * {@inheritdoc}
    */
-  public function getLocales() {
-    return $this->locales;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setLocales(array $locales) {
-    $this->locales = $locales;
-    return $this;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function hasLocales() {
-    return !empty($this->locales);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function addLocale($locale) {
-    $this->locales[] = $locale;
-    $this->locales = array_unique($this->locales);
-    return $this;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function isLocked() {
     return (bool) $this->locked;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function preSave(EntityStorageControllerInterface $storage_controller) {
-    if ($this->hasLocales()) {
-      $config_factory = \Drupal::service('config.factory');
-      $properties = $this->getExportProperties();
-      $languages = language_list();
-      // Check if the suggested language codes are configured.
-      foreach ($this->getLocales() as $langcode) {
-        if (isset($languages[$langcode])) {
-          $config_factory->get('locale.config.' . $langcode . '.system.date_format.' . $this->id())
-            ->setData($properties)
-            ->save();
-        }
-      }
-    }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function postDelete(EntityStorageControllerInterface $storage_controller, array $entities) {
-    // Clean up the localized entry if required.
-    if (\Drupal::moduleHandler()->moduleExists('language')) {
-      $languages = language_list();
-      foreach ($entities as $entity) {
-        $format_id = $entity->id();
-        foreach ($languages as $langcode => $data) {
-          \Drupal::config("locale.config.$langcode.system.date_format.$format_id")->delete();
-        }
-      }
-    }
   }
 
 }

@@ -42,7 +42,7 @@ class BanAdmin extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'ban_ip_form';
   }
 
@@ -63,7 +63,8 @@ class BanAdmin extends FormBase {
       $links = array();
       $links['delete'] = array(
         'title' => $this->t('delete'),
-        'href' => "admin/config/people/ban/delete/$ip->iid",
+        'route_name' => 'ban.delete',
+        'route_parameters' => array('ban_id' => $ip->iid),
       );
       $row[] = array(
         'data' => array(
@@ -121,7 +122,7 @@ class BanAdmin extends FormBase {
     $ip = trim($form_state['values']['ip']);
     $this->ipManager->banIp($ip);
     drupal_set_message($this->t('The IP address %ip has been banned.', array('%ip' => $ip)));
-    $form_state['redirect'] = 'admin/config/people/ban';
+    $form_state['redirect_route']['route_name'] = 'ban.admin_page';
   }
 
 }

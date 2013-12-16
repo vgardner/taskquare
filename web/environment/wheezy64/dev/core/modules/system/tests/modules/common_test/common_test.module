@@ -6,55 +6,6 @@
  */
 
 /**
- * Implements hook_menu().
- */
-function common_test_menu() {
-  $items['common-test/destination'] = array(
-    'title' => 'Drupal Get Destination',
-    'page callback' => 'common_test_destination',
-    'access arguments' => array('access content'),
-    'type' => MENU_CALLBACK,
-  );
-  $items['common-test/query-string'] = array(
-    'title' => 'Test querystring',
-    'page callback' => 'common_test_js_and_css_querystring',
-    'access arguments' => array('access content'),
-    'type' => MENU_CALLBACK,
-  );
-  $items['common-test/drupal-render-invalid-keys'] = array(
-    'title' => 'Drupal Render',
-    'page callback' => 'common_test_drupal_render_invalid_keys',
-    'access arguments' => array('access content'),
-    'type' => MENU_CALLBACK,
-  );
-  return $items;
-}
-
-/**
- * Prints a destination query parameter.
- */
-function common_test_destination() {
-  $destination = drupal_get_destination();
-  print "The destination: " . check_plain($destination['destination']);
-}
-
-/**
- * Renders an element with an invalid render array key.
- */
-function common_test_drupal_render_invalid_keys() {
-  define('SIMPLETEST_COLLECT_ERRORS', FALSE);
-
-  // Keys that begin with # may contain a value of any type, otherwise they must
-  // contain arrays.
-  $key = 'child';
-  $value = 'This should be an array.';
-  $element = array(
-    $key => $value,
-  );
-  return drupal_render($element);
-}
-
-/**
  * Applies #printed to an element to help test #pre_render.
  */
 function common_test_drupal_render_printing_pre_render($elements) {
@@ -235,18 +186,6 @@ function common_test_library_info() {
 }
 
 /**
- * Adds a JavaScript file and a CSS file with a query string appended.
- */
-function common_test_js_and_css_querystring() {
-   drupal_add_library('system', 'drupalSettings');
-   drupal_add_js(drupal_get_path('module', 'node') . '/node.js');
-   drupal_add_css(drupal_get_path('module', 'node') . '/css/node.admin.css');
-   // A relative URI may have a query string.
-   drupal_add_css('/' . drupal_get_path('module', 'node') . '/node-fake.css?arg1=value1&arg2=value2');
-   return '';
-}
-
-/**
  * Implements hook_cron().
  *
  * System module should handle if a module does not catch an exception and keep
@@ -257,4 +196,64 @@ function common_test_js_and_css_querystring() {
  */
 function common_test_cron() {
   throw new Exception(t('Uncaught exception'));
+}
+
+/**
+ * #post_render_cache callback; modifies #markup, #attached and #context_test.
+ *
+ * @param array $element
+ *  A render array with the following keys:
+ *    - #markup
+ *    - #attached
+ * @param array $context
+ *  An array with the following keys:
+ *    - foo: contains a random string.
+ *
+ * @return array $element
+ *   The updated $element.
+ */
+function common_test_post_render_cache(array $element, array $context) {
+  // Override #markup.
+  $element['#markup'] = '<p>overridden</p>';
+
+  // Extend #attached.
+  $element['#attached']['js'][] = array(
+    'type' => 'setting',
+    'data' => array(
+      'common_test' => $context
+    ),
+  );
+
+  // Set new property.
+  $element['#context_test'] = $context;
+
+  return $element;
+}
+
+/**
+ * #post_render_cache callback; replaces placeholder, extends #attached.
+ *
+ * @param array $context
+ *  An array with the following keys:
+ *    - bar: contains a random string.
+ *
+ * @return array
+ *   A render array.
+ */
+function common_test_post_render_cache_placeholder(array $context) {
+  $element = array(
+    '#markup' => '<bar>' . $context['bar'] . '</bar>',
+    '#attached' => array(
+      'js' => array(
+        array(
+          'type' => 'setting',
+          'data' => array(
+            'common_test' => $context,
+          ),
+        ),
+      ),
+    ),
+  );
+
+  return $element;
 }

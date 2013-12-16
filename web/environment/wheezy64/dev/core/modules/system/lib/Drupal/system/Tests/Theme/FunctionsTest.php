@@ -8,12 +8,19 @@
 namespace Drupal\system\Tests\Theme;
 
 use Drupal\simpletest\WebTestBase;
-use DOMDocument;
 
 /**
  * Tests for common theme functions.
  */
 class FunctionsTest extends WebTestBase {
+
+  /**
+   * Modules to enable.
+   *
+   * @var array
+   */
+  public static $modules = array('router_test');
+
   public static function getInfo() {
     return array(
       'name' => 'Theme functions',
@@ -26,15 +33,29 @@ class FunctionsTest extends WebTestBase {
    * Tests theme_item_list().
    */
   function testItemList() {
-    // Verify that empty variables produce no output.
+    // Verify that empty items produce no output.
     $variables = array();
     $expected = '';
     $this->assertThemeOutput('item_list', $variables, $expected, 'Empty %callback generates no output.');
 
+    // Verify that empty items with title produce no output.
     $variables = array();
     $variables['title'] = 'Some title';
     $expected = '';
     $this->assertThemeOutput('item_list', $variables, $expected, 'Empty %callback with title generates no output.');
+
+    // Verify that empty items produce the empty string.
+    $variables = array();
+    $variables['empty'] = 'No items found.';
+    $expected = '<div class="item-list">No items found.</div>';
+    $this->assertThemeOutput('item_list', $variables, $expected, 'Empty %callback generates empty string.');
+
+    // Verify that empty items produce the empty string with title.
+    $variables = array();
+    $variables['title'] = 'Some title';
+    $variables['empty'] = 'No items found.';
+    $expected = '<div class="item-list"><h3>Some title</h3>No items found.</div>';
+    $this->assertThemeOutput('item_list', $variables, $expected, 'Empty %callback generates empty string with title.');
 
     // Verify nested item lists.
     $variables = array();
@@ -159,13 +180,19 @@ class FunctionsTest extends WebTestBase {
         'title' => 'Front page',
         'href' => '<front>',
       ),
+      'router-test' => array(
+        'title' => 'Test route',
+        'route_name' => 'router_test.1',
+        'route_parameters' => array(),
+      ),
     );
 
     $expected_links = '';
     $expected_links .= '<ul id="somelinks">';
     $expected_links .= '<li class="a-link odd first"><a href="' . url('a/link') . '">' . check_plain('A <link>') . '</a></li>';
     $expected_links .= '<li class="plain-text even">' . check_plain('Plain "text"') . '</li>';
-    $expected_links .= '<li class="front-page odd last active"><a href="' . url('<front>') . '" class="active">' . check_plain('Front page') . '</a></li>';
+    $expected_links .= '<li class="front-page odd active"><a href="' . url('<front>') . '" class="active">' . check_plain('Front page') . '</a></li>';
+    $expected_links .= '<li class="router-test even last"><a href="' . \Drupal::urlGenerator()->generate('router_test.1') . '">' . check_plain('Test route') . '</a></li>';
     $expected_links .= '</ul>';
 
     // Verify that passing a string as heading works.
@@ -197,7 +224,8 @@ class FunctionsTest extends WebTestBase {
     $expected_links .= '<ul id="somelinks">';
     $expected_links .= '<li class="a-link odd first"><a href="' . url('a/link') . '" class="a/class">' . check_plain('A <link>') . '</a></li>';
     $expected_links .= '<li class="plain-text even"><span class="a/class">' . check_plain('Plain "text"') . '</span></li>';
-    $expected_links .= '<li class="front-page odd last active"><a href="' . url('<front>') . '" class="active">' . check_plain('Front page') . '</a></li>';
+    $expected_links .= '<li class="front-page odd active"><a href="' . url('<front>') . '" class="active">' . check_plain('Front page') . '</a></li>';
+    $expected_links .= '<li class="router-test even last"><a href="' . \Drupal::urlGenerator()->generate('router_test.1') . '">' . check_plain('Test route') . '</a></li>';
     $expected_links .= '</ul>';
     $expected = $expected_heading . $expected_links;
     $this->assertThemeOutput('links', $variables, $expected);
@@ -264,7 +292,7 @@ class FunctionsTest extends WebTestBase {
     // it.
     $render_array = $base_array;
     $html = drupal_render($render_array);
-    $dom = new DOMDocument();
+    $dom = new \DOMDocument();
     $dom->loadHTML($html);
     $this->assertEqual($dom->getElementsByTagName('ul')->length, 1, 'One "ul" tag found in the rendered HTML.');
     $list_elements = $dom->getElementsByTagName('li');
@@ -282,7 +310,7 @@ class FunctionsTest extends WebTestBase {
     $child_html = drupal_render($render_array['first_child']);
     $parent_html = drupal_render($render_array);
     // First check the child HTML.
-    $dom = new DOMDocument();
+    $dom = new \DOMDocument();
     $dom->loadHTML($child_html);
     $this->assertEqual($dom->getElementsByTagName('ul')->length, 1, 'One "ul" tag found in the rendered child HTML.');
     $list_elements = $dom->getElementsByTagName('li');
@@ -290,7 +318,7 @@ class FunctionsTest extends WebTestBase {
     $this->assertEqual($list_elements->item(0)->nodeValue, 'Parent link copy', 'First expected link found.');
     $this->assertEqual($list_elements->item(1)->nodeValue, 'First child link', 'Second expected link found.');
     // Then check the parent HTML.
-    $dom = new DOMDocument();
+    $dom = new \DOMDocument();
     $dom->loadHTML($parent_html);
     $this->assertEqual($dom->getElementsByTagName('ul')->length, 1, 'One "ul" tag found in the rendered parent HTML.');
     $list_elements = $dom->getElementsByTagName('li');

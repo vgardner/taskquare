@@ -7,11 +7,8 @@
 
 namespace Drupal\search\Plugin\Block;
 
+use Drupal\Core\Session\AccountInterface;
 use Drupal\block\BlockBase;
-use Drupal\block\Annotation\Block;
-use Drupal\Core\Annotation\Translation;
-use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
-use Drupal\search\Form\SearchBlockForm;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -20,39 +17,24 @@ use Symfony\Component\HttpFoundation\Request;
  *
  * @Block(
  *   id = "search_form_block",
- *   admin_label = @Translation("Search form")
+ *   admin_label = @Translation("Search form"),
+ *   category = @Translation("Forms")
  * )
  */
-class SearchBlock extends BlockBase implements ContainerFactoryPluginInterface {
+class SearchBlock extends BlockBase {
 
   /**
    * {@inheritdoc}
    */
-  public static function create(ContainerInterface $container, array $configuration, $plugin_id, array $plugin_definition) {
-    return new static($configuration, $plugin_id, $plugin_definition, $container->get('request'));
-  }
-
-  /**
-   * Constructs a SearchBlock object.
-   */
-  public function __construct(array $configuration, $plugin_id, array $plugin_definition, Request $request) {
-    parent::__construct($configuration, $plugin_id, $plugin_definition);
-
-    $this->request = $request;
-  }
-
-  /**
-   * Overrides \Drupal\block\BlockBase::access().
-   */
-  public function access() {
-    return user_access('search content');
+  public function access(AccountInterface $account) {
+    return $account->hasPermission('search content');
   }
 
   /**
    * {@inheritdoc}
    */
   public function build() {
-    // Pass the current request to drupal_get_form for use in the buildForm.
-    return drupal_get_form(new SearchBlockForm(), $this->request);
+    return drupal_get_form('Drupal\search\Form\SearchBlockForm');
   }
+
 }

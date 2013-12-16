@@ -10,6 +10,7 @@ namespace Drupal\statistics\Plugin\Block;
 use Drupal\block\BlockBase;
 use Drupal\block\Annotation\Block;
 use Drupal\Core\Annotation\Translation;
+use Drupal\Core\Session\AccountInterface;
 
 /**
  * Provides a 'Popular content' block.
@@ -43,9 +44,9 @@ class StatisticsPopularBlock extends BlockBase {
   protected $last_list;
 
   /**
-   * Overrides \Drupal\block\BlockBase::settings().
+   * {@inheritdoc}
    */
-  public function settings() {
+  public function defaultConfiguration() {
     return array(
       'top_day_num' => 0,
       'top_all_num' => 0,
@@ -53,11 +54,11 @@ class StatisticsPopularBlock extends BlockBase {
     );
   }
 
-    /**
-   * Overrides \Drupal\block\BlockBase::access().
+  /**
+   * {@inheritdoc}
    */
-  public function access() {
-    if (user_access('access content')) {
+  public function access(AccountInterface $account) {
+    if ($account->hasPermission('access content')) {
       $daytop = $this->configuration['top_day_num'];
       if (!$daytop || !($result = statistics_title_list('daycount', $daytop)) || !($this->day_list = node_title_list($result, t("Today's:")))) {
         return FALSE;

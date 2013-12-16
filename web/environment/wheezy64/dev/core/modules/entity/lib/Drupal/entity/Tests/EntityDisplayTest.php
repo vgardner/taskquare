@@ -156,7 +156,7 @@ class EntityDisplayTest extends DrupalUnitTestBase {
 
     // Check that providing no options results in default values being used.
     $display->setComponent($field_name);
-    $field_type_info = \Drupal::service('plugin.manager.entity.field.field_type')->getDefinition($field->type);
+    $field_type_info = \Drupal::service('plugin.manager.field.field_type')->getDefinition($field->type);
     $default_formatter = $field_type_info['default_formatter'];
     $formatter_settings =  \Drupal::service('plugin.manager.field.formatter')->getDefinition($default_formatter);
     $expected = array(
@@ -257,18 +257,31 @@ class EntityDisplayTest extends DrupalUnitTestBase {
     ));
     $instance->save();
 
-    // Create an entity display.
+    // Create default and teaser entity display.
     entity_create('entity_display', array(
       'targetEntityType' => 'entity_test',
       'bundle' => 'entity_test',
-      'viewMode' => 'default',
+      'mode' => 'default',
     ))->setComponent($field_name)->save();
+    entity_create('entity_display', array(
+      'targetEntityType' => 'entity_test',
+      'bundle' => 'entity_test',
+      'mode' => 'teaser',
+    ))->setComponent($field_name)->save();
+
+    // Check the component exists.
+    $display = entity_get_display('entity_test', 'entity_test', 'default');
+    $this->assertTrue($display->getComponent($field_name));
+    $display = entity_get_display('entity_test', 'entity_test', 'teaser');
+    $this->assertTrue($display->getComponent($field_name));
 
     // Delete the instance.
     $instance->delete();
 
-    // Check that the component has been removed from the entity display.
+    // Check that the component has been removed from the entity displays.
     $display = entity_get_display('entity_test', 'entity_test', 'default');
+    $this->assertFalse($display->getComponent($field_name));
+    $display = entity_get_display('entity_test', 'entity_test', 'teaser');
     $this->assertFalse($display->getComponent($field_name));
   }
 

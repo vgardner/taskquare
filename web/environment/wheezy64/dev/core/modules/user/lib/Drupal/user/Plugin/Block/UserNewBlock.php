@@ -10,21 +10,23 @@ namespace Drupal\user\Plugin\Block;
 use Drupal\block\BlockBase;
 use Drupal\block\Annotation\Block;
 use Drupal\Core\Annotation\Translation;
+use Drupal\Core\Session\AccountInterface;
 
 /**
  * Provides a "Who's new" block.
  *
  * @Block(
  *   id = "user_new_block",
- *   admin_label = @Translation("Who's new")
+ *   admin_label = @Translation("Who's new"),
+ *   category = @Translation("Lists (Views)")
  * )
  */
 class UserNewBlock extends BlockBase {
 
   /**
-   * Overrides \Drupal\block\BlockBase::settings().
+   * {@inheritdoc}
    */
-  public function settings() {
+  public function defaultConfiguration() {
     return array(
       'properties' => array(
         'administrative' => TRUE
@@ -34,10 +36,10 @@ class UserNewBlock extends BlockBase {
   }
 
   /**
-   * Overrides \Drupal\block\BlockBase::access().
+   * {@inheritdoc}
    */
-  public function access() {
-    return user_access('access content');
+  public function access(AccountInterface $account) {
+    return $account->hasPermission('access content');
   }
 
   /**

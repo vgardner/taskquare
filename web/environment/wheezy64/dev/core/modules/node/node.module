@@ -14,13 +14,12 @@ use Symfony\Component\HttpFoundation\Response;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Database\Query\AlterableInterface;
 use Drupal\Core\Database\Query\SelectInterface;
-use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\node\NodeTypeInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
+use Drupal\Core\Entity\Display\EntityFormDisplayInterface;
 use Drupal\Core\Template\Attribute;
-use Drupal\entity\Entity\EntityDisplay;
 use Drupal\file\Entity\File;
-use Drupal\user\UserInterface;
 
 /**
  * Denotes that the node is not published.
@@ -171,6 +170,9 @@ function node_theme() {
       'render element' => 'form',
       'template' => 'node-edit-form',
     ),
+    'field__node__title' => array(
+      'base hook' => 'field',
+    ),
   );
 }
 
@@ -190,14 +192,42 @@ function node_entity_bundle_info() {
 /**
  * Implements hook_entity_display_alter().
  */
-function node_entity_display_alter(EntityDisplay $display, $context) {
-  // Hide field labels in search index.
-  if ($context['entity_type'] == 'node' && $context['view_mode'] == 'search_index') {
-    foreach ($display->getComponents() as $name => $options) {
-      if (isset($options['label'])) {
-        $options['label'] = 'hidden';
-        $display->setComponent($name, $options);
+function node_entity_display_alter(EntityViewDisplayInterface $display, $context) {
+  if ($context['entity_type'] == 'node') {
+    // Hide field labels in search index.
+    if ($context['view_mode'] == 'search_index') {
+      foreach ($display->getComponents() as $name => $options) {
+        if (isset($options['label'])) {
+          $options['label'] = 'hidden';
+          $display->setComponent($name, $options);
+        }
       }
+    }
+    // @todo Manage base field displays in the YAML:
+    //   https://drupal.org/node/2144919.
+    $display->setComponent('title', array(
+      'label' => 'hidden',
+      'type' => 'text_default',
+    ));
+  }
+}
+
+/**
+ * Implements hook_entity_form_display_alter().
+ */
+function node_entity_form_display_alter(EntityFormDisplayInterface $form_display, $context) {
+  if ($context['entity_type'] == 'node') {
+    // @todo Manage base field displays in the YAML:
+    //   https://drupal.org/node/2144919.
+    $node_type = node_type_load($context['bundle']);
+    if ($node_type->has_title) {
+      // Title is also registered in node_field_extra_fields().
+      $options = $form_display->getComponent('title') ?: array('weight' => -5);
+      $options['type'] = 'text_textfield';
+      $form_display->setComponent('title', $options);
+    }
+    else {
+      $form_display->removeComponent('title');
     }
   }
 }
@@ -276,10 +306,10 @@ function node_title_list($result, $title = NULL) {
  *   One of the MARK constants.
  */
 function node_mark($nid, $timestamp) {
-  global $user;
+
   $cache = &drupal_static(__FUNCTION__, array());
 
-  if ($user->isAnonymous() || !\Drupal::moduleHandler()->moduleExists('history')) {
+  if (\Drupal::currentUser()->isAnonymous() || !\Drupal::moduleHandler()->moduleExists('history')) {
     return MARK_READ;
   }
   if (!isset($cache[$nid])) {
@@ -449,7 +479,7 @@ function node_field_extra_fields() {
   foreach (node_type_get_types() as $bundle) {
     if ($bundle->has_title) {
       $extra['node'][$bundle->type]['form']['title'] = array(
-        'label' => $bundle->title_label,
+        'label' => check_plain($bundle->title_label),
         'description' => $description,
         'weight' => -5,
       );
@@ -648,7 +678,8 @@ function template_preprocess_node(&$variables) {
 
   $uri = $node->uri();
   $variables['node_url']  = url($uri['path'], $uri['options']);
-  $variables['label'] = check_plain($node->label());
+  $variables['label'] = $variables['elements']['title'];
+  unset($variables['elements']['title']);
   $variables['page'] = $variables['view_mode'] == 'full' && node_is_page($node);
 
   // Helpful $content variable for templates.
@@ -704,6 +735,23 @@ function template_preprocess_node(&$variables) {
     $variables['attributes']['class'][] = 'preview';
   }
   $variables['content_attributes']['class'][] = 'content';
+}
+
+/**
+ * Returns HTML for the node title field.
+ *
+ * This is an override of theme_field() for the node title field. See that
+ * function for documentation about its details and overrides.
+ *
+ * @param array $variables
+ *   An associative array. See theme_field() for details.
+ *
+ * @see theme_field()
+ *
+ * @ingroup themeable
+ */
+function theme_field__node__title($variables) {
+  return '<span' . $variables['attributes'] . '>' . drupal_render($variables['items']) . '</span>';
 }
 
 /**
@@ -935,19 +983,11 @@ function node_menu() {
     'route_name' => 'node.content_overview',
     'weight' => -10,
   );
-  $items['admin/content/node'] = array(
-    'title' => 'Content',
-    'type' => MENU_DEFAULT_LOCAL_TASK,
-  );
 
   $items['admin/structure/types'] = array(
     'title' => 'Content types',
     'description' => 'Manage content types, including default status, front page promotion, comment settings, etc.',
     'route_name' => 'node.overview_types',
-  );
-  $items['admin/structure/types/list'] = array(
-    'title' => 'List',
-    'type' => MENU_DEFAULT_LOCAL_TASK,
   );
   $items['node/add'] = array(
     'title' => 'Add content',
@@ -1070,7 +1110,7 @@ function node_get_recent($number = 10) {
     // If the user is able to view their own unpublished nodes, allow them
     // to see these in addition to published nodes. Check that they actually
     // have some unpublished nodes to view before adding the condition.
-    if (user_access('view own unpublished content') && $own_unpublished = db_query('SELECT DISTINCT nid FROM {node_field_data} WHERE uid = :uid AND status = :status', array(':uid' => $GLOBALS['user']->id(), ':status' => NODE_NOT_PUBLISHED))->fetchCol()) {
+    if (user_access('view own unpublished content') && $own_unpublished = db_query('SELECT DISTINCT nid FROM {node_field_data} WHERE uid = :uid AND status = :status', array(':uid' => \Drupal::currentUser()->id(), ':status' => NODE_NOT_PUBLISHED))->fetchCol()) {
       $query->condition(db_or()
         ->condition('n.status', NODE_PUBLISHED)
         ->condition('n.nid', $own_unpublished, 'IN')
@@ -1119,13 +1159,13 @@ function theme_node_recent_block($variables) {
       'data' => drupal_render($node_recent_content),
       'class' => 'title-author',
     );
-    if (node_access('update', $node)) {
+    if ($node->access('update')) {
       $row[] = array(
         'data' => l(t('edit'), 'node/' . $node->id() . '/edit', $l_options),
         'class' => 'edit',
       );
     }
-    if (node_access('delete', $node)) {
+    if ($node->access('delete')) {
       $row[] = array(
         'data' => l(t('delete'), 'node/' . $node->id() . '/delete', $l_options),
         'class' => 'delete',
@@ -1445,9 +1485,10 @@ function node_form_system_themes_admin_form_submit($form, &$form_state) {
  * @{
  * The node access system determines who can do what to which nodes.
  *
- * In determining access rights for a node, node_access() first checks whether
- * the user has the "bypass node access" permission. Such users have
- * unrestricted access to all nodes. user 1 will always pass this check.
+ * In determining access rights for a node, \Drupal\node\NodeAccessController
+ * first checks whether the user has the "bypass node access" permission. Such
+ * users have unrestricted access to all nodes. user 1 will always pass this
+ * check.
  *
  * Next, all implementations of hook_node_access() will be called. Each
  * implementation may explicitly allow, explicitly deny, or ignore the access
@@ -1482,55 +1523,6 @@ function node_form_system_themes_admin_form_submit($form, &$form_state) {
  * To see how to write a node access module of your own, see
  * node_access_example.module.
  */
-
-/**
- * Access callback: Checks a user's permission for performing a node operation.
- *
- * @param $op
- *   The operation to be performed on the node. Possible values are:
- *   - "view"
- *   - "update"
- *   - "delete"
- *   - "create"
- * @param \Drupal\Core\Entity\EntityInterface|string|stdClass $node
- *   The node entity on which the operation is to be performed, or the node type
- *   object, or node type string (e.g., 'forum') for the 'create' operation.
- * @param $account
- *   (optional) A user object representing the user for whom the operation is to
- *   be performed. Determines access for a user other than the current user.
- *   Defaults to NULL.
- * @param $langcode
- *   (optional) Language code for the variant of the node. Different language
- *   variants might have different permissions associated. If NULL, the
- *   original langcode of the node is used. Defaults to NULL.
- *
- * @return
- *   TRUE if the operation may be performed, FALSE otherwise.
- *
- * @see node_menu()
- */
-function node_access($op, $node, $account = NULL, $langcode = NULL) {
-  $access_controller = \Drupal::entityManager()->getAccessController('node');
-
-  if ($op == 'create') {
-    if (!$node instanceof EntityInterface) {
-      $bundle = $node;
-    }
-    elseif ($node instanceof NodeTypeInterface) {
-      $bundle = $node->id();
-    }
-    else {
-      $bundle = $node->bundle();
-    }
-    return $access_controller->createAccess($bundle, $account, array('langcode' => $langcode));
-  }
-
-  // If no language code was provided, default to the node's langcode.
-  if (empty($langcode)) {
-    $langcode = $node->prepareLangcode();
-  }
-  return $access_controller->access($node, $op, $langcode, $account);
-}
 
 /**
  * Implements hook_node_access().
@@ -1651,7 +1643,7 @@ function node_permissions_get_configured_types() {
 function node_access_grants($op, $account = NULL) {
 
   if (!isset($account)) {
-    $account = $GLOBALS['user'];
+    $account = \Drupal::currentUser();
   }
 
   // Fetch node access grants from other modules.
@@ -1685,9 +1677,9 @@ function node_access_grants($op, $account = NULL) {
  * @see node_query_node_access_alter()
  */
 function node_access_view_all_nodes($account = NULL) {
-  global $user;
+
   if (!$account) {
-    $account = $user;
+    $account = \Drupal::currentUser();
   }
 
   // Statically cache results in an array keyed by $account->id().
@@ -1713,7 +1705,7 @@ function node_access_view_all_nodes($account = NULL) {
  *
  * This is the hook_query_alter() for queries tagged with 'node_access'. It adds
  * node access checks for the user account given by the 'account' meta-data (or
- * global $user if not provided), for an operation given by the 'op' meta-data
+ * current user if not provided), for an operation given by the 'op' meta-data
  * (or 'view' if not provided; other possible values are 'update' and 'delete').
  *
  * Queries tagged with 'node_access' that are not against the {node} table
@@ -1992,7 +1984,7 @@ function node_modules_uninstalled($modules) {
  */
 function node_file_download_access($field, EntityInterface $entity, File $file) {
   if ($entity->entityType() == 'node') {
-    return node_access('view', $entity);
+    return $entity->access('view');
   }
 }
 

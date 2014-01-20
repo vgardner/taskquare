@@ -2,6 +2,7 @@
  * @file
  * A Backbone View that provides an interactive toolbar (1 per in-place editor).
  */
+
 (function ($, _, Backbone, Drupal) {
 
 "use strict";
@@ -25,7 +26,7 @@ Drupal.edit.FieldToolbarView = Backbone.View.extend({
     this.$root = this.$el;
 
     // Generate a DOM-compatible ID for the form container DOM element.
-    this._id = 'edit-toolbar-for-' + this.model.id.replace(/\//g, '_');
+    this._id = 'edit-toolbar-for-' + this.model.id.replace(/[\/\[\]]/g, '_');
 
     this.model.on('change:state', this.stateChange, this);
   },
@@ -181,6 +182,7 @@ Drupal.edit.FieldToolbarView = Backbone.View.extend({
       $group.removeClass('edit-animate-invisible');
     }, 0);
    }
+
 });
 
 })(jQuery, _, Backbone, Drupal);

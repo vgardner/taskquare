@@ -16,7 +16,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Config\ConfigFactory;
 use Drupal\Core\Config\StorageInterface;
 use Drupal\Core\Extension\ModuleHandler;
-use Drupal\Core\KeyValueStore\KeyValueStoreInterface;
+use Drupal\Core\KeyValueStore\StateInterface;
 
 /**
  * Controller class for fields.
@@ -40,7 +40,7 @@ class FieldStorageController extends ConfigStorageController {
   /**
    * The state keyvalue collection.
    *
-   * @var \Drupal\Core\KeyValueStore\KeyValueStoreInterface
+   * @var \Drupal\Core\KeyValueStore\StateInterface
    */
   protected $state;
 
@@ -63,10 +63,10 @@ class FieldStorageController extends ConfigStorageController {
    *   The entity manager.
    * @param \Drupal\Core\Extension\ModuleHandler $module_handler
    *   The module handler.
-   * @param \Drupal\Core\KeyValueStore\KeyValueStoreInterface $state
+   * @param \Drupal\Core\KeyValueStore\StateInterface $state
    *   The state key value store.
    */
-  public function __construct($entity_type, array $entity_info, ConfigFactory $config_factory, StorageInterface $config_storage, QueryFactory $entity_query_factory, UuidInterface $uuid_service, EntityManagerInterface $entity_manager, ModuleHandler $module_handler, KeyValueStoreInterface $state) {
+  public function __construct($entity_type, array $entity_info, ConfigFactory $config_factory, StorageInterface $config_storage, QueryFactory $entity_query_factory, UuidInterface $uuid_service, EntityManagerInterface $entity_manager, ModuleHandler $module_handler, StateInterface $state) {
     parent::__construct($entity_type, $entity_info, $config_factory, $config_storage, $entity_query_factory, $uuid_service);
     $this->entityManager = $entity_manager;
     $this->moduleHandler = $module_handler;
@@ -94,10 +94,6 @@ class FieldStorageController extends ConfigStorageController {
    * {@inheritdoc}
    */
   public function loadByProperties(array $conditions = array()) {
-    // Include instances of inactive fields if specified in the
-    // $conditions parameters.
-    $include_inactive = isset($conditions['include_inactive']) ? $conditions['include_inactive'] : FALSE;
-    unset($conditions['include_inactive']);
     // Include deleted instances if specified in the $conditions parameters.
     $include_deleted = isset($conditions['include_deleted']) ? $conditions['include_deleted'] : FALSE;
     unset($conditions['include_deleted']);
@@ -119,11 +115,6 @@ class FieldStorageController extends ConfigStorageController {
       foreach ($deleted_fields as $id => $config) {
         $fields[$id] = $this->entityManager->getStorageController($this->entityType)->create($config);
       }
-    }
-
-    // Translate "do not include inactive instances" into actual conditions.
-    if (!$include_inactive) {
-      $conditions['active'] = TRUE;
     }
 
     // Collect matching fields.

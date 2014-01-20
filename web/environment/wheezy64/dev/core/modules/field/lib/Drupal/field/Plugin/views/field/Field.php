@@ -143,8 +143,8 @@ class Field extends FieldPluginBase {
     $this->multiple = FALSE;
     $this->limit_values = FALSE;
 
-    $cardinality = $this->field_info->getFieldCardinality();
-    if ($this->field_info->isFieldMultiple()) {
+    $cardinality = $this->field_info->getCardinality();
+    if ($this->field_info->isMultiple()) {
       $this->multiple = TRUE;
 
       // If "Display all values in the same row" is FALSE, then we always limit
@@ -259,7 +259,7 @@ class Field extends FieldPluginBase {
         $default_langcode = language_default()->id;
         $langcode = str_replace(
           array('***CURRENT_LANGUAGE***', '***DEFAULT_LANGUAGE***'),
-          array($this->languageManager->getLanguage(Language::TYPE_CONTENT)),
+          array($this->languageManager->getLanguage(Language::TYPE_CONTENT), $default_langcode),
           $this->view->display_handler->options['field_langcode']
         );
         $placeholder = $this->placeholder();
@@ -325,7 +325,7 @@ class Field extends FieldPluginBase {
 
     // defineOptions runs before init/construct, so no $this->field_info
     $field = field_info_field($this->definition['entity_type'], $this->definition['field_name']);
-    $field_type = \Drupal::service('plugin.manager.field.field_type')->getDefinition($field->getFieldType());
+    $field_type = \Drupal::service('plugin.manager.field.field_type')->getDefinition($field->getType());
     $column_names = array_keys($field->getColumns());
     $default_column = '';
     // Try to determine a sensible default.
@@ -361,7 +361,7 @@ class Field extends FieldPluginBase {
     // If we know the exact number of allowed values, then that can be
     // the default. Otherwise, default to 'all'.
     $options['delta_limit'] = array(
-      'default' => ($field->getFieldCardinality() > 1) ? $field->getFieldCardinality() : 'all',
+      'default' => ($field->getCardinality() > 1) ? $field->getCardinality() : 'all',
     );
     $options['delta_offset'] = array(
       'default' => 0,
@@ -397,7 +397,7 @@ class Field extends FieldPluginBase {
     parent::buildOptionsForm($form, $form_state);
 
     $field = $this->field_info;
-    $formatters = $this->formatterPluginManager->getOptions($field->getFieldType());
+    $formatters = $this->formatterPluginManager->getOptions($field->getType());
     $column_names = array_keys($field->getColumns());
 
     // If this is a multiple value field, add its options.
@@ -496,14 +496,14 @@ class Field extends FieldPluginBase {
     // translating prefix and suffix separately.
     list($prefix, $suffix) = explode('@count', t('Display @count value(s)'));
 
-    if ($field->getFieldCardinality() == FieldDefinitionInterface::CARDINALITY_UNLIMITED) {
+    if ($field->getCardinality() == FieldDefinitionInterface::CARDINALITY_UNLIMITED) {
       $type = 'textfield';
       $options = NULL;
       $size = 5;
     }
     else {
       $type = 'select';
-      $options = drupal_map_assoc(range(1, $field->getFieldCardinality()));
+      $options = drupal_map_assoc(range(1, $field->getCardinality()));
       $size = 1;
     }
     $form['multi_type'] = array(
@@ -844,7 +844,7 @@ class Field extends FieldPluginBase {
         $tokens['[' . $this->options['id'] . '-' . $id . ']'] = filter_xss_admin($raw[$id]);
       }
       else {
-        // Take sure that empty values are replaced as well.
+        // Make sure that empty values are replaced as well.
         $tokens['[' . $this->options['id'] . '-' . $id . ']'] = '';
       }
     }
@@ -859,7 +859,7 @@ class Field extends FieldPluginBase {
       $default_langcode = language_default()->id;
       $langcode = str_replace(
         array('***CURRENT_LANGUAGE***', '***DEFAULT_LANGUAGE***'),
-        array($this->languageManager->getLanguage(Language::TYPE_CONTENT)),
+        array($this->languageManager->getLanguage(Language::TYPE_CONTENT), $default_langcode),
         $this->view->display_handler->options['field_language']
       );
 

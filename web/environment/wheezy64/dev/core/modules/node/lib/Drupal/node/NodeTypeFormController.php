@@ -182,7 +182,7 @@ class NodeTypeFormController extends EntityFormController {
     $id = trim($form_state['values']['type']);
     // '0' is invalid, since elsewhere we check it using empty().
     if ($id == '0') {
-      form_set_error('type', t("Invalid machine-readable name. Enter a name other than %invalid.", array('%invalid' => $id)));
+      $this->setFormError('type', $form_state, $this->t("Invalid machine-readable name. Enter a name other than %invalid.", array('%invalid' => $id)));
     }
   }
 
@@ -198,32 +198,6 @@ class NodeTypeFormController extends EntityFormController {
     // module alters the title field.
     $type->has_title = ($type->title_label != '');
 
-    $variables = $form_state['values'];
-
-    // Do not save settings from vertical tabs.
-    // @todo Fix vertical_tabs.
-    unset($variables['additional_settings__active_tab']);
-
-    // @todo Remove the entire following code after converting node settings of
-    //   Comment and Menu module. https://drupal.org/node/2026165
-    // Remove all node type entity properties.
-    foreach (get_class_vars(get_class($type)) as $key => $value) {
-      unset($variables[$key]);
-    }
-    // Save or reset persistent variable values.
-    foreach ($variables as $key => $value) {
-      $variable_new = $key . '_' . $type->id();
-      $variable_old = $key . '_' . $type->getOriginalID();
-      if (is_array($value)) {
-        $value = array_keys(array_filter($value));
-      }
-      variable_set($variable_new, $value);
-      if ($variable_new != $variable_old) {
-        variable_del($variable_old);
-      }
-    }
-    // Saving the content type after saving the variables allows modules to act
-    // on those variables via hook_node_type_insert().
     $status = $type->save();
 
     $t_args = array('%name' => $type->label());

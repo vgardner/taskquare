@@ -43,7 +43,7 @@ class PathPluginBaseTest extends UnitTestCase {
   /**
    * The mocked key value storage.
    *
-   * @var \Drupal\Core\KeyValueStore\KeyValueStoreInterface|\PHPUnit_Framework_MockObject_MockObject
+   * @var \Drupal\Core\KeyValueStore\StateInterface|\PHPUnit_Framework_MockObject_MockObject
    */
   protected $state;
 
@@ -62,23 +62,33 @@ class PathPluginBaseTest extends UnitTestCase {
     parent::setUp();
 
     $this->routeProvider = $this->getMock('Drupal\Core\Routing\RouteProviderInterface');
-    $this->state = $this->getMock('\Drupal\Core\KeyValueStore\KeyValueStoreInterface');
+    $this->state = $this->getMock('\Drupal\Core\KeyValueStore\StateInterface');
     $this->pathPlugin = $this->getMockBuilder('Drupal\views\Plugin\views\display\PathPluginBase')
       ->setConstructorArgs(array(array(), 'path_base', array(), $this->routeProvider, $this->state))
       ->setMethods(NULL)
       ->getMock();
-    $this->setupAccessPluginManager();
+    $this->setupContainer();
   }
 
   /**
-   * Setup access plugin manager in a Drupal class.
+   * Setup access plugin manager and config factory in the Drupal class.
    */
-  public function setupAccessPluginManager() {
+  public function setupContainer() {
     $this->accessPluginManager = $this->getMockBuilder('\Drupal\views\Plugin\ViewsPluginManager')
       ->disableOriginalConstructor()
       ->getMock();
     $container = new ContainerBuilder();
     $container->set('plugin.manager.views.access', $this->accessPluginManager);
+
+    $config = array(
+      'views.settings' => array(
+        'skip_cache' => TRUE,
+        'display_extenders' => array(),
+      ),
+    );
+
+    $container->set('config.factory', $this->getConfigFactoryStub($config));
+
     \Drupal::setContainer($container);
   }
 
@@ -106,7 +116,31 @@ class PathPluginBaseTest extends UnitTestCase {
     $this->assertTrue($route instanceof Route);
     $this->assertEquals('test_id', $route->getDefault('view_id'));
     $this->assertEquals('page_1', $route->getDefault('display_id'));
+  }
 
+  /**
+   * Tests the collect routes method with an alternative route name in the UI.
+   */
+  public function testCollectRoutesWithSpecialRouteName() {
+    list($view) = $this->setupViewExecutableAccessPlugin();
+
+    $display = array();
+    $display['display_plugin'] = 'page';
+    $display['id'] = 'page_1';
+    $display['display_options'] = array(
+      'path' => 'test_route',
+      'route_name' => 'test_route',
+    );
+    $this->pathPlugin->initDisplay($view, $display);
+
+    $collection = new RouteCollection();
+    $result = $this->pathPlugin->collectRoutes($collection);
+    $this->assertEquals(array('test_id.page_1' => 'test_route'), $result);
+
+    $route = $collection->get('test_route');
+    $this->assertTrue($route instanceof Route);
+    $this->assertEquals('test_id', $route->getDefault('view_id'));
+    $this->assertEquals('page_1', $route->getDefault('display_id'));
   }
 
   /**

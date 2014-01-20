@@ -5,6 +5,8 @@
  * Admin page callbacks for the Comment module.
  */
 
+use Drupal\comment\CommentInterface;
+
 /**
  * Page callback: Presents an administrative comment listing.
  *
@@ -70,7 +72,7 @@ function comment_admin_overview($form, &$form_state, $arg) {
   );
 
   // Load the comments that need to be displayed.
-  $status = ($arg == 'approval') ? COMMENT_NOT_PUBLISHED : COMMENT_PUBLISHED;
+  $status = ($arg == 'approval') ? CommentInterface::NOT_PUBLISHED : CommentInterface::PUBLISHED;
   $header = array(
     'subject' => array('data' => t('Subject'), 'field' => 'subject'),
     'author' => array('data' => t('Author'), 'field' => 'name', 'class' => array(RESPONSIVE_PRIORITY_MEDIUM)),
@@ -154,14 +156,14 @@ function comment_admin_overview($form, &$form_state, $arg) {
     );
     $links = array();
     $links['edit'] = array(
-      'title' => t('edit'),
+      'title' => t('Edit'),
       'route_name' => 'comment.edit_page',
       'route_parameters' => array('comment' => $comment->id()),
       'query' => $destination,
     );
     if (module_invoke('content_translation', 'translate_access', $comment)) {
       $links['translate'] = array(
-        'title' => t('translate'),
+        'title' => t('Translate'),
         'route_name' => 'content_translation.translation_overview_comment',
         'route_parameters' => array('comment' => $comment->id()),
         'query' => $destination,
@@ -194,7 +196,7 @@ function comment_admin_overview_validate($form, &$form_state) {
   $form_state['values']['comments'] = array_diff($form_state['values']['comments'], array(0));
   // We can't execute any 'Update options' if no comments were selected.
   if (count($form_state['values']['comments']) == 0) {
-    form_set_error('', t('Select one or more comments to perform the update on.'));
+    form_set_error('', $form_state, t('Select one or more comments to perform the update on.'));
   }
 }
 
@@ -218,10 +220,10 @@ function comment_admin_overview_submit($form, &$form_state) {
       $comment = comment_load($value);
 
       if ($operation == 'unpublish') {
-        $comment->status->value = COMMENT_NOT_PUBLISHED;
+        $comment->status->value = CommentInterface::NOT_PUBLISHED;
       }
       elseif ($operation == 'publish') {
-        $comment->status->value = COMMENT_PUBLISHED;
+        $comment->status->value = CommentInterface::PUBLISHED;
       }
       $comment->save();
     }

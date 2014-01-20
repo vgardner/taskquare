@@ -11,43 +11,12 @@ use Drupal\Component\Utility\String;
 use Drupal\Core\Entity\ContentEntityFormController;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Language\Language;
-use Drupal\aggregator\CategoryStorageControllerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Form controller for the aggregator feed edit forms.
  */
 class FeedFormController extends ContentEntityFormController {
-
-  /**
-   * The category storage controller.
-   *
-   * @var \Drupal\aggregator\CategoryStorageControllerInterface
-   */
-  protected $categoryStorageController;
-
-  /**
-   * Constructs a FeedForm object.
-   *
-   * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
-   *   The entity manager.
-   * @param \Drupal\aggregator\CategoryStorageControllerInterface $category_storage_controller
-   *   The category storage controller.
-   */
-  public function __construct(EntityManagerInterface $entity_manager, CategoryStorageControllerInterface $category_storage_controller) {
-    parent::__construct($entity_manager);
-    $this->categoryStorageController = $category_storage_controller;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function create(ContainerInterface $container) {
-    return new static(
-      $container->get('entity.manager'),
-      $container->get('aggregator.category.storage')
-    );
-  }
 
   /**
    * {@inheritdoc}
@@ -88,27 +57,6 @@ class FeedFormController extends ContentEntityFormController {
       '#description' => $this->t('The length of time between feed updates. Requires a correctly configured <a href="@cron">cron maintenance task</a>.', array('@cron' => url('admin/reports/status'))),
     );
 
-    // Handling of categories.
-    $options = array();
-    $values = array();
-    $categories = $this->categoryStorageController->loadAllKeyed();
-    foreach ($categories as $cid => $title) {
-      $options[$cid] = String::checkPlain($title);
-      if (!empty($feed->categories) && in_array($cid, array_keys($feed->categories))) {
-        $values[] = $cid;
-      }
-    }
-
-    if ($options) {
-      $form['category'] = array(
-        '#type' => 'checkboxes',
-        '#title' => $this->t('Categorize news items'),
-        '#default_value' => $values,
-        '#options' => $options,
-        '#description' => $this->t('New feed items are automatically filed in the checked categories.'),
-      );
-    }
-
     return parent::form($form, $form_state, $feed);
   }
 
@@ -122,10 +70,10 @@ class FeedFormController extends ContentEntityFormController {
     $result = $feed_storage_controller->getFeedDuplicates($feed);
     foreach ($result as $item) {
       if (strcasecmp($item->title, $feed->label()) == 0) {
-        form_set_error('title', $this->t('A feed named %feed already exists. Enter a unique title.', array('%feed' => $feed->label())));
+        $this->setFormError('title', $form_state, $this->t('A feed named %feed already exists. Enter a unique title.', array('%feed' => $feed->label())));
       }
       if (strcasecmp($item->url, $feed->url->value) == 0) {
-        form_set_error('url', $this->t('A feed with this URL %url already exists. Enter a unique URL.', array('%url' => $feed->url->value)));
+        $this->setFormError('url', $form_state, $this->t('A feed with this URL %url already exists. Enter a unique URL.', array('%url' => $feed->url->value)));
       }
     }
     parent::validate($form, $form_state);
@@ -137,11 +85,6 @@ class FeedFormController extends ContentEntityFormController {
   public function save(array $form, array &$form_state) {
     $feed = $this->entity;
     $insert = (bool) $feed->id();
-    if (!empty($form_state['values']['category'])) {
-      // Store category values for post save operations.
-      // @see \Drupal\Core\Entity\FeedStorageController::postSave()
-      $feed->categories = $form_state['values']['category'];
-    }
     $feed->save();
     if ($insert) {
       drupal_set_message($this->t('The feed %feed has been updated.', array('%feed' => $feed->label())));

@@ -85,9 +85,18 @@ body.install-page #page-title {
   background: transparent;
   padding-top: 0;
 }
+body.install-page .site-slogan {
+  margin: 0.75em 0 0.75em 50px; /* LTR */
+}
+[dir="rtl"] body.install-page .site-slogan {
+  margin: 0.75em 50px 0.75em 0;
+}
 @media all and  (max-width: 48em) { /* 768px */
   body.install-page #site-name {
     margin-left: 0;
+  }
+  body.install-page .site-slogan {
+    margin: 0.75em 0 1.5em;
   }
   body.install-page {
     padding: 0;
@@ -174,11 +183,15 @@ body.install-page #page-title {
   float: none;
   width: auto;
 }
-@media all and (max-width: 975px) and (min-width: 48em) {
+@media all and (max-width: 1010px) and (min-width: 48em) {
   .install-page .password-strength,
   .install-page .confirm-parent,
   .install-page div.password-confirm {
     float: none;
     width: auto;
+  }
+  input.password-confirm,
+  input.password-field {
+    float: none;
   }
 }

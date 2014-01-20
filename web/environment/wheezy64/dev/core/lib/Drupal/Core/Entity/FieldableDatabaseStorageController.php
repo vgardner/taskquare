@@ -229,11 +229,11 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
       $queried_entities = $query_result->fetchAllAssoc($this->idKey);
     }
 
-    // Pass all entities loaded from the database through $this->attachLoad(),
+    // Pass all entities loaded from the database through $this->postLoad(),
     // which attaches fields (if supported by the entity type) and calls the
     // entity type specific load callback, for example hook_node_load().
     if (!empty($queried_entities)) {
-      $this->attachLoad($queried_entities);
+      $this->postLoad($queried_entities);
       $entities += $queried_entities;
     }
 
@@ -271,21 +271,29 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
    *
    * @param array $records
    *   Associative array of query results, keyed on the entity ID.
-   * @param bool $load_revision
-   *   (optional) TRUE if the revision should be loaded, defaults to FALSE.
    *
    * @return array
    *   An array of entity objects implementing the EntityInterface.
    */
-  protected function mapFromStorageRecords(array $records, $load_revision = FALSE) {
+  protected function mapFromStorageRecords(array $records) {
     $entities = array();
     foreach ($records as $id => $record) {
       $entities[$id] = array();
+      // Skip the item delta and item value levels (if possible) but let the
+      // field assign the value as suiting. This avoids unnecessary array
+      // hierarchies and saves memory here.
       foreach ($record as $name => $value) {
-        // Skip the item delta and item value levels but let the field assign
-        // the value as suiting. This avoids unnecessary array hierarchies and
-        // saves memory here.
-        $entities[$id][$name][Language::LANGCODE_DEFAULT] = $value;
+        // Handle columns named [field_name]__[column_name] (e.g for field types
+        // that store several properties).
+        if ($field_name = strstr($name, '__', TRUE)) {
+          $property_name = substr($name, strpos($name, '__') + 2);
+          $entities[$id][$field_name][Language::LANGCODE_DEFAULT][$property_name] = $value;
+        }
+        else {
+          // Handle columns named directly after the field (e.g if the field
+          // type only stores one property).
+          $entities[$id][$name][Language::LANGCODE_DEFAULT] = $value;
+        }
       }
       // If we have no multilingual values we can instantiate entity objecs
       // right now, otherwise we need to collect all the field values first.
@@ -295,7 +303,7 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
         $entities[$id] = new $this->entityClass($entities[$id], $this->entityType, $bundle);
       }
     }
-    $this->attachPropertyData($entities, $load_revision);
+    $this->attachPropertyData($entities);
     return $entities;
   }
 
@@ -304,10 +312,8 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
    *
    * @param array &$entities
    *   Associative array of entities, keyed on the entity ID.
-   * @param int $revision_id
-   *   (optional) The revision to be loaded. Defaults to FALSE.
    */
-  protected function attachPropertyData(array &$entities, $revision_id = FALSE) {
+  protected function attachPropertyData(array &$entities) {
     if ($this->dataTable) {
       // If a revision table is available, we need all the properties of the
       // latest revision. Otherwise we fall back to the data table.
@@ -318,27 +324,22 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
         ->orderBy('data.' . $this->idKey);
 
       if ($this->revisionDataTable) {
-        if ($revision_id) {
-          $query->condition($this->revisionKey, $revision_id);
+        // Get the revision IDs.
+        $revision_ids = array();
+        foreach ($entities as $values) {
+          $revision_ids[] = is_object($values) ? $values->getRevisionId() : $values[$this->revisionKey][Language::LANGCODE_DEFAULT];
         }
-        else {
-          // Get the revision IDs.
-          $revision_ids = array();
-          foreach ($entities as $values) {
-            $revision_ids[] = $values[$this->revisionKey];
-          }
-          $query->condition($this->revisionKey, $revision_ids);
-        }
+        $query->condition($this->revisionKey, $revision_ids);
       }
 
       $data = $query->execute();
-      $field_definition = \Drupal::entityManager()->getFieldDefinitions($this->entityType);
+      $field_definitions = \Drupal::entityManager()->getFieldDefinitions($this->entityType);
       $translations = array();
       if ($this->revisionDataTable) {
-        $data_fields = array_flip(array_diff(drupal_schema_fields_sql($this->entityInfo['revision_data_table']), drupal_schema_fields_sql($this->entityInfo['base_table'])));
+        $data_column_names = array_flip(array_diff(drupal_schema_fields_sql($this->entityInfo['revision_data_table']), drupal_schema_fields_sql($this->entityInfo['base_table'])));
       }
       else {
-        $data_fields = array_flip(drupal_schema_fields_sql($this->entityInfo['data_table']));
+        $data_column_names = array_flip(drupal_schema_fields_sql($this->entityInfo['data_table']));
       }
 
       foreach ($data as $values) {
@@ -349,9 +350,24 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
         $langcode = empty($values['default_langcode']) ? $values['langcode'] : Language::LANGCODE_DEFAULT;
         $translations[$id][$langcode] = TRUE;
 
-        foreach ($field_definition as $name => $definition) {
-          if (isset($data_fields[$name])) {
-            $entities[$id][$name][$langcode] = $values[$name];
+        foreach (array_keys($field_definitions) as $field_name) {
+          // Handle columns named directly after the field.
+          if (isset($data_column_names[$field_name])) {
+            $entities[$id][$field_name][$langcode] = $values[$field_name];
+          }
+          else {
+            // @todo Change this logic to be based on a mapping of field
+            // definition properties (translatability, revisionability) in
+            // https://drupal.org/node/2144631.
+            foreach ($data_column_names as $data_column_name) {
+              // Handle columns named [field_name]__[column_name], for which we
+              // need to look through all column names from the table that start
+              // with the name of the field.
+              if (($data_field_name = strstr($data_column_name, '__', TRUE)) && $data_field_name === $field_name) {
+                $property_name = substr($data_column_name, strpos($data_column_name, '__') + 2);
+                $entities[$id][$field_name][$langcode][$property_name] = $values[$data_column_name];
+              }
+            }
           }
         }
       }
@@ -372,11 +388,11 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
     $query_result = $this->buildQuery(array(), $revision_id)->execute();
     $queried_entities = $query_result->fetchAllAssoc($this->idKey);
 
-    // Pass the loaded entities from the database through $this->attachLoad(),
+    // Pass the loaded entities from the database through $this->postLoad(),
     // which attaches fields (if supported by the entity type) and calls the
     // entity type specific load callback, for example hook_node_load().
     if (!empty($queried_entities)) {
-      $this->attachLoad($queried_entities, $revision_id);
+      $this->postLoad($queried_entities);
     }
     return reset($queried_entities);
   }
@@ -519,30 +535,17 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
    *
    * @param $queried_entities
    *   Associative array of query results, keyed on the entity ID.
-   * @param $load_revision
-   *   (optional) TRUE if the revision should be loaded, defaults to FALSE.
    */
-  protected function attachLoad(&$queried_entities, $load_revision = FALSE) {
+  protected function postLoad(array &$queried_entities) {
     // Map the loaded records into entity objects and according fields.
-    $queried_entities = $this->mapFromStorageRecords($queried_entities, $load_revision);
+    $queried_entities = $this->mapFromStorageRecords($queried_entities);
 
     // Attach field values.
     if ($this->entityInfo['fieldable']) {
-      $this->loadFieldItems($queried_entities, $load_revision ? static::FIELD_LOAD_REVISION : static::FIELD_LOAD_CURRENT);
+      $this->loadFieldItems($queried_entities);
     }
 
-    // Call hook_entity_load().
-    foreach (\Drupal::moduleHandler()->getImplementations('entity_load') as $module) {
-      $function = $module . '_entity_load';
-      $function($queried_entities, $this->entityType);
-    }
-    // Call hook_TYPE_load(). The first argument for hook_TYPE_load() are
-    // always the queried entities, followed by additional arguments set in
-    // $this->hookLoadArguments.
-    $args = array_merge(array($queried_entities), $this->hookLoadArguments);
-    foreach (\Drupal::moduleHandler()->getImplementations($this->entityType . '_load') as $module) {
-      call_user_func_array($module . '_' . $this->entityType . '_load', $args);
-    }
+    parent::postLoad($queried_entities);
   }
 
   /**
@@ -586,13 +589,16 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
           ->execute();
       }
 
+      foreach ($entities as $entity) {
+        $this->invokeFieldMethod('delete', $entity);
+        $this->deleteFieldItems($entity);
+      }
+
       // Reset the cache as soon as the changes have been applied.
       $this->resetCache($ids);
 
       $entity_class::postDelete($this, $entities);
       foreach ($entities as $entity) {
-        $this->invokeFieldMethod('delete', $entity);
-        $this->deleteFieldItems($entity);
         $this->invokeHook('delete', $entity);
       }
       // Ignore slave server temporarily.
@@ -644,11 +650,11 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
         if ($this->revisionDataTable) {
           $this->savePropertyData($entity, 'revision_data_table');
         }
-        $this->resetCache(array($entity->id()));
         $entity->setNewRevision(FALSE);
-        $entity->postSave($this, TRUE);
         $this->invokeFieldMethod('update', $entity);
         $this->saveFieldItems($entity, TRUE);
+        $this->resetCache(array($entity->id()));
+        $entity->postSave($this, TRUE);
         $this->invokeHook('update', $entity);
         if ($this->dataTable) {
           $this->invokeTranslationHooks($entity);
@@ -671,13 +677,13 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
           $this->savePropertyData($entity, 'revision_data_table');
         }
 
-        // Reset general caches, but keep caches specific to certain entities.
-        $this->resetCache(array());
 
         $entity->enforceIsNew(FALSE);
-        $entity->postSave($this, FALSE);
         $this->invokeFieldMethod('insert', $entity);
         $this->saveFieldItems($entity, FALSE);
+        // Reset general caches, but keep caches specific to certain entities.
+        $this->resetCache(array());
+        $entity->postSave($this, FALSE);
         $this->invokeHook('insert', $entity);
       }
 
@@ -744,17 +750,41 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
    */
   protected function mapToStorageRecord(EntityInterface $entity, $table_key = 'base_table') {
     $record = new \stdClass();
+    $values = array();
     $definitions = $entity->getPropertyDefinitions();
     $schema = drupal_get_schema($this->entityInfo[$table_key]);
     $is_new = $entity->isNew();
 
+    $multi_column_fields = array();
     foreach (drupal_schema_fields_sql($this->entityInfo[$table_key]) as $name) {
-      $info = $schema['fields'][$name];
-      $value = isset($definitions[$name]) && isset($entity->$name->value) ? $entity->$name->value : NULL;
+      // Check for fields which store data in multiple columns and process them
+      // separately.
+      if ($field = strstr($name, '__', TRUE)) {
+        $multi_column_fields[$field] = TRUE;
+        continue;
+      }
+      $values[$name] = isset($definitions[$name]) && isset($entity->$name->value) ? $entity->$name->value : NULL;
+    }
+
+    // Handle fields that store multiple properties and match each property name
+    // to its schema column name.
+    foreach (array_keys($multi_column_fields) as $field_name) {
+      $field_items = $entity->get($field_name);
+      $field_value = $field_items->getValue();
+      // @todo Reconsider the usage of getPropertyDefinitions() after
+      // https://drupal.org/node/2144327.
+      foreach (array_keys($field_items[0]->getPropertyDefinitions()) as $property_name) {
+        if (isset($schema['fields'][$field_name . '__' . $property_name])) {
+          $values[$field_name . '__' . $property_name] = isset($field_value[0][$property_name]) ? $field_value[0][$property_name] : NULL;
+        }
+      }
+    }
+
+    foreach ($values as $field_name => $value) {
       // If we are creating a new entity, we must not populate the record with
       // NULL values otherwise defaults would not be applied.
       if (isset($value) || !$is_new) {
-        $record->$name = drupal_schema_get_field_value($info, $value);
+        $record->$field_name = drupal_schema_get_field_value($schema['fields'][$field_name], $value);
       }
     }
 
@@ -832,12 +862,14 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
   protected function doLoadFieldItems($entities, $age) {
     $load_current = $age == static::FIELD_LOAD_CURRENT;
 
-    // Collect entities ids and bundles.
+    // Collect entities ids, bundles and languages.
     $bundles = array();
     $ids = array();
+    $default_langcodes = array();
     foreach ($entities as $key => $entity) {
       $bundles[$entity->bundle()] = TRUE;
       $ids[] = $load_current ? $key : $entity->getRevisionId();
+      $default_langcodes[$key] = $entity->getUntranslated()->language()->id;
     }
 
     // Collect impacted fields.
@@ -849,14 +881,13 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
     }
 
     // Load field data.
-    $all_langcodes = array_keys(language_list());
+    $langcodes = array_keys(language_list(Language::STATE_ALL));
     foreach ($fields as $field_name => $field) {
       $table = $load_current ? static::_fieldTableName($field) : static::_fieldRevisionTableName($field);
 
-      // If the field is translatable ensure that only values having valid
-      // languages are retrieved. Since we are loading values for multiple
-      // entities, we cannot limit the query to the available translations.
-      $langcodes = $field->isFieldTranslatable() ? $all_langcodes : array(Language::LANGCODE_NOT_SPECIFIED);
+      // Ensure that only values having valid languages are retrieved. Since we
+      // are loading values for multiple entities, we cannot limit the query to
+      // the available translations.
       $results = $this->database->select($table, 't')
         ->fields('t')
         ->condition($load_current ? 'entity_id' : 'revision_id', $ids, 'IN')
@@ -867,23 +898,28 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
 
       $delta_count = array();
       foreach ($results as $row) {
-        if (!isset($delta_count[$row->entity_id][$row->langcode])) {
-          $delta_count[$row->entity_id][$row->langcode] = 0;
-        }
 
-        if ($field->getFieldCardinality() == FieldInterface::CARDINALITY_UNLIMITED || $delta_count[$row->entity_id][$row->langcode] < $field->getFieldCardinality()) {
-          $item = array();
-          // For each column declared by the field, populate the item from the
-          // prefixed database column.
-          foreach ($field->getColumns() as $column => $attributes) {
-            $column_name = static::_fieldColumnName($field, $column);
-            // Unserialize the value if specified in the column schema.
-            $item[$column] = (!empty($attributes['serialize'])) ? unserialize($row->$column_name) : $row->$column_name;
+        // Ensure that records for non-translatable fields having invalid
+        // languages are skipped.
+        if ($row->langcode == $default_langcodes[$row->entity_id] || $field->isTranslatable()) {
+          if (!isset($delta_count[$row->entity_id][$row->langcode])) {
+            $delta_count[$row->entity_id][$row->langcode] = 0;
           }
 
-          // Add the item to the field values for the entity.
-          $entities[$row->entity_id]->getTranslation($row->langcode)->{$field_name}[$delta_count[$row->entity_id][$row->langcode]] = $item;
-          $delta_count[$row->entity_id][$row->langcode]++;
+          if ($field->getCardinality() == FieldInterface::CARDINALITY_UNLIMITED || $delta_count[$row->entity_id][$row->langcode] < $field->getCardinality()) {
+            $item = array();
+            // For each column declared by the field, populate the item from the
+            // prefixed database column.
+            foreach ($field->getColumns() as $column => $attributes) {
+              $column_name = static::_fieldColumnName($field, $column);
+              // Unserialize the value if specified in the column schema.
+              $item[$column] = (!empty($attributes['serialize'])) ? unserialize($row->$column_name) : $row->$column_name;
+            }
+
+            // Add the item to the field values for the entity.
+            $entities[$row->entity_id]->getTranslation($row->langcode)->{$field_name}[$delta_count[$row->entity_id][$row->langcode]] = $item;
+            $delta_count[$row->entity_id][$row->langcode]++;
+          }
         }
       }
     }
@@ -897,6 +933,9 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
     $id = $entity->id();
     $bundle = $entity->bundle();
     $entity_type = $entity->entityType();
+    $default_langcode = $entity->getUntranslated()->language()->id;
+    $translation_langcodes = array_keys($entity->getTranslationLanguages());
+
     if (!isset($vid)) {
       $vid = $id;
     }
@@ -930,7 +969,7 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
       $query = $this->database->insert($table_name)->fields($columns);
       $revision_query = $this->database->insert($revision_name)->fields($columns);
 
-      $langcodes = $field->isFieldTranslatable() ? array_keys($entity->getTranslationLanguages()) : array(Language::LANGCODE_NOT_SPECIFIED);
+      $langcodes = $field->isTranslatable() ? $translation_langcodes : array($default_langcode);
       foreach ($langcodes as $langcode) {
         $delta_count = 0;
         $items = $entity->getTranslation($langcode)->get($field_name);
@@ -953,7 +992,7 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
           $query->values($record);
           $revision_query->values($record);
 
-          if ($field->getFieldCardinality() != FieldInterface::CARDINALITY_UNLIMITED && ++$delta_count == $field->getFieldCardinality()) {
+          if ($field->getCardinality() != FieldInterface::CARDINALITY_UNLIMITED && ++$delta_count == $field->getCardinality()) {
             break;
           }
         }
@@ -1106,7 +1145,6 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
    */
   public function onFieldDelete(FieldInterface $field) {
     // Mark all data associated with the field for deletion.
-    $field->deleted = FALSE;
     $table = static::_fieldTableName($field);
     $revision_table = static::_fieldRevisionTableName($field);
     $this->database->update($table)
@@ -1115,9 +1153,10 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
 
     // Move the table to a unique name while the table contents are being
     // deleted.
-    $field->deleted = TRUE;
-    $new_table = static::_fieldTableName($field);
-    $revision_new_table = static::_fieldRevisionTableName($field);
+    $deleted_field = clone $field;
+    $deleted_field->deleted = TRUE;
+    $new_table = static::_fieldTableName($deleted_field);
+    $revision_new_table = static::_fieldRevisionTableName($deleted_field);
     $this->database->schema()->renameTable($table, $new_table);
     $this->database->schema()->renameTable($revision_table, $revision_new_table);
   }
@@ -1143,10 +1182,10 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
    * {@inheritdoc}
    */
   public function onBundleRename($bundle, $bundle_new) {
-    // We need to account for deleted or inactive fields and instances. The
-    // method runs before the instance definitions are updated, so we need to
-    // fetch them using the old bundle name.
-    $instances = field_read_instances(array('entity_type' => $this->entityType, 'bundle' => $bundle), array('include_deleted' => TRUE, 'include_inactive' => TRUE));
+    // We need to account for deleted fields and instances. The method runs
+    // before the instance definitions are updated, so we need to fetch them
+    // using the old bundle name.
+    $instances = field_read_instances(array('entity_type' => $this->entityType, 'bundle' => $bundle), array('include_deleted' => TRUE));
     foreach ($instances as $instance) {
       $field = $instance->getField();
       $table_name = static::_fieldTableName($field);
@@ -1222,12 +1261,12 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
    */
   public static function _fieldSqlSchema(FieldInterface $field, array $schema = NULL) {
     if ($field->deleted) {
-      $description_current = "Data storage for deleted field {$field->uuid()} ({$field->entity_type}, {$field->getFieldName()}).";
-      $description_revision = "Revision archive storage for deleted field {$field->uuid()} ({$field->entity_type}, {$field->getFieldName()}).";
+      $description_current = "Data storage for deleted field {$field->uuid()} ({$field->entity_type}, {$field->getName()}).";
+      $description_revision = "Revision archive storage for deleted field {$field->uuid()} ({$field->entity_type}, {$field->getName()}).";
     }
     else {
-      $description_current = "Data storage for {$field->entity_type} field {$field->getFieldName()}.";
-      $description_revision = "Revision archive storage for {$field->entity_type} field {$field->getFieldName()}.";
+      $description_current = "Data storage for {$field->entity_type} field {$field->getName()}.";
+      $description_revision = "Revision archive storage for {$field->entity_type} field {$field->getName()}.";
     }
 
     $current = array(
@@ -1441,7 +1480,7 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
    *   unique among all other fields.
    */
   static public function _fieldIndexName(FieldInterface $field, $index) {
-    return $field->getFieldName() . '_' . $index;
+    return $field->getName() . '_' . $index;
   }
 
   /**
@@ -1464,7 +1503,7 @@ class FieldableDatabaseStorageController extends FieldableEntityStorageControlle
    *   unique among all other fields.
    */
   static public function _fieldColumnName(FieldInterface $field, $column) {
-    return in_array($column, Field::getReservedColumns()) ? $column : $field->getFieldName() . '_' . $column;
+    return in_array($column, Field::getReservedColumns()) ? $column : $field->getName() . '_' . $column;
   }
 
 }

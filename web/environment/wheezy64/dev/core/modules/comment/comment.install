@@ -14,11 +14,7 @@ use Drupal\field\Entity\Field;
  */
 function comment_uninstall() {
   // Remove the comment fields.
-  $fields = entity_load_multiple_by_properties('field_entity', array(
-    'type' => 'comment',
-    'include_inactive' => TRUE,
-    'include_deleted' => FALSE,
-  ));
+  $fields = entity_load_multiple_by_properties('field_entity', array('type' => 'comment'));
   foreach ($fields as $field) {
     entity_invoke_bundle_hook('delete', 'comment', $field->entity_type . '__' . $field->name);
     $field->delete();
@@ -35,34 +31,6 @@ function comment_install() {
   // By default, maintain entity statistics for comments.
   // @see \Drupal\comment\CommentStorageController::updateEntityStatistics().
   \Drupal::state()->set('comment.maintain_entity_statistics', TRUE);
-}
-
-/**
- * Returns comment fields.
- *
- * comment_get_comment_fields() cannot be used in maintenance mode because
- * comment is disabled and its fields are inactive.
- *
- * @return array
- *   An array of comment fields keyed by field ID.
- */
-function _comment_get_comment_fields() {
-  $fields = entity_load_multiple_by_properties('field_entity', array(
-    'type' => 'comment',
-    'include_inactive' => TRUE,
-    'include_deleted' => FALSE,
-  ));
-  foreach ($fields as &$field) {
-    $instances = entity_load_multiple_by_properties('field_instance', array(
-      'field_uuid' => $field->uuid,
-      'include_inactive' => TRUE,
-      'include_deleted' => FALSE,
-    ));
-    foreach ($instances as $instance) {
-      $field->bundles[$instance->entity_type] = $instance->bundle;
-    }
-  }
-  return $fields;
 }
 
 /**
@@ -731,6 +699,13 @@ function comment_update_8008(&$sandbox) {
   db_drop_field('node', 'comment');
   // Remove the {node_revision}.comment field.
   db_drop_field('node_revision', 'comment');
+}
+
+/**
+ * Remove the comment_block_count variable.
+ */
+function comment_update_8009() {
+  update_variable_del('comment_block_count');
 }
 
 /**

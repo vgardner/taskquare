@@ -1,4 +1,11 @@
-(function ($, _, Backbone, Drupal, drupalSettings) {
+/**
+ * @file
+ * A Backbone View that controls the overall "in-place editing application".
+ *
+ * @see Drupal.edit.AppModel
+ */
+
+(function ($, _, Backbone, Drupal) {
 
 "use strict";
 
@@ -10,9 +17,6 @@
 // makes it impossible for Edit to know where to restore the original HTML.
 var reload = false;
 
-/**
- *
- */
 Drupal.edit.AppView = Backbone.View.extend({
 
   /**
@@ -41,6 +45,7 @@ Drupal.edit.AppView = Backbone.View.extend({
       // Track app state.
       .on('change:state', this.editorStateChange, this)
       // Respond to field model HTML representation change events.
+      .on('change:html', this.propagateUpdatedField, this)
       .on('change:html', this.renderUpdatedField, this)
       // Respond to addition.
       .on('add', this.rerenderedFieldToCandidate, this)
@@ -257,8 +262,9 @@ Drupal.edit.AppView = Backbone.View.extend({
       fieldModel: fieldModel
     });
 
-    // Create in-place editor's toolbar — positions appropriately above the
-    // edited element.
+    // Create in-place editor's toolbar for this field — stored inside the
+    // entity toolbar, the entity toolbar will position itself appropriately
+    // above (or below) the edited element.
     var toolbarView = new Drupal.edit.FieldToolbarView({
       el: fieldToolbarRoot,
       model: fieldModel,
@@ -269,7 +275,7 @@ Drupal.edit.AppView = Backbone.View.extend({
 
     // Create decoration for edited element: padding if necessary, sets classes
     // on the element to style it according to the current state.
-    var decorationView = new Drupal.edit.EditorDecorationView({
+    var decorationView = new Drupal.edit.FieldDecorationView({
       el: $(editorView.getEditedElement()),
       model: fieldModel,
       editorView: editorView
@@ -417,20 +423,33 @@ Drupal.edit.AppView = Backbone.View.extend({
    *
    * @param Drupal.edit.FieldModel fieldModel
    *   The FieldModel whose 'html' attribute changed.
+   * @param String html
+   *   The updated 'html' attribute.
+   * @param Object options
+   *   An object with the following keys:
+   *   - Boolean propagation: whether this change to the 'html' attribute
+   *     occurred because of the propagation of changes to another instance of
+   *     this field.
    */
-  renderUpdatedField: function (fieldModel) {
+  renderUpdatedField: function (fieldModel, html, options) {
     // Get data necessary to rerender property before it is unavailable.
-    var html = fieldModel.get('html');
     var $fieldWrapper = $(fieldModel.get('el'));
     var $context = $fieldWrapper.parent();
 
-    // First set the state to 'candidate', to allow all attached views to
-    // clean up all their "active state"-related changes.
-    fieldModel.set('state', 'candidate');
+    // When propagating the changes of another instance of this field, this
+    // field is not being actively edited and hence no state changes are
+    // necessary. So: only update the state of this field when the rerendering
+    // of this field happens not because of propagation, but because it is being
+    // edited itself.
+    if (!options.propagation) {
+      // First set the state to 'candidate', to allow all attached views to
+      // clean up all their "active state"-related changes.
+      fieldModel.set('state', 'candidate');
 
-    // Set the field's state to 'inactive', to enable the updating of its DOM
-    // value.
-    fieldModel.set('state', 'inactive', { reason: 'rerender' });
+      // Set the field's state to 'inactive', to enable the updating of its DOM
+      // value.
+      fieldModel.set('state', 'inactive', { reason: 'rerender' });
+    }
 
     // Destroy the field model; this will cause all attached views to be
     // destroyed too, and removal from all collections in which it exists.
@@ -442,6 +461,56 @@ Drupal.edit.AppView = Backbone.View.extend({
     // Attach behaviors again to the modified piece of HTML; this will create
     // a new field model and call rerenderedFieldToCandidate() with it.
     Drupal.attachBehaviors($context);
+  },
+
+  /**
+   * Propagates the changes to an updated field to all instances of that field.
+   *
+   * @param Drupal.edit.FieldModel updatedField
+   *   The FieldModel whose 'html' attribute changed.
+   * @param String html
+   *   The updated 'html' attribute.
+   * @param Object options
+   *   An object with the following keys:
+   *   - Boolean propagation: whether this change to the 'html' attribute
+   *     occurred because of the propagation of changes to another instance of
+   *     this field.
+   *
+   * @see Drupal.edit.AppView.renderUpdatedField()
+   */
+  propagateUpdatedField: function (updatedField, html, options) {
+    // Don't propagate field updates that themselves were caused by propagation.
+    if (options.propagation) {
+      return;
+    }
+
+    var htmlForOtherViewModes = updatedField.get('htmlForOtherViewModes');
+    Drupal.edit.collections.fields
+      // Find all instances of fields that display the same logical field (same
+      // entity, same field, just a different instance and maybe a different
+      // view mode).
+      .where({ logicalFieldID: updatedField.get('logicalFieldID') })
+      .forEach(function (field) {
+        // Ignore the field that was already updated.
+        if (field === updatedField) {
+          return;
+        }
+        // If this other instance of the field has the same view mode, we can
+        // update it easily.
+        else if (field.getViewMode() === updatedField.getViewMode()) {
+          field.set('html', updatedField.get('html'));
+        }
+        // If this other instance of the field has a different view mode, and
+        // that is one of the view modes for which a re-rendered version is
+        // available (and that should be the case unless this field was only
+        // added to the page after editing of the updated field began), then use
+        // that view mode's re-rendered version.
+        else {
+          if (field.getViewMode() in htmlForOtherViewModes) {
+            field.set('html', htmlForOtherViewModes[field.getViewMode()], { propagation: true });
+          }
+        }
+      });
   },
 
   /**
@@ -490,6 +559,7 @@ Drupal.edit.AppView = Backbone.View.extend({
         entityModel.set('state', 'deactivating');
       });
   }
+
 });
 
-}(jQuery, _, Backbone, Drupal, drupalSettings));
+}(jQuery, _, Backbone, Drupal));

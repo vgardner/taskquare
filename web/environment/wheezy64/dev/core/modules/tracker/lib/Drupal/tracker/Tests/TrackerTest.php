@@ -7,6 +7,7 @@
 
 namespace Drupal\tracker\Tests;
 
+use Drupal\comment\CommentInterface;
 use Drupal\simpletest\WebTestBase;
 
 /**
@@ -117,11 +118,14 @@ class TrackerTest extends WebTestBase {
     $this->assertText($my_published->label(), "Published nodes show up in the user's tracker listing.");
     $this->assertNoText($other_published_no_comment->label(), "Other user's nodes do not show up in the user's tracker listing.");
     $this->assertText($other_published_my_comment->label(), "Nodes that the user has commented on appear in the user's tracker listing.");
+    // Verify that title and tab title have been set correctly.
+    $this->assertText('Track', 'The user tracker tab has the name "Track".');
+    $this->assertTitle(t('@name | @site', array('@name' => $this->user->getUsername(), '@site' => \Drupal::config('system.site')->get('name'))), 'The user tracker page has the correct page title.');
 
     // Verify that unpublished comments are removed from the tracker.
     $admin_user = $this->drupalCreateUser(array('post comments', 'administer comments', 'access user profiles'));
     $this->drupalLogin($admin_user);
-    $this->drupalPostForm('comment/1/edit', array('status' => COMMENT_NOT_PUBLISHED), t('Save'));
+    $this->drupalPostForm('comment/1/edit', array('status' => CommentInterface::NOT_PUBLISHED), t('Save'));
     $this->drupalGet('user/' . $this->user->id() . '/track');
     $this->assertNoText($other_published_my_comment->label(), 'Unpublished comments are not counted on the tracker listing.');
   }

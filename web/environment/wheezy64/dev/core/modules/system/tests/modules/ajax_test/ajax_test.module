@@ -13,19 +13,6 @@ use Drupal\Core\Ajax\CloseDialogCommand;
 use Drupal\Core\Ajax\HtmlCommand;
 
 /**
- * Implements hook_menu().
- */
-function ajax_test_menu() {
-  $items['ajax-test/order'] = array(
-    'title' => 'AJAX commands order',
-    'route_name' => 'ajax_test.order',
-    'theme callback' => 'ajax_base_page_theme',
-    'type' => MENU_CALLBACK,
-  );
-  return $items;
-}
-
-/**
  * Implements hook_system_theme_info().
  */
 function ajax_test_system_theme_info() {
@@ -43,7 +30,17 @@ function ajax_test_system_theme_info() {
  * @deprecated \Drupal\ajax_test\Controller\AjaxTestController::render()
  */
 function ajax_test_render() {
-  drupal_add_js(array('ajax' => 'test'), 'setting');
+  $attached = array(
+    '#attached' => array(
+      'js' => array(
+        0 => array(
+          'type' => 'setting',
+          'data' => array('ajax' => 'test'),
+        ),
+      ),
+    ),
+  );
+  drupal_render($attached);
   $response = new AjaxResponse();
   return $response;
 }
@@ -60,14 +57,26 @@ function ajax_test_order() {
   $path = drupal_get_path('module', 'system');
   // HTML insertion command.
   $response->addCommand(new HtmlCommand('body', 'Hello, world!'));
-  // Add two CSS files (order should remain the same).
-  drupal_add_css($path . '/css/system.admin.css');
-  drupal_add_css($path . '/css/system.maintenance.css');
-  // Add two JavaScript files (first to the footer, should appear last).
-  drupal_add_js($path . '/system.modules.js', array('scope' => 'footer'));
-  drupal_add_js($path . '/system.js');
-  // Finally, add a JavaScript setting.
-  drupal_add_js(array('ajax' => 'test'), 'setting');
+  $attached = array(
+    '#attached' => array(
+      'css' => array(
+        // Add two CSS files (order should remain the same).
+        $path . '/css/system.admin.css' => array(),
+        $path . '/css/system.maintenance.css' => array(),
+      ),
+      'js' => array(
+        // Add two JavaScript files (first to the footer, should appear last).
+        $path . '/system.modules.js' => array('scope' => 'footer'),
+        $path . '/system.js' => array(),
+        // Finally, add a JavaScript setting.
+        0 => array(
+          'type' => 'setting',
+          'data' => array('ajax' => 'test'),
+        ),
+      ),
+    ),
+  );
+  drupal_render($attached);
   return $response;
 }
 
@@ -78,8 +87,9 @@ function ajax_test_order() {
  */
 function ajax_test_error() {
   $message = '';
-  if (!empty($_GET['message'])) {
-    $message = $_GET['message'];
+  $query = \Drupal::request()->query;
+  if ($query->has('message')) {
+    $message = $query->get('message');
   }
   $response = new AjaxResponse();
   $response->addCommand(new AlertCommand($message));

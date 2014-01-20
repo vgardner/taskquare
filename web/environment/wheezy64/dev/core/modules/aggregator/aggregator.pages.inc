@@ -16,22 +16,16 @@ use Drupal\Core\Entity\EntityInterface;
  *   - sum: No filtering.
  *   - source: Filter the feed items, limiting the result to items from a
  *     single source.
- *   - category: Filter the feed items by category.
  * @param mixed $data
- *   Feed or category data used for filtering. The type and value of $data
- *   depends on $type:
+ *   Feed data used for filtering. The type and value of $data depends on $type:
  *   - source: $data is an object with $data->fid identifying the feed used to
  *     as filter.
- *   - category: $data is an array with $data['cid'] being the category id to
- *     filter on.
  *   The $data parameter is not used when $type is 'sum'.
  * @param int $limit
  *   (optional) The number of records to return. Defaults to 20.
  *
  * @deprecated Use \Drupal\aggregator\ItemStorageController::loadAll() for
  *   loading all feed items, \Drupal\aggregator\ItemStorageController::loadByFeed()
- *   for loading feed items filtered by the source feed, and \Drupal\aggregator\ItemStorageController::loadByCategory()
- *   for loading feed items filtered by the feed category.
  *
  * @return \Drupal\aggregator\ItemInterface[]
  *   An array of the feed items.
@@ -44,9 +38,6 @@ function aggregator_load_feed_items($type, $data = NULL, $limit = 20) {
 
     case 'source':
       return $storage_controller->loadByFeed($data->id(), $limit);
-
-    case 'category':
-      return $storage_controller->loadByCategory($data->cid, $limit);
   }
 }
 
@@ -81,42 +72,7 @@ function template_preprocess_aggregator_item(&$variables) {
     $variables['source_date'] = format_date($item->getPostedTime(), 'medium');
   }
 
-  $variables['categories'] = array();
-  foreach ($item->categories as $category) {
-    $variables['categories'][$category->cid] = l($category->title, 'aggregator/categories/' . $category->cid);
-  }
-
   $variables['attributes']['class'][] = 'feed-item';
-}
-
-/**
- * Page callback: Generates an OPML representation of all feeds.
- *
- * @param $cid
- *   (optional) If set, feeds are exported only from a category with this ID.
- *   Otherwise, all feeds are exported. Defaults to NULL.
- *
- * @return string
- *   An OPML formatted string.
- *
- * @see aggregator_menu()
- *
- * @deprecated Use \Drupal\aggregator\Controller\AggregatorController::opmlPage()
- */
-function aggregator_page_opml($cid = NULL) {
-  if ($cid) {
-    $result = db_query('SELECT f.title, f.url FROM {aggregator_feed} f LEFT JOIN {aggregator_category_feed} c on f.fid = c.fid WHERE c.cid = :cid ORDER BY title', array(':cid' => $cid));
-  }
-  else {
-    $result = db_query('SELECT * FROM {aggregator_feed} ORDER BY title');
-  }
-
-  $feeds = $result->fetchAll();
-  $aggregator_page_opml = array(
-    '#theme' => 'aggregator_page_opml',
-    '#feeds' => $feeds,
-  );
-  return drupal_render($aggregator_page_opml);
 }
 
 /**
@@ -126,12 +82,13 @@ function aggregator_page_opml($cid = NULL) {
  *   An associative array containing:
  *   - feeds: An array of the feeds to theme.
  *
+ * @return string
+ *   An OPML formatted string.
+ *
  * @ingroup themeable
  */
 function theme_aggregator_page_opml($variables) {
   $feeds = $variables['feeds'];
-
-  drupal_add_http_header('Content-Type', 'text/xml; charset=utf-8');
 
   $output  = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
   $output .= "<opml version=\"1.1\">\n";
@@ -146,7 +103,7 @@ function theme_aggregator_page_opml($variables) {
   $output .= "</body>\n";
   $output .= "</opml>\n";
 
-  print $output;
+  return $output;
 }
 
 /**
@@ -243,7 +200,7 @@ function template_preprocess_aggregator_feed_source(&$variables) {
     $variables['last_checked'] = t('never');
   }
 
-  if (user_access('administer news feeds')) {
+  if (\Drupal::currentUser()->hasPermission('administer news feeds')) {
     $variables['last_checked'] = l($variables['last_checked'], 'admin/config/services/aggregator');
   }
 

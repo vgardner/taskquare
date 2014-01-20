@@ -8,33 +8,31 @@
 namespace Drupal\Core\Field;
 
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\TypedData\DataDefinition;
+use Drupal\Core\TypedData\ListDefinition;
 
 /**
  * A class for defining entity fields.
  */
-class FieldDefinition implements FieldDefinitionInterface {
+class FieldDefinition extends ListDefinition implements FieldDefinitionInterface {
 
   /**
-   * The array holding values for all definition keys.
+   * Creates a new field definition.
    *
-   * @var array
-   */
-  protected $definition = array();
-
-  /**
-   * Constructs a new FieldDefinition object.
+   * @param string $type
+   *   The type of the field.
    *
-   * @param array $definition
-   *   (optional) If given, a definition represented as array.
+   * @return static
+   *   A new field definition object.
    */
-  public function __construct(array $definition = array()) {
-    $this->definition = $definition;
+  public static function create($type) {
+    return new static(array(), DataDefinition::create('field_item:' . $type));
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getFieldName() {
+  public function getName() {
     return $this->definition['field_name'];
   }
 
@@ -44,10 +42,10 @@ class FieldDefinition implements FieldDefinitionInterface {
    * @param string $name
    *   The field name to set.
    *
-   * @return \Drupal\Core\Field\FieldDefinition
+   * @return static
    *   The object itself for chaining.
    */
-  public function setFieldName($name) {
+  public function setName($name) {
     $this->definition['field_name'] = $name;
     return $this;
   }
@@ -55,65 +53,68 @@ class FieldDefinition implements FieldDefinitionInterface {
   /**
    * {@inheritdoc}
    */
-  public function getFieldType() {
+  public function getType() {
+    $data_type = $this->getItemDefinition()->getDataType();
     // Cut of the leading field_item: prefix from 'field_item:FIELD_TYPE'.
-    $parts = explode(':', $this->definition['type']);
+    $parts = explode(':', $data_type);
     return $parts[1];
   }
 
   /**
-   * Sets the field type.
+   * {@inheritdoc}
+   */
+  public function getSettings() {
+    return $this->getItemDefinition()->getSettings();
+  }
+
+  /**
+   * Sets field settings.
    *
-   * @param string $type
-   *   The field type to set.
+   * @param array $settings
+   *   The value to set.
    *
-   * @return \Drupal\Core\Field\FieldDefinition
+   * @return static
    *   The object itself for chaining.
    */
-  public function setFieldType($type) {
-    $this->definition['type'] = 'field_item:' . $type;
+  public function setSettings(array $settings) {
+    $this->getItemDefinition()->setSettings($settings);
     return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getSetting($setting_name) {
+    return $this->getItemDefinition()->getSetting($setting_name);
   }
 
   /**
    * Sets a field setting.
    *
-   * @param string $type
-   *   The field type to set.
+   * @param string $setting_name
+   *   The field setting to set.
+   * @param mixed $value
+   *   The value to set.
    *
-   * @return \Drupal\Core\Field\FieldDefinition
+   * @return static
    *   The object itself for chaining.
    */
-  public function setFieldSetting($setting_name, $value) {
-    $this->definition['settings'][$setting_name] = $value;
+  public function setSetting($setting_name, $value) {
+    $this->getItemDefinition()->setSetting($setting_name, $value);
     return $this;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getFieldSettings() {
-    return $this->definition['settings'];
+  public function getPropertyNames() {
+    return array_keys(\Drupal::typedData()->create($this->getItemDefinition())->getPropertyDefinitions());
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getFieldSetting($setting_name) {
-    return isset($this->definition['settings'][$setting_name]) ? $this->definition['settings'][$setting_name] : NULL;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getFieldPropertyNames() {
-    return array_keys(\Drupal::typedData()->create($this->definition['type'])->getPropertyDefinitions());
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function isFieldTranslatable() {
+  public function isTranslatable() {
     return !empty($this->definition['translatable']);
   }
 
@@ -123,7 +124,7 @@ class FieldDefinition implements FieldDefinitionInterface {
    * @param bool $translatable
    *   Whether the field is translatable.
    *
-   * @return \Drupal\Core\Field\FieldDefinition
+   * @return static
    *   The object itself for chaining.
    */
   public function setTranslatable($translatable) {
@@ -134,49 +135,7 @@ class FieldDefinition implements FieldDefinitionInterface {
   /**
    * {@inheritdoc}
    */
-  public function getFieldLabel() {
-    return $this->definition['label'];
-  }
-
-  /**
-   * Sets the field label.
-   *
-   * @param string $label
-   *   The field label to set.
-   *
-   * @return \Drupal\Core\Field\FieldDefinition
-   *   The object itself for chaining.
-   */
-  public function setFieldLabel($label) {
-    $this->definition['label'] = $label;
-    return $this;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getFieldDescription() {
-    return $this->definition['description'];
-  }
-
-  /**
-   * Sets the field label.
-   *
-   * @param string $description
-   *   The field label to set.
-   *
-   * @return \Drupal\Core\Field\FieldDefinition
-   *   The object itself for chaining.
-   */
-  public function setFieldDescription($description) {
-    $this->definition['description'] = $description;
-    return $this;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getFieldCardinality() {
+  public function getCardinality() {
     // @todo: Allow to control this.
     return isset($this->definition['cardinality']) ? $this->definition['cardinality'] : 1;
   }
@@ -184,29 +143,29 @@ class FieldDefinition implements FieldDefinitionInterface {
   /**
    * {@inheritdoc}
    */
-  public function isFieldRequired() {
-    return !empty($this->definition['required']);
+  public function isMultiple() {
+    $cardinality = $this->getCardinality();
+    return ($cardinality == static::CARDINALITY_UNLIMITED) || ($cardinality > 1);
   }
 
   /**
    * {@inheritdoc}
    */
-  public function isFieldMultiple() {
-    $cardinality = $this->getFieldCardinality();
-    return ($cardinality == static::CARDINALITY_UNLIMITED) || ($cardinality > 1);
+  public function isQueryable() {
+    return isset($this->definition['queryable']) ? $this->definition['queryable'] : !$this->isComputed();
   }
 
   /**
-   * Sets whether the field is required.
+   * Sets whether the field is queryable.
    *
-   * @param bool $required
-   *   TRUE if the field is required, FALSE otherwise.
+   * @param bool $queryable
+   *   Whether the field is queryable.
    *
-   * @return \Drupal\Core\Field\FieldDefinition
+   * @return static
    *   The object itself for chaining.
    */
-  public function setFieldRequired($required) {
-    $this->definition['required'] = $required;
+  public function setQueryable($queryable) {
+    $this->definition['queryable'] = $queryable;
     return $this;
   }
 
@@ -218,26 +177,28 @@ class FieldDefinition implements FieldDefinitionInterface {
    * @param array $constraints
    *   The constraints to set.
    *
-   * @return \Drupal\Core\Field\FieldDefinition
+   * @return static
    *   The object itself for chaining.
    */
   public function setPropertyConstraints($name, array $constraints) {
-    $this->definition['item_definition']['constraints']['ComplexData'][$name] = $constraints;
+    $item_constraints = $this->getItemDefinition()->getConstraints();
+    $item_constraints['ComplexData'][$name] = $constraints;
+    $this->getItemDefinition()->setConstraints($item_constraints);
     return $this;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function isFieldConfigurable() {
+  public function isConfigurable() {
     return FALSE;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getFieldDefaultValue(EntityInterface $entity) {
-    return $this->getFieldSetting('default_value');
+  public function getDefaultValue(EntityInterface $entity) {
+    return $this->getSetting('default_value');
   }
 
 }

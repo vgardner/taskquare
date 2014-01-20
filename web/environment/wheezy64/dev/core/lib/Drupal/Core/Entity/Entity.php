@@ -110,7 +110,7 @@ abstract class Entity implements EntityInterface {
     $label = NULL;
     $entity_info = $this->entityInfo();
     if (isset($entity_info['label_callback']) && function_exists($entity_info['label_callback'])) {
-      $label = $entity_info['label_callback']($this->entityType, $this, $langcode);
+      $label = $entity_info['label_callback']($this, $langcode);
     }
     elseif (!empty($entity_info['entity_keys']['label']) && isset($this->{$entity_info['entity_keys']['label']})) {
       $label = $this->{$entity_info['entity_keys']['label']};
@@ -356,7 +356,7 @@ abstract class Entity implements EntityInterface {
   /**
    * {@inheritdoc}
    */
-  public static function postLoad(EntityStorageControllerInterface $storage_controller, array $entities) {
+  public static function postLoad(EntityStorageControllerInterface $storage_controller, array &$entities) {
   }
 
   /**
@@ -370,17 +370,17 @@ abstract class Entity implements EntityInterface {
    * {@inheritdoc}
    */
   public function changed() {
-    $referenced_entity_ids = array(
-      $this->entityType() => array($this->id() => TRUE),
+    $referenced_entities = array(
+      $this->entityType() => array($this->id() => $this),
     );
 
     foreach ($this->referencedEntities() as $referenced_entity) {
-      $referenced_entity_ids[$referenced_entity->entityType()][$referenced_entity->id()] = TRUE;
+      $referenced_entities[$referenced_entity->entityType()][$referenced_entity->id()] = $referenced_entity;
     }
 
-    foreach ($referenced_entity_ids as $entity_type => $entity_ids) {
+    foreach ($referenced_entities as $entity_type => $entities) {
       if (\Drupal::entityManager()->hasController($entity_type, 'view_builder')) {
-        \Drupal::entityManager()->getViewBuilder($entity_type)->resetCache(array_keys($entity_ids));
+        \Drupal::entityManager()->getViewBuilder($entity_type)->resetCache($entities);
       }
     }
   }

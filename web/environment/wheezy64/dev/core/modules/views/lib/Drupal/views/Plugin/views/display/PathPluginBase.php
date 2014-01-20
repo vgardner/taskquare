@@ -7,7 +7,7 @@
 
 namespace Drupal\views\Plugin\views\display;
 
-use Drupal\Core\KeyValueStore\KeyValueStoreInterface;
+use Drupal\Core\KeyValueStore\StateInterface;
 use Drupal\Core\Routing\RouteCompiler;
 use Drupal\Core\Routing\RouteProviderInterface;
 use Drupal\views\Views;
@@ -35,7 +35,7 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
   /**
    * The state key value store.
    *
-   * @var \Drupal\Core\KeyValueStore\KeyValueStoreInterface
+   * @var \Drupal\Core\KeyValueStore\StateInterface
    */
   protected $state;
 
@@ -50,10 +50,10 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
    *   The plugin implementation definition.
    * @param \Drupal\Core\Routing\RouteProviderInterface $route_provider
    *   The route provider.
-   * @param \Drupal\Core\KeyValueStore\KeyValueStoreInterface $state
+   * @param \Drupal\Core\KeyValueStore\StateInterface $state
    *   The state key value store.
    */
-  public function __construct(array $configuration, $plugin_id, array $plugin_definition, RouteProviderInterface $route_provider, KeyValueStoreInterface $state) {
+  public function __construct(array $configuration, $plugin_id, array $plugin_definition, RouteProviderInterface $route_provider, StateInterface $state) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
 
     $this->routeProvider = $route_provider;
@@ -109,6 +109,7 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
   protected function defineOptions() {
     $options = parent::defineOptions();
     $options['path'] = array('default' => '');
+    $options['route_name'] = array('default' => '');
 
     return $options;
   }
@@ -197,8 +198,11 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
 
     $route = $this->getRoute($view_id, $display_id);
 
-    $collection->add("view.$view_id.$display_id", $route);
-    return array("$view_id.$display_id" => "view.$view_id.$display_id");
+    if (!($route_name = $this->getOption('route_name'))) {
+      $route_name = "view.$view_id.$display_id";
+    }
+    $collection->add($route_name, $route);
+    return array("$view_id.$display_id" => $route_name);
   }
 
   /**
@@ -314,17 +318,20 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
           $items[$path]['menu_name'] = $menu['name'];
           break;
         case 'tab':
-          $items[$path]['type'] = MENU_LOCAL_TASK;
+          $items[$path]['type'] = MENU_CALLBACK;
           break;
         case 'default tab':
-          $items[$path]['type'] = MENU_DEFAULT_LOCAL_TASK;
+          $items[$path]['type'] = MENU_CALLBACK;
           break;
       }
 
       // Add context for contextual links.
-      if (!empty($menu['context'])) {
-        // @todo Make this work with the new contextual links system.
-        $items[$path]['context'] = TRUE;
+      if (in_array($menu['type'], array('tab', 'default tab'))) {
+        // @todo Remove once contextual links are ported to a new plugin based
+        //   system.
+        if (!empty($menu['context'])) {
+          $items[$path]['context'] = TRUE;
+        }
       }
 
       // If this is a 'default' tab, check to see if we have to create the
@@ -335,6 +342,11 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
         $bits = explode('/', $path);
         // Remove the last piece.
         $bit = array_pop($bits);
+
+        // Default tabs are handled by the local task plugins.
+        if ($tab_options['type'] == 'tab') {
+          return $items;
+        }
 
         // we can't do this if they tried to make the last path bit variable.
         // @todo: We can validate this.
@@ -358,9 +370,6 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
             default:
             case 'normal':
               $items[$default_path]['type'] = MENU_NORMAL_ITEM;
-              break;
-            case 'tab':
-              $items[$default_path]['type'] = MENU_LOCAL_TASK;
               break;
           }
           if (isset($tab_options['weight'])) {
@@ -450,7 +459,7 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
 
     if ($form_state['section'] == 'path') {
       if (strpos($form_state['values']['path'], '%') === 0) {
-        form_error($form['path'], t('"%" may not be used for the first segment of a path.'));
+        form_error($form['path'], $form_state, t('"%" may not be used for the first segment of a path.'));
       }
 
       // Automatically remove '/' and trailing whitespace from path.

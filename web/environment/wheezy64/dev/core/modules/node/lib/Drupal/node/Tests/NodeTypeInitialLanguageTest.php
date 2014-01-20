@@ -86,7 +86,7 @@ class NodeTypeInitialLanguageTest extends NodeTestBase {
     // Tests if the language field is hidden by default.
     $this->assertOptionSelected('edit-fields-langcode-type', 'hidden', 'Language is hidden by default on manage display tab.');
 
-    // Changes the inital language settings.
+    // Changes the initial language settings.
     $edit = array(
       'language_configuration[langcode]' => 'en',
     );
@@ -101,11 +101,11 @@ class NodeTypeInitialLanguageTest extends NodeTestBase {
   function testLanguageFieldVisibility() {
     // Creates a node to test Language field visibility feature.
     $edit = array(
-      'title' => $this->randomName(8),
+      'title[0][value]' => $this->randomName(8),
       'body[0][value]' => $this->randomName(16),
     );
     $this->drupalPostForm('node/add/article', $edit, t('Save'));
-    $node = $this->drupalGetNodeByTitle($edit['title']);
+    $node = $this->drupalGetNodeByTitle($edit['title[0][value]']);
     $this->assertTrue($node, 'Node found in database.');
 
     // Loads node page and check if Language field is hidden by default.

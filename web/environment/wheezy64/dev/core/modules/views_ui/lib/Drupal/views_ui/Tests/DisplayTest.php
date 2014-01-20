@@ -9,11 +9,12 @@ namespace Drupal\views_ui\Tests;
 
 use Drupal\Component\Utility\String;
 
+use Drupal\views\Views;
+use Drupal\Core\Template\Attribute;
+
 /**
  * Tests the handling of displays in the UI, adding removing etc.
  */
-use Drupal\views\Views;
-
 class DisplayTest extends UITestBase {
 
   /**
@@ -272,11 +273,16 @@ class DisplayTest extends UITestBase {
     $this->assertEqual($result[0], 'Page', 'Make sure that the link option summary shows the right linked display.');
 
     $link_display_path = 'admin/structure/views/nojs/display/test_display/block_1/link_display';
-    $this->drupalPostForm($link_display_path, array('link_display' => 'custom_url'), t('Apply'));
+    $this->drupalPostForm($link_display_path, array('link_display' => 'custom_url', 'link_url' => 'a-custom-url'), t('Apply'));
     // The form redirects to the master display.
     $this->drupalGet($path);
 
     $this->assertLink(t('Custom URL'), 0, 'The link option has custom url as summary.');
+
+    // Test the default link_url value for new display
+    $this->drupalPostForm(NULL, array(), t('Add Block'));
+    $this->clickLink(t('Custom URL'));
+    $this->assertFieldByName('link_url', 'a-custom-url');
   }
 
   /**
@@ -290,7 +296,7 @@ class DisplayTest extends UITestBase {
     $this->drupalGet('test-display');
     $id = 'views_ui_edit:view=test_display:location=page&name=test_display&display_id=page_1';
     // @see \Drupal\contextual\Tests\ContextualDynamicContextTest:assertContextualLinkPlaceHolder()
-    $this->assertRaw('<div data-contextual-id="'. $id . '"></div>', format_string('Contextual link placeholder with id @id exists.', array('@id' => $id)));
+    $this->assertRaw('<div' . new Attribute(array('data-contextual-id' => $id)) . '></div>', format_string('Contextual link placeholder with id @id exists.', array('@id' => $id)));
 
     // Get server-rendered contextual links.
     // @see \Drupal\contextual\Tests\ContextualDynamicContextTest:renderContextualLinks()

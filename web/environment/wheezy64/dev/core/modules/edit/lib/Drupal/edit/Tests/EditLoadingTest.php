@@ -32,7 +32,7 @@ class EditLoadingTest extends WebTestBase {
     );
   }
 
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     // Create a text format.
@@ -79,7 +79,7 @@ class EditLoadingTest extends WebTestBase {
     // Library and in-place editors.
     $settings = $this->drupalGetSettings();
     $this->assertFalse(isset($settings['ajaxPageState']['js']['core/modules/edit/js/edit.js']), 'Edit library not loaded.');
-    $this->assertFalse(isset($settings['ajaxPageState']['js']['core/modules/edit/js/createjs/editingWidgets/formwidget.js']), "'form' in-place editor not loaded.");
+    $this->assertFalse(isset($settings['ajaxPageState']['js']['core/modules/edit/js/editors/formEditor.js']), "'form' in-place editor not loaded.");
 
     // HTML annotation must always exist (to not break the render cache).
     $this->assertRaw('data-edit-entity-id="node/1"');
@@ -135,7 +135,7 @@ class EditLoadingTest extends WebTestBase {
     // Library and in-place editors.
     $settings = $this->drupalGetSettings();
     $this->assertTrue(isset($settings['ajaxPageState']['js']['core/modules/edit/js/edit.js']), 'Edit library loaded.');
-    $this->assertFalse(isset($settings['ajaxPageState']['js']['core/modules/edit/js/createjs/editingWidgets/formwidget.js']), "'form' in-place editor not loaded.");
+    $this->assertFalse(isset($settings['ajaxPageState']['js']['core/modules/edit/js/editors/formEditor.js']), "'form' in-place editor not loaded.");
 
     // HTML annotation must always exist (to not break the render cache).
     $this->assertRaw('data-edit-entity-id="node/1"');
@@ -216,6 +216,7 @@ class EditLoadingTest extends WebTestBase {
       $this->assertIdentical(1, count($ajax_commands), 'The field form HTTP request results in one AJAX command.');
       $this->assertIdentical('editFieldFormSaved', $ajax_commands[0]['command'], 'The first AJAX command is an editFieldFormSaved command.');
       $this->assertTrue(strpos($ajax_commands[0]['data'], 'Fine thanks.'), 'Form value saved and printed back.');
+      $this->assertIdentical($ajax_commands[0]['other_view_modes'], array(), 'Field was not rendered in any other view mode.');
 
       // Ensure the text on the original node did not change yet.
       $this->drupalGet('node/1');
@@ -290,6 +291,88 @@ class EditLoadingTest extends WebTestBase {
   }
 
   /**
+   * Tests the loading of Edit for the title base field.
+   */
+  public function testTitleBaseField() {
+    $this->drupalLogin($this->editor_user);
+    $this->drupalGet('node/1');
+
+    // Retrieving the metadata should result in a 200 JSON response.
+    $htmlPageDrupalSettings = $this->drupalSettings;
+    $post = array('fields[0]' => 'node/1/title/und/full');
+    $response = $this->drupalPost('edit/metadata', 'application/json', $post);
+    $this->assertResponse(200);
+    $expected = array(
+      'node/1/title/und/full' => array(
+        'label' => 'Title',
+        'access' => TRUE,
+        'editor' => 'plain_text',
+        'aria' => 'Entity node 1, field Title',
+      )
+    );
+    $this->assertIdentical(drupal_json_decode($response), $expected, 'The metadata HTTP request answers with the correct JSON response.');
+    // Restore drupalSettings to build the next requests; simpletest wipes them
+    // after a JSON response.
+    $this->drupalSettings = $htmlPageDrupalSettings;
+
+    // Retrieving the form for this field should result in a 200 response,
+    // containing only an editFieldForm command.
+    $post = array('nocssjs' => 'true', 'reset' => 'true') + $this->getAjaxPageStatePostData();
+    $response = $this->drupalPost('edit/form/' . 'node/1/title/und/full', 'application/vnd.drupal-ajax', $post);
+    $this->assertResponse(200);
+    $ajax_commands = drupal_json_decode($response);
+    $this->assertIdentical(1, count($ajax_commands), 'The field form HTTP request results in one AJAX command.');
+    $this->assertIdentical('editFieldForm', $ajax_commands[0]['command'], 'The first AJAX command is an editFieldForm command.');
+    $this->assertIdentical('<form ', Unicode::substr($ajax_commands[0]['data'], 0, 6), 'The editFieldForm command contains a form.');
+
+    // Prepare form values for submission. drupalPostAjaxForm() is not suitable
+    // for handling pages with JSON responses, so we need our own solution
+    // here.
+    $form_tokens_found = preg_match('/\sname="form_token" value="([^"]+)"/', $ajax_commands[0]['data'], $token_match) && preg_match('/\sname="form_build_id" value="([^"]+)"/', $ajax_commands[0]['data'], $build_id_match);
+    $this->assertTrue($form_tokens_found, 'Form tokens found in output.');
+
+    if ($form_tokens_found) {
+      $edit = array(
+        'title[0][value]' => 'Obligatory question',
+        'op' => t('Save'),
+      );
+      $post = array(
+        'form_id' => 'edit_field_form',
+        'form_token' => $token_match[1],
+        'form_build_id' => $build_id_match[1],
+      );
+      $post += $edit + $this->getAjaxPageStatePostData();
+
+      // Submit field form and check response. This should store the
+      // updated entity in TempStore on the server.
+      $response = $this->drupalPost('edit/form/' . 'node/1/title/und/full', 'application/vnd.drupal-ajax', $post);
+      $this->assertResponse(200);
+      $ajax_commands = drupal_json_decode($response);
+      $this->assertIdentical(1, count($ajax_commands), 'The field form HTTP request results in one AJAX command.');
+      $this->assertIdentical('editFieldFormSaved', $ajax_commands[0]['command'], 'The first AJAX command is an editFieldFormSaved command.');
+      $this->assertTrue(strpos($ajax_commands[0]['data'], 'Obligatory question'), 'Form value saved and printed back.');
+
+      // Ensure the text on the original node did not change yet.
+      $this->drupalGet('node/1');
+      $this->assertNoText('Obligatory question');
+
+      // Save the entity by moving the TempStore values to entity storage.
+      $post = array('nocssjs' => 'true');
+      $response = $this->drupalPost('edit/entity/' . 'node/1', 'application/json', $post);
+      $this->assertResponse(200);
+      $ajax_commands = drupal_json_decode($response);
+      $this->assertIdentical(1, count($ajax_commands), 'The entity submission HTTP request results in one AJAX command.');
+      $this->assertIdentical('editEntitySaved', $ajax_commands[0]['command'], 'The first AJAX command is an editEntitySaved command.');
+      $this->assertIdentical($ajax_commands[0]['data']['entity_type'], 'node', 'Saved entity is of type node.');
+      $this->assertIdentical($ajax_commands[0]['data']['entity_id'], '1', 'Entity id is 1.');
+
+      // Ensure the text on the original node did change.
+      $this->drupalGet('node/1');
+      $this->assertText('Obligatory question');
+    }
+  }
+
+  /**
    * Tests that Edit doesn't make pseudo fields or computed fields editable.
    */
   public function testPseudoFields() {
@@ -300,6 +383,19 @@ class EditLoadingTest extends WebTestBase {
 
     // Check that the data- attribute is not added.
     $this->assertNoRaw('data-edit-field-id="node/1/edit_test_pseudo_field/und/default"');
+  }
+
+  /**
+   * Tests that Edit doesn't make fields rendered with display options editable.
+   */
+  public function testDisplayOptions() {
+    $node = entity_load('node', '1');
+    $display_settings = array(
+      'label' => 'inline',
+    );
+    $build = field_view_field($node, 'body', $display_settings);
+    $output = drupal_render($build);
+    $this->assertFalse(strpos($output, 'data-edit-field-id'), 'data-edit-field-id attribute not added when rendering field using dynamic display options.');
   }
 
   /**
@@ -331,6 +427,9 @@ class EditLoadingTest extends WebTestBase {
         'body[0][format]' => 'filtered_html',
         'op' => t('Save'),
       );
+      // Assume there is another field on this page, which doesn't use a custom
+      // render pipeline, but the default one, and it uses the "full" view mode.
+      $post += array('other_view_modes[]' => 'full');
 
       // Submit field form and check response. Should render with the custom
       // render pipeline.
@@ -341,6 +440,8 @@ class EditLoadingTest extends WebTestBase {
       $this->assertIdentical('editFieldFormSaved', $ajax_commands[0]['command'], 'The first AJAX command is an editFieldFormSaved command.');
       $this->assertTrue(strpos($ajax_commands[0]['data'], 'Fine thanks.'), 'Form value saved and printed back.');
       $this->assertTrue(strpos($ajax_commands[0]['data'], '<div class="edit-test-wrapper">') !== FALSE, 'Custom render pipeline used to render the value.');
+      $this->assertIdentical(array_keys($ajax_commands[0]['other_view_modes']), array('full'), 'Field was also rendered in the "full" view mode.');
+      $this->assertTrue(strpos($ajax_commands[0]['other_view_modes']['full'], 'Fine thanks.'), '"full" version of field contains the form value.');
     }
   }
 

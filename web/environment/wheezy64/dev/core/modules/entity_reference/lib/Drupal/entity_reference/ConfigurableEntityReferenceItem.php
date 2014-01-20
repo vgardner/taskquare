@@ -7,6 +7,7 @@
 
 namespace Drupal\entity_reference;
 
+use Drupal\Core\TypedData\DataDefinition;
 use Drupal\field\FieldInterface;
 use Drupal\Core\Field\ConfigEntityReferenceItemBase;
 use Drupal\Core\Field\ConfigFieldItemInterface;
@@ -17,16 +18,56 @@ use Drupal\Core\Field\ConfigFieldItemInterface;
  * Replaces the Core 'entity_reference' entity field type implementation, this
  * supports configurable fields, auto-creation of referenced entities and more.
  *
+ * Required settings (below the definition's 'settings' key) are:
+ *  - target_type: The entity type to reference.
+ *
  * @see entity_reference_field_info_alter().
  *
  */
 class ConfigurableEntityReferenceItem extends ConfigEntityReferenceItemBase implements ConfigFieldItemInterface {
 
   /**
+   * Definitions of the contained properties.
+   *
+   * @see ConfigurableEntityReferenceItem::getPropertyDefinitions()
+   *
+   * @var array
+   */
+  static $propertyDefinitions;
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getPropertyDefinitions() {
+    $settings = $this->definition->getSettings();
+    $target_type = $settings['target_type'];
+
+    // Definitions vary by entity type and bundle, so key them accordingly.
+    $key = $target_type . ':';
+    $key .= isset($settings['target_bundle']) ? $settings['target_bundle'] : '';
+
+    if (!isset(static::$propertyDefinitions[$key])) {
+      // Call the parent to define the target_id and entity properties.
+      parent::getPropertyDefinitions();
+
+      // Only add the revision ID property if the target entity type supports
+      // revisions.
+      $target_type_info = \Drupal::entityManager()->getDefinition($target_type);
+      if (!empty($target_type_info['entity_keys']['revision']) && !empty($target_type_info['revision_table'])) {
+        static::$propertyDefinitions[$key]['revision_id'] = DataDefinition::create('integer')
+          ->setLabel(t('Revision ID'))
+          ->setConstraints(array('Range' => array('min' => 0)));
+      }
+    }
+
+    return static::$propertyDefinitions[$key];
+  }
+
+  /**
    * {@inheritdoc}
    */
   public static function schema(FieldInterface $field) {
-    $target_type = $field->getFieldSetting('target_type');
+    $target_type = $field->getSetting('target_type');
     $target_type_info = \Drupal::entityManager()->getDefinition($target_type);
 
     if (is_subclass_of($target_type_info['class'], '\Drupal\Core\Entity\ContentEntityInterface')) {
@@ -63,19 +104,6 @@ class ConfigurableEntityReferenceItem extends ConfigEntityReferenceItemBase impl
     );
 
     return $schema;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function preSave() {
-    $entity = $this->get('entity')->getValue();
-    $target_id = $this->get('target_id')->getValue();
-
-    if (!$target_id && !empty($entity) && $entity->isNew()) {
-      $entity->save();
-      $this->set('target_id', $entity->id());
-    }
   }
 
   /**
@@ -137,7 +165,7 @@ class ConfigurableEntityReferenceItem extends ConfigEntityReferenceItemBase impl
       '#type' => 'select',
       '#title' => t('Reference method'),
       '#options' => $handlers_options,
-      '#default_value' => $instance->getFieldSetting('handler'),
+      '#default_value' => $instance->getSetting('handler'),
       '#required' => TRUE,
       '#ajax' => TRUE,
       '#limit_validation_errors' => array(),

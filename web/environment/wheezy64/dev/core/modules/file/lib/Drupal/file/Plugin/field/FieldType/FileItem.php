@@ -8,6 +8,7 @@
 namespace Drupal\file\Plugin\Field\FieldType;
 
 use Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem;
+use Drupal\Core\TypedData\DataDefinition;
 use Drupal\field\FieldInterface;
 use Drupal\Core\Field\ConfigFieldItemInterface;
 
@@ -87,19 +88,16 @@ class FileItem extends EntityReferenceItem implements ConfigFieldItemInterface {
    * {@inheritdoc}
    */
   public function getPropertyDefinitions() {
-    $this->definition['settings']['target_type'] = 'file';
+    $this->definition->setSetting('target_type', 'file');
 
     if (!isset(static::$propertyDefinitions)) {
       static::$propertyDefinitions = parent::getPropertyDefinitions();
 
-      static::$propertyDefinitions['display'] = array(
-        'type' => 'boolean',
-        'label' => t('Flag to control whether this file should be displayed when viewing content.'),
-      );
-      static::$propertyDefinitions['description'] = array(
-        'type' => 'string',
-        'label' => t('A description of the file.'),
-      );
+      static::$propertyDefinitions['display'] = DataDefinition::create('boolean')
+        ->setLabel(t('Flag to control whether this file should be displayed when viewing content'));
+
+      static::$propertyDefinitions['description'] = DataDefinition::create('string')
+        ->setLabel(t('A description of the file'));
     }
     return static::$propertyDefinitions;
   }
@@ -237,7 +235,7 @@ class FileItem extends EntityReferenceItem implements ConfigFieldItemInterface {
       $extensions = array_filter(explode(' ', $extensions));
       $extensions = implode(' ', array_unique($extensions));
       if (!preg_match('/^([a-z0-9]+([.][a-z0-9])* ?)+$/', $extensions)) {
-        form_error($element, t('The list of allowed extensions is not valid, be sure to exclude leading dots and to separate extensions with a comma or space.'));
+        form_error($element, $form_state, t('The list of allowed extensions is not valid, be sure to exclude leading dots and to separate extensions with a comma or space.'));
       }
       else {
         form_set_value($element, $extensions, $form_state);
@@ -256,7 +254,7 @@ class FileItem extends EntityReferenceItem implements ConfigFieldItemInterface {
    */
   public static function validateMaxFilesize($element, &$form_state) {
     if (!empty($element['#value']) && !is_numeric(parse_size($element['#value']))) {
-      form_error($element, t('The "!name" option must contain a valid value. You may either leave the text field empty or enter a string like "512" (bytes), "80 KB" (kilobytes) or "50 MB" (megabytes).', array('!name' => t($element['title']))));
+      form_error($element, $form_state, t('The "!name" option must contain a valid value. You may either leave the text field empty or enter a string like "512" (bytes), "80 KB" (kilobytes) or "50 MB" (megabytes).', array('!name' => t($element['title']))));
     }
   }
 

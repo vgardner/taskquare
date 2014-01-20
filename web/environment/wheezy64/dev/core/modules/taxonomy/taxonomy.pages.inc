@@ -16,9 +16,6 @@ use Drupal\taxonomy\Entity\Term;
  * @deprecated Use \Drupal\taxonomy\Controller\TaxonomyController::termPage()
  */
 function taxonomy_term_page(Term $term) {
-  // Assign the term name as the page title.
-  drupal_set_title($term->label());
-
   $build['#attached']['drupal_add_feed'][] = array('taxonomy/term/' . $term->id() . '/feed', 'RSS - ' . $term->label());
 
   foreach ($term->uriRelationships() as $rel) {
@@ -76,7 +73,7 @@ function taxonomy_term_feed(Term $term) {
   $channel['title'] = \Drupal::config('system.site')->get('name') . ' - ' . $term->label();
   // Only display the description if we have a single term, to avoid clutter and confusion.
   // HTML will be removed from feed description.
-  $channel['description'] = check_markup($term->description->value, $term->format->value, '', TRUE);
+  $channel['description'] = $term->description->processed;
   $nids = taxonomy_select_nodes($term->id(), FALSE, \Drupal::config('system.rss')->get('items.limit'));
 
   return node_feed($nids, $channel);

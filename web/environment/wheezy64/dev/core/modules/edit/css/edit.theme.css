@@ -1,13 +1,8 @@
 /**
- * @file edit.theme.css
+ * @file
+ * Styling for edit module.
  */
 
-/**
- * Hide comments on entities
- */
-.edit-entity-active .comment-wrapper {
-  display: none ;
-}
 /**
  * Editable.
  */

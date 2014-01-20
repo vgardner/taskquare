@@ -7,9 +7,8 @@
 
 namespace Drupal\field_ui;
 
-use Drupal\Component\Utility\NestedArray;
-use Drupal\entity\EntityDisplayBaseInterface;
 use Drupal\field\FieldInstanceInterface;
+use Drupal\Core\Entity\Display\EntityDisplayInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -49,7 +48,7 @@ class DisplayOverview extends DisplayOverviewBase {
   /**
    * {@inheritdoc}
    */
-  protected function buildFieldRow($field_id, FieldInstanceInterface $instance, EntityDisplayBaseInterface $entity_display, array $form, array &$form_state) {
+  protected function buildFieldRow($field_id, FieldInstanceInterface $instance, EntityDisplayInterface $entity_display, array $form, array &$form_state) {
     $field_row = parent::buildFieldRow($field_id, $instance, $entity_display, $form, $form_state);
     $display_options = $entity_display->getComponent($field_id);
 
@@ -57,7 +56,7 @@ class DisplayOverview extends DisplayOverviewBase {
     $label = array(
       'label' => array(
         '#type' => 'select',
-        '#title' => $this->t('Label display for @title', array('@title' => $instance->getFieldLabel())),
+        '#title' => $this->t('Label display for @title', array('@title' => $instance->getLabel())),
         '#title_display' => 'invisible',
         '#options' => $this->getFieldLabelOptions(),
         '#default_value' => $display_options ? $display_options['label'] : 'above',
@@ -68,7 +67,7 @@ class DisplayOverview extends DisplayOverviewBase {
     $field_row = array_slice($field_row, 0, $label_position, TRUE) + $label + array_slice($field_row, $label_position, count($field_row) - 1, TRUE);
 
     // Update the (invisible) title of the 'plugin' column.
-    $field_row['plugin']['#title'] = $this->t('Formatter for @title', array('@title' => $instance->getFieldLabel()));
+    $field_row['plugin']['#title'] = $this->t('Formatter for @title', array('@title' => $instance->getLabel()));
     if (!empty($field_row['plugin']['settings_edit_form'])) {
       $plugin_type_info = $entity_display->getRenderer($field_id)->getPluginDefinition();
       $field_row['plugin']['settings_edit_form']['label']['#markup'] = $this->t('Format settings:') . ' <span class="plugin-name">' . $plugin_type_info['label'] . '</span>';

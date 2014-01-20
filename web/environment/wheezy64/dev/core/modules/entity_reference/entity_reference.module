@@ -25,35 +25,7 @@ function entity_reference_field_info_alter(&$info) {
   $info['entity_reference']['default_widget'] = 'entity_reference_autocomplete';
   $info['entity_reference']['default_formatter'] = 'entity_reference_label';
   $info['entity_reference']['list_class'] = '\Drupal\entity_reference\Plugin\Field\FieldType\ConfigurableEntityReferenceFieldItemList';
-}
-
-/**
- * Implements hook_entity_field_info_alter().
- *
- * Set the "target_type" and "list_class" property definition for entity
- * reference fields.
- *
- * @see \Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem::getPropertyDefinitions()
- *
- * @param array $info
- *   The property info array as returned by hook_entity_field_info().
- * @param string $entity_type
- *   The entity type for which entity properties are defined.
- */
-function entity_reference_entity_field_info_alter(&$info, $entity_type) {
-  foreach (field_info_instances($entity_type) as $bundle_name => $instances) {
-    foreach ($instances as $field_name => $instance) {
-      if ($instance->getFieldType() != 'entity_reference') {
-        continue;
-      }
-      if (isset($info['definitions'][$field_name])) {
-        $info['definitions'][$field_name]['settings']['target_type'] = $instance->getFieldSetting('target_type');
-      }
-      elseif (isset($info['optional'][$field_name])) {
-        $info['optional'][$field_name]['settings']['target_type'] = $instance->getFieldSetting('target_type');
-      }
-    }
-  }
+  $info['entity_reference']['provider'] = 'entity_reference';
 }
 
 /**
@@ -79,7 +51,7 @@ function entity_reference_field_entity_update(FieldInterface $field) {
     return;
   }
 
-  if ($field->getFieldSetting('target_type') == $field->original->getFieldSetting('target_type')) {
+  if ($field->getSetting('target_type') == $field->original->getSetting('target_type')) {
     // Target type didn't change.
     return;
   }
@@ -89,7 +61,7 @@ function entity_reference_field_entity_update(FieldInterface $field) {
     return;
   }
 
-  $field_name = $field->getFieldName();
+  $field_name = $field->getName();
 
   foreach ($field->bundles() as $entity_type => $bundles) {
     foreach ($bundles as $bundle) {
@@ -181,7 +153,7 @@ function entity_reference_options_list(FieldDefinitionInterface $field_definitio
   }
 
   // Rebuild the array by changing the bundle key into the bundle label.
-  $target_type = $field_definition->getFieldSetting('target_type');
+  $target_type = $field_definition->getSetting('target_type');
   $bundles = entity_get_bundles($target_type);
 
   $return = array();

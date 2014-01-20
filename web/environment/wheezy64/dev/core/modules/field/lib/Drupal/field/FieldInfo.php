@@ -190,12 +190,10 @@ class FieldInfo {
 
     $map = array();
 
-    // Get active fields.
+    // Get fields.
     foreach (config_get_storage_names_with_prefix('field.field.') as $config_id) {
       $field_config = $this->config->get($config_id)->get();
-      if ($field_config['active']) {
-        $fields[$field_config['uuid']] = $field_config;
-      }
+      $fields[$field_config['uuid']] = $field_config;
     }
     // Get field instances.
     foreach (config_get_storage_names_with_prefix('field.instance.') as $config_id) {
@@ -216,7 +214,7 @@ class FieldInfo {
   }
 
   /**
-   * Returns all active fields, including deleted ones.
+   * Returns all fields, including deleted ones.
    *
    * @return \Drupal\field\FieldInterface[]
    *   An array of field entities, keyed by field ID.
@@ -244,7 +242,7 @@ class FieldInfo {
     // Fill the name/ID map.
     foreach ($this->fieldsById as $field) {
       if (!$field->deleted) {
-        $this->fieldIdsByName[$field->entity_type][$field->getFieldName()] = $field->uuid();
+        $this->fieldIdsByName[$field->entity_type][$field->getName()] = $field->uuid();
       }
     }
 
@@ -254,7 +252,7 @@ class FieldInfo {
   }
 
   /**
-   * Retrieves all active, non-deleted instances definitions.
+   * Retrieves all non-deleted instances definitions.
    *
    * @param string $entity_type
    *   (optional) The entity type.
@@ -281,7 +279,7 @@ class FieldInfo {
 
         foreach (field_read_instances() as $instance) {
           $instance = $this->prepareInstance($instance);
-          $this->bundleInstances[$instance->entity_type][$instance->bundle][$instance->getFieldName()] = $instance;
+          $this->bundleInstances[$instance->entity_type][$instance->bundle][$instance->getName()] = $instance;
         }
 
         // Store in persistent cache.
@@ -302,7 +300,7 @@ class FieldInfo {
   /**
    * Returns a field definition from a field name.
    *
-   * This method only retrieves active, non-deleted fields.
+   * This method only retrieves non-deleted fields.
    *
    * @param string $entity_type
    *   The entity type.
@@ -342,8 +340,6 @@ class FieldInfo {
   /**
    * Returns a field entity from a field ID.
    *
-   * This method only retrieves active fields, deleted or not.
-   *
    * @param string $field_id
    *   The field ID.
    *
@@ -370,7 +366,7 @@ class FieldInfo {
       // Store in the static cache.
       $this->fieldsById[$field->uuid()] = $field;
       if (!$field->deleted) {
-        $this->fieldIdsByName[$field->entity_type][$field->getFieldName()] = $field->uuid();
+        $this->fieldIdsByName[$field->entity_type][$field->getName()] = $field->uuid();
       }
 
       return $field;
@@ -414,7 +410,7 @@ class FieldInfo {
         if (!isset($this->fieldsById[$field->uuid()])) {
           $this->fieldsById[$field->uuid()] = $field;
           if (!$field->deleted) {
-            $this->fieldIdsByName[$field->entity_type][$field->getFieldName()] = $field->uuid();
+            $this->fieldIdsByName[$field->entity_type][$field->getName()] = $field->uuid();
           }
         }
       }
@@ -444,8 +440,8 @@ class FieldInfo {
     if (entity_get_info($entity_type) && !empty($field_map[$entity_type])) {
 
       // Collect names of fields and instances involved in the bundle, using the
-      // field map. The field map is already filtered to active, non-deleted
-      // fields and instances, so those are kept out of the persistent caches.
+      // field map. The field map is already filtered to non-deleted fields and
+      // instances, so those are kept out of the persistent caches.
       $config_ids = array();
       foreach ($field_map[$entity_type] as $field_name => $field_data) {
         if (in_array($bundle, $field_data['bundles'])) {
@@ -462,7 +458,7 @@ class FieldInfo {
             $field = $this->prepareField($field);
 
             $this->fieldsById[$field->uuid()] = $field;
-            $this->fieldIdsByName[$field->entity_type][$field->getFieldName()] = $field->uuid();
+            $this->fieldIdsByName[$field->entity_type][$field->getName()] = $field->uuid();
           }
 
           $fields[] = $this->fieldsById[$field->uuid()];
@@ -472,7 +468,7 @@ class FieldInfo {
         $loaded_instances = entity_load_multiple('field_instance', array_values($config_ids));
         foreach ($loaded_instances as $instance) {
           $instance = $this->prepareInstance($instance);
-          $instances[$instance->getFieldName()] = $instance;
+          $instances[$instance->getName()] = $instance;
         }
       }
     }
@@ -564,7 +560,7 @@ class FieldInfo {
    */
   public function prepareField(FieldInterface $field) {
     // Make sure all expected field settings are present.
-    $field->settings += $this->fieldTypeManager->getDefaultSettings($field->getFieldType());
+    $field->settings += $this->fieldTypeManager->getDefaultSettings($field->getType());
 
     return $field;
   }
@@ -580,7 +576,7 @@ class FieldInfo {
    */
   public function prepareInstance(FieldInstanceInterface $instance) {
     // Make sure all expected instance settings are present.
-    $instance->settings += $this->fieldTypeManager->getDefaultInstanceSettings($instance->getFieldType());
+    $instance->settings += $this->fieldTypeManager->getDefaultInstanceSettings($instance->getType());
 
     return $instance;
   }

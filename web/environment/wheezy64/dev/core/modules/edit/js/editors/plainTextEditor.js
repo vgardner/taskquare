@@ -2,7 +2,8 @@
  * @file
  * contentEditable-based in-place editor for plain text content.
  */
-(function ($, _, Backbone, Drupal) {
+
+(function ($, _, Drupal) {
 
 "use strict";
 
@@ -21,7 +22,14 @@ Drupal.edit.editors.plain_text = Drupal.edit.EditorView.extend({
     var fieldModel = this.fieldModel;
 
     // Store the original value of this field. Necessary for reverting changes.
-    var $textElement = this.$textElement = this.$el.find('.field-item:first');
+    var $textElement;
+    var $fieldItems = this.$el.find('.field-item');
+    if ($fieldItems.length) {
+      $textElement = this.$textElement = $fieldItems.eq(0);
+    }
+    else {
+      $textElement = this.$textElement = this.$el;
+    }
     editorModel.set('originalValue', $.trim(this.$textElement.text()));
 
     // Sets the state to 'changed' whenever the value changes
@@ -54,7 +62,7 @@ Drupal.edit.editors.plain_text = Drupal.edit.EditorView.extend({
         break;
       case 'candidate':
         if (from !== 'inactive') {
-          this.$textElement.removeAttr('contentEditable');
+          this.$textElement.removeAttr('contenteditable');
         }
         if (from === 'invalid') {
           this.removeValidationErrors();
@@ -70,7 +78,7 @@ Drupal.edit.editors.plain_text = Drupal.edit.EditorView.extend({
         });
         break;
       case 'active':
-        this.$textElement.attr('contentEditable', 'true');
+        this.$textElement.attr('contenteditable', 'true');
         break;
       case 'changed':
         break;
@@ -104,4 +112,4 @@ Drupal.edit.editors.plain_text = Drupal.edit.EditorView.extend({
 
 });
 
-})(jQuery, _, Backbone, Drupal);
+})(jQuery, _, Drupal);

@@ -37,9 +37,10 @@ class FileFieldValidateTest extends FileFieldTestBase {
     $test_file = $this->getTestFile('text');
 
     // Try to post a new node without uploading a file.
-    $edit = array("title" => $this->randomName());
+    $edit = array();
+    $edit['title[0][value]'] = $this->randomName();
     $this->drupalPostForm('node/add/' . $type_name, $edit, t('Save and publish'));
-    $this->assertRaw(t('!title field is required.', array('!title' => $instance->getFieldLabel())), 'Node save failed when required file field was empty.');
+    $this->assertRaw(t('!title field is required.', array('!title' => $instance->getLabel())), 'Node save failed when required file field was empty.');
 
     // Create a new node with the uploaded file.
     $nid = $this->uploadNodeFile($test_file, $field_name, $type_name);
@@ -56,9 +57,10 @@ class FileFieldValidateTest extends FileFieldTestBase {
     $this->createFileField($field_name, 'node', $type_name, array('cardinality' => FieldDefinitionInterface::CARDINALITY_UNLIMITED), array('required' => '1'));
 
     // Try to post a new node without uploading a file in the multivalue field.
-    $edit = array('title' => $this->randomName());
+    $edit = array();
+    $edit['title[0][value]'] = $this->randomName();
     $this->drupalPostForm('node/add/' . $type_name, $edit, t('Save and publish'));
-    $this->assertRaw(t('!title field is required.', array('!title' => $instance->getFieldLabel())), 'Node save failed when required multiple value file field was empty.');
+    $this->assertRaw(t('!title field is required.', array('!title' => $instance->getLabel())), 'Node save failed when required multiple value file field was empty.');
 
     // Create a new node with the uploaded file into the multivalue field.
     $nid = $this->uploadNodeFile($test_file, $field_name, $type_name);

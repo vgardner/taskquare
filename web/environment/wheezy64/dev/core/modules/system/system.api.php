@@ -51,8 +51,7 @@ function hook_hook_info() {
  *
  * Modules may specify whether or not the routing paths they define are
  * to be considered administrative. Other modules may use this information to
- * display those pages differently (e.g. in a modal overlay, or in a different
- * theme).
+ * display those pages differently.
  *
  * To change the administrative status of menu items defined in another module's
  * routing paths, modules should implement hook_admin_paths_alter().
@@ -1426,36 +1425,6 @@ function hook_template_preprocess_default_variables_alter(&$variables) {
 }
 
 /**
- * Return the machine-readable name of the theme to use for the current page.
- *
- * This hook can be used to dynamically set the theme for the current page
- * request. It should be used by modules which need to override the theme
- * based on dynamic conditions (for example, a module which allows the theme to
- * be set based on the current user's role). The return value of this hook will
- * be used on all pages except those which have a valid per-page or per-section
- * theme set via a theme callback function in hook_menu(); the themes on those
- * pages can only be overridden using hook_menu_alter().
- *
- * Note that returning different themes for the same path may not work with page
- * caching. This is most likely to be a problem if an anonymous user on a given
- * path could have different themes returned under different conditions.
- *
- * Since only one theme can be used at a time, the last (i.e., highest
- * weighted) module which returns a valid theme name from this hook will
- * prevail.
- *
- * @return
- *   The machine-readable name of the theme that should be used for the current
- *   page request. The value returned from this function will only have an
- *   effect if it corresponds to a currently-active theme on the site. Do not
- *   return a value if you do not wish to set a custom theme.
- */
-function hook_custom_theme() {
-  // Allow the user to request a particular theme via a query parameter.
-  return \Drupal::request()->query->get('theme');
-}
-
-/**
  * Log an event message.
  *
  * This hook allows modules to route log events to custom destinations, such as
@@ -1852,7 +1821,7 @@ function hook_file_download($uri) {
  *   shipped file.
  */
 function hook_file_url_alter(&$uri) {
-  global $user;
+  $user = \Drupal::currentUser();
 
   // User 1 will always see the local file in this example.
   if ($user->id() == 1) {
@@ -2719,8 +2688,7 @@ function hook_url_outbound_alter(&$path, &$options, $original_path) {
 
   // Instead of pointing to user/[uid]/edit, point to user/me/edit.
   if (preg_match('|^user/([0-9]*)/edit(/.*)?|', $path, $matches)) {
-    global $user;
-    if ($user->id() == $matches[1]) {
+    if (\Drupal::currentUser()->id() == $matches[1]) {
       $path = 'user/me/edit' . $matches[2];
     }
   }
@@ -2986,16 +2954,6 @@ function hook_token_info_alter(&$data) {
  * @ingroup batch
  */
 function hook_batch_alter(&$batch) {
-  // If the current page request is inside the overlay, add ?render=overlay to
-  // the success callback URL, so that it appears correctly within the overlay.
-  if (overlay_get_mode() == 'child') {
-    if (isset($batch['url_options']['query'])) {
-      $batch['url_options']['query']['render'] = 'overlay';
-    }
-    else {
-      $batch['url_options']['query'] = array('render' => 'overlay');
-    }
-  }
 }
 
 /**
@@ -3324,8 +3282,7 @@ function hook_link_alter(&$variables) {
  * identified when you are looking at the Drupal source code by having
  * "@ Annotation" in their documentation blocks (without the space after @). To
  * find examples of annotation for a particular annotation class, such as
- * EntityType, look for class files that contain a PHP "use" declaration of the
- * annotation class, or files that have an @ annotation section using the
+ * EntityType, look for class files that have an @ annotation section using the
  * annotation class.
  * @}
  */

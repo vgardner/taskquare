@@ -8,7 +8,7 @@
 namespace Drupal\field_ui;
 
 use Drupal\Component\Utility\NestedArray;
-use Drupal\entity\EntityDisplayBaseInterface;
+use Drupal\Core\Entity\Display\EntityDisplayInterface;
 use Drupal\field\FieldInstanceInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -49,11 +49,11 @@ class FormDisplayOverview extends DisplayOverviewBase {
   /**
    * {@inheritdoc}
    */
-  protected function buildFieldRow($field_id, FieldInstanceInterface $instance, EntityDisplayBaseInterface $entity_display, array $form, array &$form_state) {
+  protected function buildFieldRow($field_id, FieldInstanceInterface $instance, EntityDisplayInterface $entity_display, array $form, array &$form_state) {
     $field_row = parent::buildFieldRow($field_id, $instance, $entity_display, $form, $form_state);
 
     // Update the (invisible) title of the 'plugin' column.
-    $field_row['plugin']['#title'] = $this->t('Formatter for @title', array('@title' => $instance->getFieldLabel()));
+    $field_row['plugin']['#title'] = $this->t('Formatter for @title', array('@title' => $instance->getLabel()));
     if (!empty($field_row['plugin']['settings_edit_form']) && ($plugin = $entity_display->getRenderer($field_id))) {
       $plugin_type_info = $plugin->getPluginDefinition();
       $field_row['plugin']['settings_edit_form']['label']['#markup'] = $this->t('Widget settings:') . ' <span class="plugin-name">' . $plugin_type_info['label'] . '</span>';

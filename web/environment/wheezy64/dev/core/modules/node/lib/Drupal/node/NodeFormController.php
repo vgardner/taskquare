@@ -47,8 +47,7 @@ class NodeFormController extends ContentEntityFormController {
           $node->$key = (int) in_array($key, $this->settings['options']);
         }
       }
-      global $user;
-      $node->setAuthorId($user->id());
+      $node->setAuthorId(\Drupal::currentUser()->id());
       $node->setCreatedTime(REQUEST_TIME);
     }
     else {
@@ -100,18 +99,6 @@ class NodeFormController extends ContentEntityFormController {
       '#type' => 'hidden',
       '#default_value' => $node->getChangedTime(),
     );
-
-    $node_type = node_type_load($node->getType());
-    if ($node_type->has_title) {
-      $form['title'] = array(
-        '#type' => 'textfield',
-        '#title' => check_plain($node_type->title_label),
-        '#required' => TRUE,
-        '#default_value' => $node->title->value,
-        '#maxlength' => 255,
-        '#weight' => -5,
-      );
-    }
 
     $language_configuration = module_invoke('language', 'get_default_configuration', 'node', $node->getType());
     $form['langcode'] = array(
@@ -251,7 +238,7 @@ class NodeFormController extends ContentEntityFormController {
     $node = $this->entity;
     $preview_mode = $this->settings['preview'];
 
-    $element['submit']['#access'] = $preview_mode != DRUPAL_REQUIRED || (!form_get_errors() && isset($form_state['node_preview']));
+    $element['submit']['#access'] = $preview_mode != DRUPAL_REQUIRED || (!form_get_errors($form_state) && isset($form_state['node_preview']));
 
     // If saving is an option, privileged users get dedicated form submit
     // buttons to adjust the publishing status while saving in one go.
@@ -305,7 +292,7 @@ class NodeFormController extends ContentEntityFormController {
     }
 
     $element['preview'] = array(
-      '#access' => $preview_mode != DRUPAL_DISABLED && (node_access('create', $node) || node_access('update', $node)),
+      '#access' => $preview_mode != DRUPAL_DISABLED && ($node->access('create') || $node->access('update')),
       '#value' => t('Preview'),
       '#weight' => 20,
       '#validate' => array(
@@ -317,7 +304,7 @@ class NodeFormController extends ContentEntityFormController {
       ),
     );
 
-    $element['delete']['#access'] = node_access('delete', $node);
+    $element['delete']['#access'] = $node->access('delete');
     $element['delete']['#weight'] = 100;
 
     return $element;
@@ -330,7 +317,7 @@ class NodeFormController extends ContentEntityFormController {
     $node = $this->buildEntity($form, $form_state);
 
     if ($node->id() && (node_last_changed($node->id(), $this->getFormLangcode($form_state)) > $node->getChangedTime())) {
-      form_set_error('changed', t('The content on this page has either been modified by another user, or you have already submitted modifications using this form. As a result, your changes cannot be saved.'));
+      $this->setFormError('changed', $form_state, $this->t('The content on this page has either been modified by another user, or you have already submitted modifications using this form. As a result, your changes cannot be saved.'));
     }
 
     // Validate the "authored by" field.
@@ -338,14 +325,14 @@ class NodeFormController extends ContentEntityFormController {
       // The use of empty() is mandatory in the context of usernames
       // as the empty string denotes the anonymous user. In case we
       // are dealing with an anonymous user we set the user ID to 0.
-      form_set_error('name', t('The username %name does not exist.', array('%name' => $form_state['values']['name'])));
+      $this->setFormError('name', $form_state, $this->t('The username %name does not exist.', array('%name' => $form_state['values']['name'])));
     }
 
     // Validate the "authored on" field.
     // The date element contains the date object.
     $date = $node->date instanceof DrupalDateTime ? $node->date : new DrupalDateTime($node->date);
     if ($date->hasErrors()) {
-      form_set_error('date', t('You have to specify a valid date.'));
+      $this->setFormError('date', $form_state, $this->t('You have to specify a valid date.'));
     }
 
     // Invoke hook_node_validate() for validation needed by modules.
@@ -377,8 +364,7 @@ class NodeFormController extends ContentEntityFormController {
       $node->setNewRevision();
       // If a new revision is created, save the current user as revision author.
       $node->setRevisionCreationTime(REQUEST_TIME);
-      global $user;
-      $node->setRevisionAuthorId($user->id());
+      $node->setRevisionAuthorId(\Drupal::currentUser()->id());
     }
 
     $node->validated = TRUE;
@@ -403,7 +389,7 @@ class NodeFormController extends ContentEntityFormController {
     //   classes.
     module_load_include('inc', 'node', 'node.pages');
     drupal_set_title(t('Preview'), PASS_THROUGH);
-    $form_state['node_preview'] = node_preview($this->entity);
+    $form_state['node_preview'] = node_preview($this->entity, $form_state);
     $form_state['rebuild'] = TRUE;
   }
 

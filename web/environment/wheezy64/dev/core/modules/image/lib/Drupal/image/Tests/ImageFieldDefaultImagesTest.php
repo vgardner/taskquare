@@ -33,6 +33,14 @@ class ImageFieldDefaultImagesTest extends ImageFieldTestBase {
   public function testDefaultImages() {
     // Create files to use as the default images.
     $files = $this->drupalGetTestFiles('image');
+    // Create 10 files so the default image fids are not a single value.
+    for ($i = 1; $i <= 10; $i++) {
+      $filename = $this->randomName() . "$i";
+      $desired_filepath = 'public://' . $filename;
+      file_unmanaged_copy($files[0]->uri, $desired_filepath, FILE_EXISTS_ERROR);
+      $file = entity_create('file', array('uri' => $desired_filepath, 'filename' => $filename, 'name' => $filename));
+      $file->save();
+    }
     $default_images = array();
     foreach (array('field', 'instance', 'instance2', 'field_new', 'instance_new') as $image_target) {
       $file = entity_create('file', (array) array_pop($files));
@@ -62,21 +70,21 @@ class ImageFieldDefaultImagesTest extends ImageFieldTestBase {
     $instance = $this->createImageField($field_name, 'article', $field_settings, $instance_settings, $widget_settings);
 
     // The instance default image id should be 2.
-    $default_image = $instance->getFieldSetting('default_image');
+    $default_image = $instance->getSetting('default_image');
     $this->assertEqual($default_image['fid'], $default_images['instance']->id());
 
-    // Also test \Drupal\field\Entity\FieldInstance::getFieldSetting().
-    $instance_field_settings = $instance->getFieldSettings();
+    // Also test \Drupal\field\Entity\FieldInstance::getSetting().
+    $instance_field_settings = $instance->getSettings();
     $this->assertEqual($instance_field_settings['default_image']['fid'], $default_images['instance']->id());
 
     $field = $instance->getField();
 
     // The field default image id should be 1.
-    $default_image = $field->getFieldSetting('default_image');
+    $default_image = $field->getSetting('default_image');
     $this->assertEqual($default_image['fid'], $default_images['field']->id());
 
-    // Also test \Drupal\field\Entity\Field::getFieldSettings().
-    $field_field_settings = $field->getFieldSettings();
+    // Also test \Drupal\field\Entity\Field::getSettings().
+    $field_field_settings = $field->getSettings();
     $this->assertEqual($field_field_settings['default_image']['fid'], $default_images['field']->id());
 
     // Add another instance with another default image to the page content type.
@@ -173,7 +181,7 @@ class ImageFieldDefaultImagesTest extends ImageFieldTestBase {
     );
 
     // Upload a new default for the field.
-    $field->settings['default_image']['fid'] = array($default_images['field_new']->id());
+    $field->settings['default_image']['fid'] = $default_images['field_new']->id();
     $field->save();
 
     // Confirm that the new default is used on the article field settings form.

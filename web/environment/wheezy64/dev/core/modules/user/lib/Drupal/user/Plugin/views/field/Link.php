@@ -24,6 +24,13 @@ use Drupal\Component\Annotation\PluginID;
 class Link extends FieldPluginBase {
 
   /**
+   * {@inheritdoc}
+   */
+  public function usesGroupBy() {
+    return FALSE;
+  }
+
+  /**
    * Overrides Drupal\views\Plugin\views\field\FieldPluginBase::init().
    */
   public function init(ViewExecutable $view, DisplayPluginBase $display, array &$options = NULL) {
@@ -61,7 +68,9 @@ class Link extends FieldPluginBase {
    * {@inheritdoc}
    */
   public function render(ResultRow $values) {
-    return $this->renderLink($this->getEntity($values), $values);
+    if ($entity = $this->getEntity($values)) {
+      return $this->renderLink($entity, $values);
+    }
   }
 
   /**

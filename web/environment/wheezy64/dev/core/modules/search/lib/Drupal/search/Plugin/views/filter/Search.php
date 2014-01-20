@@ -85,13 +85,13 @@ class Search extends FilterPluginBase {
     if (!empty($form_state['values'][$key])) {
       $this->query_parse_search_expression($form_state['values'][$key]);
       if (count($this->search_query->words()) == 0) {
-        form_set_error($key, format_plural(\Drupal::config('search.settings')->get('index.minimum_word_size'), 'You must include at least one positive keyword with 1 character or more.', 'You must include at least one positive keyword with @count characters or more.'));
+        form_set_error($key, $form_state, format_plural(\Drupal::config('search.settings')->get('index.minimum_word_size'), 'You must include at least one positive keyword with 1 character or more.', 'You must include at least one positive keyword with @count characters or more.'));
       }
     }
   }
 
   /**
-   * Take sure that parseSearchExpression is runned and everything is set up for it.
+   * Make sure that parseSearchExpression is run and everything is set up.
    *
    * @param $input
    *    The search phrase which was input by the user.
@@ -163,7 +163,7 @@ class Search extends FilterPluginBase {
         $conditions = $this->search_query->conditions();
         $condition_conditions =& $conditions->conditions();
         foreach ($condition_conditions  as $key => &$condition) {
-          // Take sure we just look at real conditions.
+          // Make sure we just look at real conditions.
           if (is_numeric($key)) {
             // Replace the conditions with the table alias of views.
             $this->search_query->condition_replace_string('d.', "$search_dataset.", $condition);

@@ -85,7 +85,7 @@ class EntityReferenceAutocomplete {
 
     if (isset($string)) {
       // Get an array of matching entities.
-      $widget = entity_get_form_display($instance->entity_type, $instance->bundle, 'default')->getComponent($instance->getFieldName());
+      $widget = entity_get_form_display($instance->entity_type, $instance->bundle, 'default')->getComponent($instance->getName());
       $match_operator = !empty($widget['settings']['match_operator']) ? $widget['settings']['match_operator'] : 'CONTAINS';
       $entity_labels = $handler->getReferenceableEntities($string, $match_operator, 10);
 
@@ -100,7 +100,7 @@ class EntityReferenceAutocomplete {
           if (strpos($key, ',') !== FALSE || strpos($key, '"') !== FALSE) {
             $key = '"' . str_replace('"', '""', $key) . '"';
           }
-          $matches[$prefix . $key] = $label;
+          $matches[] = array('value' => $prefix . $key, 'label' => $label);
         }
       }
     }

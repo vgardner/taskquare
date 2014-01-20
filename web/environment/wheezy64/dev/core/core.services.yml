@@ -137,10 +137,10 @@ services:
     factory_class: Drupal\Component\Utility\Settings
     factory_method: getSingleton
   state:
-    class: Drupal\Core\KeyValueStore\KeyValueStoreInterface
-    factory_method: get
-    factory_service: keyvalue
-    arguments: [state]
+    class: Drupal\Core\KeyValueStore\State
+    arguments: ['@keyvalue']
+    tags:
+      - { name: persist }
   queue:
     class: Drupal\Core\Queue\QueueFactory
     arguments: ['@settings']
@@ -165,16 +165,35 @@ services:
     calls:
       - [addSubscriber, ['@http_client_simpletest_subscriber']]
       - [setUserAgent, ['Drupal (+http://drupal.org/)']]
+  theme.negotiator:
+    class: Drupal\Core\Theme\ThemeNegotiator
+    arguments: ['@access_check.theme']
+    calls:
+      - [setRequest, ['@request']]
+  theme.negotiator.default:
+    class: Drupal\Core\Theme\DefaultNegotiator
+    arguments: ['@config.factory']
+    tags:
+      - { name: theme_negotiator, priority: -100 }
+  theme.negotiator.ajax_base_page:
+    class: Drupal\Core\Theme\AjaxBasePageNegotiator
+    arguments: ['@csrf_token', '@config.factory']
+    tags:
+      - { name: theme_negotiator, priority: 1000 }
   container.namespaces:
     class: ArrayObject
     arguments: [ '%container.namespaces%' ]
     tags:
       - { name: persist }
+  default_plugin_manager:
+    abstract: true
+    arguments: ['@container.namespaces', '@cache.cache', '@language_manager', '@module_handler']
+  theme_handler:
+    class: Drupal\Core\Extension\ThemeHandler
+    arguments: ['@config.factory', '@module_handler', '@cache.cache', '@info_parser', '@router.builder']
   entity.manager:
     class: Drupal\Core\Entity\EntityManager
     arguments: ['@container.namespaces', '@service_container', '@module_handler', '@cache.cache', '@language_manager', '@string_translation']
-  plugin.manager.entity:
-    alias: entity.manager
   plugin.manager.field.field_type:
     class: Drupal\Core\Field\FieldTypePluginManager
     arguments: ['@container.namespaces', '@cache.field', '@language_manager', '@module_handler']
@@ -186,7 +205,7 @@ services:
     arguments: ['@container.namespaces', '@cache.field', '@module_handler', '@language_manager', '@plugin.manager.field.field_type']
   plugin.manager.archiver:
     class: Drupal\Core\Archiver\ArchiverManager
-    arguments: ['@container.namespaces', '@cache.cache', '@language_manager', '@module_handler']
+    parent: default_plugin_manager
   plugin.manager.action:
     class: Drupal\Core\Action\ActionManager
     arguments: ['@container.namespaces']
@@ -231,12 +250,12 @@ services:
     arguments: [slave]
   typed_data:
     class: Drupal\Core\TypedData\TypedDataManager
-    arguments: ['@container.namespaces', '@cache.cache', '@language_manager', '@module_handler']
+    parent: default_plugin_manager
     calls:
       - [setValidationConstraintManager, ['@validation.constraint']]
   validation.constraint:
     class: Drupal\Core\Validation\ConstraintManager
-    arguments: ['@container.namespaces', '@cache.cache', '@language_manager', '@module_handler']
+    parent: default_plugin_manager
   lock:
     class: Drupal\Core\Lock\DatabaseLockBackend
     arguments: ['@database']
@@ -294,7 +313,7 @@ services:
     arguments: ['@database']
   router.builder:
     class: Drupal\Core\Routing\RouteBuilder
-    arguments: ['@router.dumper', '@lock', '@event_dispatcher', '@module_handler']
+    arguments: ['@router.dumper', '@lock', '@event_dispatcher', '@module_handler', '@controller_resolver']
   path.alias_manager.cached:
     class: Drupal\Core\CacheDecorator\AliasManagerCacheDecorator
     arguments: ['@path.alias_manager', '@cache.path']
@@ -545,7 +564,7 @@ services:
     arguments: ['@config.factory']
   plugin.manager.condition:
     class: Drupal\Core\Condition\ConditionManager
-    arguments: ['@container.namespaces', '@cache.cache', '@language_manager', '@module_handler']
+    parent: default_plugin_manager
   kernel_destruct_subscriber:
     class: Drupal\Core\EventSubscriber\KernelDestructionSubscriber
     tags:
@@ -584,7 +603,7 @@ services:
     arguments: ['@module_handler']
   date:
     class: Drupal\Core\Datetime\Date
-    arguments: ['@entity.manager', '@language_manager']
+    arguments: ['@entity.manager', '@language_manager', '@string_translation']
   feed.bridge.reader:
     class: Drupal\Component\Bridge\ZfExtensionManagerSfContainer
     calls:

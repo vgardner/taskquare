@@ -7,9 +7,8 @@
 
 namespace Drupal\Core\Entity;
 
-use Drupal\Core\Entity\EntityManager;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\Core\Language\Language;
-use Drupal\entity\Entity\EntityDisplay;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -163,7 +162,7 @@ class EntityViewBuilder implements EntityControllerInterface, EntityViewBuilderI
    *   The render array that is being created.
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity to be prepared.
-   * @param \Drupal\entity\Entity\EntityDisplay $display
+   * @param \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display
    *   The entity_display object holding the display options configured for
    *   the entity components.
    * @param string $view_mode
@@ -172,7 +171,7 @@ class EntityViewBuilder implements EntityControllerInterface, EntityViewBuilderI
    *   (optional) For which language the entity should be prepared, defaults to
    *   the current content language.
    */
-  protected function alterBuild(array &$build, EntityInterface $entity, EntityDisplay $display, $view_mode, $langcode = NULL) { }
+  protected function alterBuild(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display, $view_mode, $langcode = NULL) { }
 
   /**
    * {@inheritdoc}
@@ -208,20 +207,9 @@ class EntityViewBuilder implements EntityControllerInterface, EntityViewBuilderI
       // Store entities for rendering by view_mode.
       $view_modes[$entity_view_mode][$entity->id()] = $entity;
 
-      // Load the corresponding display settings if not stored yet.
+      // Get the corresponding display settings.
       if (!isset($displays[$entity_view_mode][$bundle])) {
-        // Get the display object for this bundle and view mode.
-        $display = entity_get_render_display($entity, $entity_view_mode);
-
-        // Let modules alter the display.
-        $display_context = array(
-          'entity_type' => $this->entityType,
-          'bundle' => $bundle,
-          'view_mode' => $entity_view_mode,
-        );
-        drupal_alter('entity_display', $display, $display_context);
-
-        $displays[$entity_view_mode][$bundle] = $display;
+        $displays[$entity_view_mode][$bundle] = entity_get_render_display($entity, $entity_view_mode);
       }
     }
 
@@ -264,11 +252,13 @@ class EntityViewBuilder implements EntityControllerInterface, EntityViewBuilderI
   /**
    * {@inheritdoc}
    */
-  public function resetCache(array $ids = NULL) {
-    if (isset($ids)) {
+  public function resetCache(array $entities = NULL) {
+    if (isset($entities)) {
       $tags = array();
-      foreach ($ids as $entity_id) {
-        $tags[$this->entityType][$entity_id] = $entity_id;
+      foreach ($entities as $entity) {
+        $id = $entity->id();
+        $tags[$this->entityType][$id] = $id;
+        $tags[$this->entityType . '_view_' . $entity->bundle()] = TRUE;
       }
       \Drupal::cache($this->cacheBin)->deleteTags($tags);
     }

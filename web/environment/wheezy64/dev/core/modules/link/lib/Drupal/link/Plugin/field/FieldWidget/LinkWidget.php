@@ -66,7 +66,7 @@ class LinkWidget extends WidgetBase {
 
     // If cardinality is 1, ensure a label is output for the field by wrapping it
     // in a details element.
-    if ($this->fieldDefinition->getFieldCardinality() == 1) {
+    if ($this->fieldDefinition->getCardinality() == 1) {
       $element += array(
         '#type' => 'fieldset',
       );
@@ -134,7 +134,7 @@ class LinkWidget extends WidgetBase {
   function validateTitle(&$element, &$form_state, $form) {
     if ($element['url']['#value'] !== '' && $element['title']['#value'] === '') {
       $element['title']['#required'] = TRUE;
-      form_error($element['title'], t('!name field is required.', array('!name' => $element['title']['#title'])));
+      form_error($element['title'], $form_state, t('!name field is required.', array('!name' => $element['title']['#title'])));
     }
   }
 }

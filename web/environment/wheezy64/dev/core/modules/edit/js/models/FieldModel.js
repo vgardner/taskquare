@@ -1,3 +1,8 @@
+/**
+ * @file
+ * A Backbone Model for the state of an in-place editable field in the DOM.
+ */
+
 (function (_, Backbone, Drupal) {
 
 "use strict";
@@ -15,6 +20,10 @@ Drupal.edit.FieldModel = Backbone.Model.extend({
     // A field ID, of the form
     // "<entity type>/<id>/<field name>/<language>/<view mode>", e.g.
     // "node/1/field_tags/und/full".
+    fieldID: null,
+    // The unique ID of this field within its entity instance on the page, of
+    // the form "<entity type>/<id>/<field name>/<language>/<view mode>[entity instance ID]",
+    // e.g. "node/1/field_tags/und/full[0]".
     id: null,
     // A Drupal.edit.EntityModel. Its "fields" attribute, which is a
     // FieldCollection, is automatically updated to include this FieldModel.
@@ -24,6 +33,11 @@ Drupal.edit.FieldModel = Backbone.Model.extend({
     // Callback function for validating changes between states. Receives the
     // previous state, new state, context, and a callback
     acceptStateChange: null,
+    // A logical field ID, of the form
+    // "<entity type>/<id>/<field name>/<language>", i.e. the fieldID without
+    // the view mode, to be able to identify other instances of the same field
+    // on the page but rendered in a different view mode. e.g. "node/1/field_tags/und".
+    logicalFieldID: null,
 
     // The attributes below are stateful. The ones above will never change
     // during the life of a FieldModel instance.
@@ -35,12 +49,16 @@ Drupal.edit.FieldModel = Backbone.Model.extend({
     // states in which the field is still changed.
     isChanged: false,
     // Is tracked by the EntityModel, is mirrored here solely for decorative
-    // purposes: so that EditorDecorationView.renderChanged() can react to it.
+    // purposes: so that FieldDecorationView.renderChanged() can react to it.
     inTempStore: false,
     // The full HTML representation of this field (with the element that has
     // the data-edit-field-id as the outer element). Used to propagate changes
     // from this field instance to other instances of the same field.
-    html: null
+    html: null,
+    // An object containing the full HTML representations (values) of other view
+    // modes (keys) of this field, for other instances of this field displayed
+    // in a different view mode.
+    htmlForOtherViewModes: null
   },
 
   /**
@@ -52,6 +70,9 @@ Drupal.edit.FieldModel = Backbone.Model.extend({
 
     // Enlist field automatically in the associated entity's field collection.
     this.get('entity').get('fields').add(this);
+
+    // Automatically generate the logical field ID.
+    this.set('logicalFieldID', this.get('fieldID').split('/').slice(0, 4).join('/'));
   },
 
   /**
@@ -102,7 +123,47 @@ Drupal.edit.FieldModel = Backbone.Model.extend({
    *   An entity ID: a string of the format `<entity type>/<id>`.
    */
   getEntityID: function () {
-    return this.id.split('/').slice(0, 2).join('/');
+    return this.get('fieldID').split('/').slice(0, 2).join('/');
+  },
+
+  /**
+   * Extracts the view mode ID from this field's ID.
+   *
+   * @return String
+   *   A view mode ID.
+   */
+  getViewMode: function () {
+    return this.get('fieldID').split('/').pop();
+  },
+
+  /**
+   * Find other instances of this field with different view modes.
+   *
+   * @return Array
+   *   An array containing view mode IDs.
+   */
+  findOtherViewModes: function () {
+    var currentField = this;
+    var otherViewModes = [];
+    Drupal.edit.collections.fields
+      // Find all instances of fields that display the same logical field (same
+      // entity, same field, just a different instance and maybe a different
+      // view mode).
+      .where({ logicalFieldID: currentField.get('logicalFieldID') })
+      .forEach(function (field) {
+        // Ignore the current field.
+        if (field === currentField) {
+          return;
+        }
+        // Also ignore other fields with the same view mode.
+        else if (field.get('fieldID') === currentField.get('fieldID')) {
+          return;
+        }
+        else {
+          otherViewModes.push(field.getViewMode());
+        }
+      });
+    return otherViewModes;
   }
 
 }, {
@@ -156,9 +217,9 @@ Drupal.edit.FieldModel = Backbone.Model.extend({
     // - Trigger: user.
     // - Guarantees: see 'candidate' and 'active'.
     // - Expected behavior: saving indicator, in-place editor is saving field
-    //   data into TempStore. Upon succesful saving (without validation errors),
-    //   the in-place editor transitions the field's state to 'saved', but to
-    //   'invalid' upon failed saving (with validation errors).
+    //   data into TempStore. Upon successful saving (without validation
+    //   errors), the in-place editor transitions the field's state to 'saved',
+    //   but to 'invalid' upon failed saving (with validation errors).
     'saving',
     // In-place editor has successfully saved the changed field.
     // - Trigger: in-place editor.

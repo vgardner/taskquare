@@ -26,13 +26,41 @@ class FieldDefinitionTest extends UnitTestCase {
   }
 
   /**
+   * {@inheritdoc}
+   */
+  protected function setUp() {
+    parent::setUp();
+
+    // Prepare a container with a mock typed data object, that returns no
+    // type definitions.
+    // @todo: Overhaul how field definitions deal with dependencies and improve
+    // unit tests. See https://drupal.org/node/2143555.
+    $typed_data = $this->getMockBuilder('Drupal\Core\TypedData\TypedDataManager')
+      ->disableOriginalConstructor()
+      ->getMock();
+
+    $typed_data
+      ->expects($this->any())
+      ->method('getDefinition')
+      ->will($this->returnValue(NULL));
+
+    $container = $this->getMock('Drupal\Core\DependencyInjection\Container');
+    $container
+      ->expects($this->any())
+      ->method('get')
+      ->will($this->returnValue($typed_data));
+
+    \Drupal::setContainer($container);
+  }
+
+  /**
    * Tests field name methods.
    */
   public function testFieldName() {
     $definition = new FieldDefinition();
     $field_name = $this->randomName();
-    $definition->setFieldName($field_name);
-    $this->assertEquals($field_name, $definition->getFieldName());
+    $definition->setName($field_name);
+    $this->assertEquals($field_name, $definition->getName());
   }
 
   /**
@@ -41,8 +69,8 @@ class FieldDefinitionTest extends UnitTestCase {
   public function testFieldLabel() {
     $definition = new FieldDefinition();
     $label = $this->randomName();
-    $definition->setFieldLabel($label);
-    $this->assertEquals($label, $definition->getFieldLabel());
+    $definition->setLabel($label);
+    $this->assertEquals($label, $definition->getLabel());
   }
 
   /**
@@ -51,18 +79,17 @@ class FieldDefinitionTest extends UnitTestCase {
   public function testFieldDescription() {
     $definition = new FieldDefinition();
     $description = $this->randomName();
-    $definition->setFieldDescription($description);
-    $this->assertEquals($description, $definition->getFieldDescription());
+    $definition->setDescription($description);
+    $this->assertEquals($description, $definition->getDescription());
   }
 
   /**
    * Tests field type methods.
    */
   public function testFieldType() {
-    $definition = new FieldDefinition();
-    $field_name = $this->randomName();
-    $definition->setFieldType($field_name);
-    $this->assertEquals($field_name, $definition->getFieldType());
+    $field_type = $this->randomName();
+    $definition = FieldDefinition::create($field_type);
+    $this->assertEquals($field_type, $definition->getType());
   }
 
   /**
@@ -72,9 +99,9 @@ class FieldDefinitionTest extends UnitTestCase {
     $definition = new FieldDefinition();
     $setting = $this->randomName();
     $value = $this->randomName();
-    $definition->setFieldSetting($setting, $value);
-    $this->assertEquals($value, $definition->getFieldSetting($setting));
-    $this->assertEquals(array($setting => $value), $definition->getFieldSettings());
+    $definition->setSetting($setting, $value);
+    $this->assertEquals($value, $definition->getSetting($setting));
+    $this->assertEquals(array($setting => $value), $definition->getSettings());
   }
 
   /**
@@ -84,11 +111,11 @@ class FieldDefinitionTest extends UnitTestCase {
     $definition = new FieldDefinition();
     $setting = 'default_value';
     $value = $this->randomName();
-    $definition->setFieldSetting($setting, $value);
+    $definition->setSetting($setting, $value);
     $entity = $this->getMockBuilder('Drupal\Core\Entity\Entity')
       ->disableOriginalConstructor()
       ->getMock();
-    $this->assertEquals($value, $definition->getFieldDefaultValue($entity));
+    $this->assertEquals($value, $definition->getDefaultValue($entity));
   }
 
   /**
@@ -96,11 +123,11 @@ class FieldDefinitionTest extends UnitTestCase {
    */
   public function testFieldTranslatable() {
     $definition = new FieldDefinition();
-    $this->assertFalse($definition->isFieldTranslatable());
+    $this->assertFalse($definition->isTranslatable());
     $definition->setTranslatable(TRUE);
-    $this->assertTrue($definition->isFieldTranslatable());
+    $this->assertTrue($definition->isTranslatable());
     $definition->setTranslatable(FALSE);
-    $this->assertFalse($definition->isFieldTranslatable());
+    $this->assertFalse($definition->isTranslatable());
   }
 
   /**
@@ -108,7 +135,7 @@ class FieldDefinitionTest extends UnitTestCase {
    */
   public function testFieldCardinality() {
     $definition = new FieldDefinition();
-    $this->assertEquals(1, $definition->getFieldCardinality());
+    $this->assertEquals(1, $definition->getCardinality());
     // @todo: Add more tests when this can be controlled.
   }
 
@@ -117,11 +144,11 @@ class FieldDefinitionTest extends UnitTestCase {
    */
   public function testFieldRequired() {
     $definition = new FieldDefinition();
-    $this->assertFalse($definition->isFieldRequired());
-    $definition->setFieldRequired(TRUE);
-    $this->assertTrue($definition->isFieldRequired());
-    $definition->setFieldRequired(FALSE);
-    $this->assertFalse($definition->isFieldRequired());
+    $this->assertFalse($definition->isRequired());
+    $definition->setRequired(TRUE);
+    $this->assertTrue($definition->isRequired());
+    $definition->setRequired(FALSE);
+    $this->assertFalse($definition->isRequired());
   }
 
   /**
@@ -129,7 +156,7 @@ class FieldDefinitionTest extends UnitTestCase {
    */
   public function testFieldConfigurable() {
     $definition = new FieldDefinition();
-    $this->assertFalse($definition->isFieldConfigurable());
+    $this->assertFalse($definition->isConfigurable());
   }
 
 }

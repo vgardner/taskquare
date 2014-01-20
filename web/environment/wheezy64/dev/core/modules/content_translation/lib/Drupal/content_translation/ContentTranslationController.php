@@ -104,7 +104,7 @@ class ContentTranslationController implements ContentTranslationControllerInterf
         $t_args = array('%language' => $languages[$form_langcode]->name, '%title' => $entity->label());
         $title = empty($source_langcode) ? $title . ' [' . t('%language translation', $t_args) . ']' : t('Create %language translation of %title', $t_args);
       }
-      drupal_set_title($title, PASS_THROUGH);
+      $form['#title'] = $title;
     }
 
     // Display source language selector only if we are creating a new
@@ -237,7 +237,7 @@ class ContentTranslationController implements ContentTranslationControllerInterf
       // Default to the anonymous user.
       $name = '';
       if ($new_translation) {
-        $name = $GLOBALS['user']->getUsername();
+        $name = \Drupal::currentUser()->getUsername();
       }
       elseif ($entity->translation[$form_langcode]['uid']) {
         $name = user_load($entity->translation[$form_langcode]['uid'])->getUsername();
@@ -414,11 +414,11 @@ class ContentTranslationController implements ContentTranslationControllerInterf
       $translation = $form_state['values']['content_translation'];
       // Validate the "authored by" field.
       if (!empty($translation['name']) && !($account = user_load_by_name($translation['name']))) {
-        form_set_error('content_translation][name', t('The translation authoring username %name does not exist.', array('%name' => $translation['name'])));
+        form_set_error('content_translation][name', $form_state, t('The translation authoring username %name does not exist.', array('%name' => $translation['name'])));
       }
       // Validate the "authored on" field.
       if (!empty($translation['created']) && strtotime($translation['created']) === FALSE) {
-        form_set_error('content_translation][created', t('You have to specify a valid translation authoring date.'));
+        form_set_error('content_translation][created', $form_state, t('You have to specify a valid translation authoring date.'));
       }
     }
   }

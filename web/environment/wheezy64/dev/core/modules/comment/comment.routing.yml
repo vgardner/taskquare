@@ -32,6 +32,7 @@ comment.approve:
     entity_type: 'comment'
   requirements:
     _entity_access: 'comment.approve'
+    _csrf_token: 'TRUE'
 
 comment.permalink:
   path: '/comment/{comment}'
@@ -69,6 +70,7 @@ comment.bundle_list:
   path: '/admin/structure/comments'
   defaults:
     _content: 'Drupal\comment\Controller\AdminController::overviewBundles'
+    _title: 'Comment forms'
   requirements:
     _permission: 'administer comments'
 

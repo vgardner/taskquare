@@ -7,9 +7,9 @@
 
 namespace Drupal\taxonomy;
 
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityViewBuilder;
-use Drupal\entity\Entity\EntityDisplay;
 
 /**
  * Render controller for taxonomy terms.
@@ -24,10 +24,12 @@ class TermViewBuilder extends EntityViewBuilder {
 
     foreach ($entities as $entity) {
       // Add the description if enabled.
+      // @todo Remove this when base fields are able to use formatters.
+      // https://drupal.org/node/2144919
       $display = $displays[$entity->bundle()];
       if (!empty($entity->description->value) && $display->getComponent('description')) {
         $entity->content['description'] = array(
-          '#markup' => check_markup($entity->description->value, $entity->format->value, '', TRUE),
+          '#markup' => $entity->description->processed,
           '#prefix' => '<div class="taxonomy-term-description">',
           '#suffix' => '</div>',
         );
@@ -51,7 +53,7 @@ class TermViewBuilder extends EntityViewBuilder {
   /**
    * {@inheritdoc}
    */
-  protected function alterBuild(array &$build, EntityInterface $entity, EntityDisplay $display, $view_mode, $langcode = NULL) {
+  protected function alterBuild(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display, $view_mode, $langcode = NULL) {
     parent::alterBuild($build, $entity, $display, $view_mode, $langcode);
     $build['#attached']['css'][] = drupal_get_path('module', 'taxonomy') . '/css/taxonomy.module.css';
     $build['#contextual_links']['taxonomy_term'] = array(

@@ -46,15 +46,6 @@ class ViewAddFormController extends ViewFormControllerBase {
   /**
    * {@inheritdoc}
    */
-  public function init(array &$form_state) {
-    parent::init($form_state);
-
-    drupal_set_title($this->t('Add new view'));
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   protected function prepareEntity() {
     // Do not prepare the entity while it is being added.
   }
@@ -180,7 +171,7 @@ class ViewAddFormController extends ViewFormControllerBase {
 
     foreach ($errors as $display_errors) {
       foreach ($display_errors as $name => $message) {
-        form_set_error($name, $message);
+        $this->setFormError($name, $form_state, $message);
       }
     }
   }

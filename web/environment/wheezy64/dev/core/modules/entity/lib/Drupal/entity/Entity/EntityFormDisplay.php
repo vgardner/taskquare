@@ -7,10 +7,8 @@
 
 namespace Drupal\entity\Entity;
 
-use Drupal\Core\Entity\Annotation\EntityType;
-use Drupal\Core\Annotation\Translation;
+use Drupal\Core\Entity\Display\EntityFormDisplayInterface;
 use Drupal\entity\EntityDisplayBase;
-use Drupal\entity\EntityFormDisplayInterface;
 
 /**
  * Configuration entity that contains widget options for all components of a
@@ -51,10 +49,9 @@ class EntityFormDisplay extends EntityDisplayBase implements EntityFormDisplayIn
     }
 
     // Instantiate the widget object from the stored display properties.
-    if ($configuration = $this->getComponent($field_name)) {
-      $instance = field_info_instance($this->targetEntityType, $field_name, $this->bundle);
+    if (($configuration = $this->getComponent($field_name)) && isset($configuration['type']) && ($definition = $this->getFieldDefinition($field_name))) {
       $widget = $this->pluginManager->getInstance(array(
-        'field_definition' => $instance,
+        'field_definition' => $definition,
         'form_mode' => $this->originalMode,
         // No need to prepare, defaults have been merged in setComponent().
         'prepare' => FALSE,

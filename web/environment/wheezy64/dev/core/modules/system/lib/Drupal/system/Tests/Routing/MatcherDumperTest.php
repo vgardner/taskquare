@@ -13,6 +13,7 @@ use Symfony\Component\Routing\RouteCollection;
 use Drupal\simpletest\UnitTestBase;
 use Drupal\Core\Database\Database;
 use Drupal\Core\Routing\MatcherDumper;
+use Drupal\Tests\Core\Routing\RoutingFixtures;
 
 /**
  * Basic tests for the UrlMatcherDumper.
@@ -45,7 +46,7 @@ class MatcherDumperTest extends UnitTestBase {
   }
 
   /**
-   * Confirms that the dumper can be instantiated successfuly.
+   * Confirms that the dumper can be instantiated successfully.
    */
   function testCreate() {
     $connection = Database::getConnection();
@@ -128,7 +129,7 @@ class MatcherDumperTest extends UnitTestBase {
 
     $this->fixtures->createTables($connection);
 
-    $dumper->dump(array('route_set' => 'test'));
+    $dumper->dump(array('provider' => 'test'));
 
     $record = $connection->query("SELECT * FROM {test_routes} WHERE name= :name", array(':name' => 'test_route'))->fetchObject();
 

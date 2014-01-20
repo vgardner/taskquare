@@ -757,7 +757,6 @@ class ViewUI implements ViewStorageInterface {
   public function getFormProgress() {
     $progress = FALSE;
     if (!empty($this->stack)) {
-      $stack = $this->stack;
       // The forms on the stack have integer keys that don't change as the forms
       // are completed, so we can see which ones are still left.
       $keys = array_keys($this->stack);
@@ -808,7 +807,7 @@ class ViewUI implements ViewStorageInterface {
    *   TRUE if the view is locked, FALSE otherwise.
    */
   public function isLocked() {
-    return is_object($this->lock) && ($this->lock->owner != $GLOBALS['user']->id());
+    return is_object($this->lock) && ($this->lock->owner != \Drupal::currentUser()->id());
   }
 
   /**
@@ -1141,7 +1140,7 @@ class ViewUI implements ViewStorageInterface {
   /**
    * {@inheritdoc}
    */
-  public static function postLoad(EntityStorageControllerInterface $storage_controller, array $entities) {
+  public static function postLoad(EntityStorageControllerInterface $storage_controller, array &$entities) {
   }
 
   /**

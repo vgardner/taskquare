@@ -7,10 +7,8 @@
 
 namespace Drupal\entity\Entity;
 
-use Drupal\Core\Entity\Annotation\EntityType;
-use Drupal\Core\Annotation\Translation;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\entity\EntityDisplayBase;
-use Drupal\entity\EntityDisplayInterface;
 
 /**
  * Configuration entity that contains display options for all components of a
@@ -30,7 +28,7 @@ use Drupal\entity\EntityDisplayInterface;
  *   }
  * )
  */
-class EntityDisplay extends EntityDisplayBase implements EntityDisplayInterface {
+class EntityDisplay extends EntityDisplayBase implements EntityViewDisplayInterface {
 
   /**
    * {@inheritdoc}
@@ -51,10 +49,9 @@ class EntityDisplay extends EntityDisplayBase implements EntityDisplayInterface 
     }
 
     // Instantiate the formatter object from the stored display properties.
-    if ($configuration = $this->getComponent($field_name)) {
-      $instance = field_info_instance($this->targetEntityType, $field_name, $this->bundle);
+    if (($configuration = $this->getComponent($field_name)) && isset($configuration['type']) && ($definition = $this->getFieldDefinition($field_name))) {
       $formatter = $this->pluginManager->getInstance(array(
-        'field_definition' => $instance,
+        'field_definition' => $definition,
         'view_mode' => $this->originalMode,
         // No need to prepare, defaults have been merged in setComponent().
         'prepare' => FALSE,

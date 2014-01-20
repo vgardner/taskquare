@@ -1,6 +1,5 @@
 <?php
 
-use Drupal\Component\Utility\Crypt;
 use Drupal\Component\Utility\Json;
 use Drupal\Component\Utility\Number;
 use Drupal\Component\Utility\Settings;
@@ -21,6 +20,7 @@ use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\Routing\GeneratorNotInitializedException;
 use Drupal\Core\SystemListingInfo;
 use Drupal\Core\Template\Attribute;
+use Drupal\Core\Render\Element;
 
 /**
  * @file
@@ -285,28 +285,6 @@ function drupal_get_profile() {
   return $profile;
 }
 
-
-/**
- * Sets the breadcrumb trail for the current page.
- *
- * @param $breadcrumb
- *   Array of links, starting with "home" and proceeding up to but not including
- *   the current page.
- *
- * @deprecated This will be removed in 8.0. Instead, register a new breadcrumb
- *   builder service.
- *
- * @see \Drupal\Core\Breadcrumb\BreadcrumbBuilderInterface
- */
-function drupal_set_breadcrumb($breadcrumb = NULL) {
-  $stored_breadcrumb = &drupal_static(__FUNCTION__);
-
-  if (isset($breadcrumb)) {
-    $stored_breadcrumb = $breadcrumb;
-  }
-  return $stored_breadcrumb;
-}
-
 /**
  * Adds output to the HEAD tag of the HTML page.
  *
@@ -433,7 +411,8 @@ function drupal_get_feeds($delimiter = "\n") {
  * Processes a URL query parameter array to remove unwanted elements.
  *
  * @param $query
- *   (optional) An array to be processed. Defaults to $_GET.
+ *   (optional) An array to be processed. Defaults to \Drupal::request()->query
+ *   parameters.
  * @param $exclude
  *   (optional) A list of $query array keys to remove. Use "parent[child]" to
  *   exclude nested items.
@@ -512,7 +491,7 @@ function drupal_get_destination() {
  * The returned array contains a 'path' that may be passed separately to url().
  * For example:
  * @code
- *   $options = drupal_parse_url($_GET['destination']);
+ *   $options = drupal_parse_url(\Drupal::request()->query->get('destination'));
  *   $my_url = url($options['path'], $options);
  *   $my_link = l('Example link', $options['path'], $options);
  * @endcode
@@ -523,7 +502,7 @@ function drupal_get_destination() {
  * $options['query'] and the fragment into $options['fragment'].
  *
  * @param $url
- *   The URL string to parse, f.e. $_GET['destination'].
+ *   The URL string to parse.
  *
  * @return
  *   An associative array containing the keys:
@@ -646,7 +625,7 @@ function valid_url($url, $absolute = FALSE) {
  *   given step.
  *
  * @return bool
- *   TRUE if no step mismatch has occured, or FALSE otherwise.
+ *   TRUE if no step mismatch has occurred, or FALSE otherwise.
  *
  * @deprecated as of Drupal 8.0. Use
  *   \Drupal\Component\Utility\Number::validStep() directly instead
@@ -918,39 +897,11 @@ function format_xml_elements($array) {
  *
  * @see t()
  * @see format_string()
+ *
+ * @deprecated as of Drupal 8.0. Use \Drupal::translation()->formatPlural()
  */
 function format_plural($count, $singular, $plural, array $args = array(), array $options = array()) {
-  $args['@count'] = $count;
-  // Join both forms to search a translation.
-  $tranlatable_string = implode(LOCALE_PLURAL_DELIMITER, array($singular, $plural));
-  // Translate as usual.
-  $translated_strings = t($tranlatable_string, $args, $options);
-  // Split joined translation strings into array.
-  $translated_array = explode(LOCALE_PLURAL_DELIMITER, $translated_strings);
-
-  if ($count == 1) {
-    return $translated_array[0];
-  }
-
-  // Get the plural index through the gettext formula.
-  // @todo implement static variable to minimize function_exists() usage.
-  $index = (function_exists('locale_get_plural')) ? locale_get_plural($count, isset($options['langcode']) ? $options['langcode'] : NULL) : -1;
-  if ($index == 0) {
-    // Singular form.
-    return $translated_array[0];
-  }
-  else {
-    if (isset($translated_array[$index])) {
-      // N-th plural form.
-      return $translated_array[$index];
-    }
-    else {
-      // If the index cannot be computed or there's no translation, use
-      // the second plural form as a fallback (which allows for most flexiblity
-      // with the replaceable @count value).
-      return $translated_array[1];
-    }
-  }
+  return \Drupal::translation()->formatPlural($count, $singular, $plural, $args, $options);
 }
 
 /**
@@ -1028,31 +979,11 @@ function format_size($size, $langcode = NULL) {
  *
  * @return
  *   A translated string representation of the interval.
+ *
+ * @deprecated as of Drupal 8.0. Use \Drupal::service('date')->formatInterval().
  */
 function format_interval($interval, $granularity = 2, $langcode = NULL) {
-  $units = array(
-    '1 year|@count years' => 31536000,
-    '1 month|@count months' => 2592000,
-    '1 week|@count weeks' => 604800,
-    '1 day|@count days' => 86400,
-    '1 hour|@count hours' => 3600,
-    '1 min|@count min' => 60,
-    '1 sec|@count sec' => 1
-  );
-  $output = '';
-  foreach ($units as $key => $value) {
-    $key = explode('|', $key);
-    if ($interval >= $value) {
-      $output .= ($output ? ' ' : '') . format_plural(floor($interval / $value), $key[0], $key[1], array(), array('langcode' => $langcode));
-      $interval %= $value;
-      $granularity--;
-    }
-
-    if ($granularity == 0) {
-      break;
-    }
-  }
-  return $output ? $output : t('0 sec', array(), array('langcode' => $langcode));
+  return \Drupal::service('date')->formatInterval($interval, $granularity, $langcode);
 }
 
 /**
@@ -1896,6 +1827,9 @@ function drupal_clean_css_identifier($identifier, $filter = array(' ' => '-', '_
   // We strip out any character not in the above list.
   $identifier = preg_replace('/[^\x{002D}\x{0030}-\x{0039}\x{0041}-\x{005A}\x{005F}\x{0061}-\x{007A}\x{00A1}-\x{FFFF}]/u', '', $identifier);
 
+  // Identifiers cannot start with a digit, two hyphens, or a hyphen followed by a digit.
+  $identifier = preg_replace(array('/^[0-9]/', '/^(-[0-9])|^(--)/'), array('_', '__') , $identifier);
+
   return $identifier;
 }
 
@@ -1956,6 +1890,7 @@ function drupal_html_id($id) {
   // take into account IDs that are already in use on the base page.
   $seen_ids_init = &drupal_static(__FUNCTION__ . ':init');
   if (!isset($seen_ids_init)) {
+    $ajax_html_ids = \Drupal::request()->request->get('ajax_html_ids');
     // Ideally, Drupal would provide an API to persist state information about
     // prior page requests in the database, and we'd be able to add this
     // function's $seen_ids static variable to that state information in order
@@ -1965,7 +1900,7 @@ function drupal_html_id($id) {
     // normally not recommended as it could open up security risks, but because
     // the raw POST data is cast to a number before being returned by this
     // function, this usage is safe.
-    if (empty($_POST['ajax_html_ids'])) {
+    if (empty($ajax_html_ids)) {
       $seen_ids_init = array();
     }
     else {
@@ -1974,7 +1909,7 @@ function drupal_html_id($id) {
       // requested id. $_POST['ajax_html_ids'] contains the ids as they were
       // returned by this function, potentially with the appended counter, so
       // we parse that to reconstruct the $seen_ids array.
-      $ajax_html_ids = explode(' ', $_POST['ajax_html_ids']);
+      $ajax_html_ids = explode(' ', $ajax_html_ids);
       foreach ($ajax_html_ids as $seen_id) {
         // We rely on '--' being used solely for separating a base id from the
         // counter, which this function ensures when returning an id.
@@ -2215,11 +2150,18 @@ function drupal_add_js($data = NULL, $options = NULL) {
           $scriptPath = $GLOBALS['script_path'];
           $pathPrefix = '';
           url('', array('script' => &$scriptPath, 'prefix' => &$pathPrefix));
+          $current_path = current_path();
+          $current_path_is_admin = FALSE;
+          // The function path_is_admin() is not available on update.php pages.
+          if (!(defined('MAINTENANCE_MODE') && MAINTENANCE_MODE === 'update')) {
+            $current_path_is_admin = path_is_admin($current_path);
+          }
           $javascript['settings']['data'][] = array(
             'basePath' => base_path(),
             'scriptPath' => $scriptPath,
             'pathPrefix' => $pathPrefix,
-            'currentPath' => current_path(),
+            'currentPath' => $current_path,
+            'currentPathIsAdmin' => $current_path_is_admin,
           );
         }
         // All JavaScript settings are placed in the header of the page with
@@ -2331,7 +2273,7 @@ function drupal_get_js($scope = 'header', $javascript = NULL, $skip_alter = FALS
       global $theme_key;
       // Provide the page with information about the theme that's used, so that
       // a later AJAX request can be rendered using the same theme.
-      // @see ajax_base_page_theme()
+      // @see \Drupal\Core\Theme\AjaxBasePageNegotiator
       $setting['ajaxPageState']['theme'] = $theme_key;
       // Checks that the DB is available before filling theme_token.
       if (!defined('MAINTENANCE_MODE')) {
@@ -3148,7 +3090,6 @@ function _drupal_bootstrap_full($skip = FALSE) {
   // Let all modules take action before the menu system handles the request.
   // We do not want this while running update.php.
   if (!defined('MAINTENANCE_MODE') || MAINTENANCE_MODE != 'update') {
-    menu_set_custom_theme();
     drupal_theme_initialize();
   }
 }
@@ -3882,7 +3823,7 @@ function drupal_render(&$elements, $is_recursive_call = FALSE) {
   }
 
   // Get the children of the element, sorted by weight.
-  $children = element_children($elements, TRUE);
+  $children = Element::children($elements, TRUE);
 
   // Initialize this element's #children, unless a #pre_render callback already
   // preset #children.
@@ -4729,23 +4670,35 @@ function drupal_sort_title($a, $b) {
 
 /**
  * Checks if the key is a property.
+ *
+ * @see \Drupal\Core\Render\Element::property()
+ *
+ * @deprecated as of Drupal 8.0. Use Element::property() instead.
  */
 function element_property($key) {
-  return $key[0] == '#';
+  return Element::property($key);
 }
 
 /**
  * Gets properties of a structured array element (keys beginning with '#').
+ *
+ * @see \Drupal\Core\Render\Element::properties()
+ *
+ * @deprecated as of Drupal 8.0. Use Element::properties() instead.
  */
 function element_properties($element) {
-  return array_filter(array_keys((array) $element), 'element_property');
+  return Element::properties($element);
 }
 
 /**
  * Checks if the key is a child.
+ *
+ * @see \Drupal\Core\Render\Element::child()
+ *
+ * @deprecated as of Drupal 8.0. Use Element::child() instead.
  */
 function element_child($key) {
-  return !isset($key[0]) || $key[0] != '#';
+  return Element::child($key);
 }
 
 /**
@@ -4761,43 +4714,13 @@ function element_child($key) {
  *
  * @return
  *   The array keys of the element's children.
+ *
+ * @see \Drupal\Core\Render\Element::children()
+ *
+ * @deprecated as of Drupal 8.0. Use Element::children() instead.
  */
 function element_children(&$elements, $sort = FALSE) {
-  // Do not attempt to sort elements which have already been sorted.
-  $sort = isset($elements['#sorted']) ? !$elements['#sorted'] : $sort;
-
-  // Filter out properties from the element, leaving only children.
-  $children = array();
-  $sortable = FALSE;
-  foreach ($elements as $key => $value) {
-    if ($key === '' || $key[0] !== '#') {
-      if (is_array($value)) {
-        $children[$key] = $value;
-        if (isset($value['#weight'])) {
-          $sortable = TRUE;
-        }
-      }
-      // Only trigger an error if the value is not null.
-      // @see http://drupal.org/node/1283892
-      elseif (isset($value)) {
-        trigger_error(t('"@key" is an invalid render array key', array('@key' => $key)), E_USER_ERROR);
-      }
-    }
-  }
-  // Sort the children if necessary.
-  if ($sort && $sortable) {
-    uasort($children, 'element_sort');
-    // Put the sorted children back into $elements in the correct order, to
-    // preserve sorting if the same element is passed through
-    // element_children() twice.
-    foreach ($children as $key => $child) {
-      unset($elements[$key]);
-      $elements[$key] = $child;
-    }
-    $elements['#sorted'] = TRUE;
-  }
-
-  return array_keys($children);
+  return Element::children($elements, $sort);
 }
 
 /**
@@ -4808,27 +4731,13 @@ function element_children(&$elements, $sort = FALSE) {
  *
  * @return
  *   The array keys of the element's visible children.
+ *
+ * @see \Drupal\Core\Render\Element::getVisibleChildren()
+ *
+ * @deprecated as of Drupal 8.0. Use Element::getVisibleChildren() instead.
  */
 function element_get_visible_children(array $elements) {
-  $visible_children = array();
-
-  foreach (element_children($elements) as $key) {
-    $child = $elements[$key];
-
-    // Skip un-accessible children.
-    if (isset($child['#access']) && !$child['#access']) {
-      continue;
-    }
-
-    // Skip value and hidden elements, since they are not rendered.
-    if (isset($child['#type']) && in_array($child['#type'], array('value', 'hidden'))) {
-      continue;
-    }
-
-    $visible_children[$key] = $child;
-  }
-
-  return array_keys($visible_children);
+  return Element::getVisibleChildren($elements);
 }
 
 /**
@@ -4842,18 +4751,13 @@ function element_get_visible_children(array $elements) {
  *   array('#propertyname' => 'attributename'). If both names are identical
  *   except for the leading '#', then an attribute name value is sufficient and
  *   no property name needs to be specified.
+ *
+ * @see \Drupal\Core\Render\Element::setAttributes()
+ *
+ * @deprecated as of Drupal 8.0. Use Element::setAttributes() instead.
  */
 function element_set_attributes(array &$element, array $map) {
-  foreach ($map as $property => $attribute) {
-    // If the key is numeric, the attribute name needs to be taken over.
-    if (is_int($property)) {
-      $property = '#' . $attribute;
-    }
-    // Do not overwrite already existing attributes.
-    if (isset($element[$property]) && !isset($element['#attributes'][$attribute])) {
-      $element['#attributes'][$attribute] = $element[$property];
-    }
-  }
+  Element::setAttributes($element, $map);
 }
 
 /**

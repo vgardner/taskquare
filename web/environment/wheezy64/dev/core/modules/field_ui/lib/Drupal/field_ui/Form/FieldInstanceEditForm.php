@@ -9,6 +9,7 @@ namespace Drupal\field_ui\Form;
 
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Form\FormBase;
+use Drupal\Component\Utility\String;
 use Drupal\field\FieldInstanceInterface;
 use Drupal\field_ui\FieldUI;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -70,7 +71,7 @@ class FieldInstanceEditForm extends FormBase {
     $bundles = entity_get_bundles();
 
     $form_title = $this->t('%instance settings for %bundle', array(
-      '%instance' => $this->instance->getFieldLabel(),
+      '%instance' => $this->instance->getLabel(),
       '%bundle' => $bundles[$entity_type][$bundle]['label'],
     ));
     $form['#title'] = $form_title;
@@ -79,11 +80,11 @@ class FieldInstanceEditForm extends FormBase {
     // Create an arbitrary entity object (used by the 'default value' widget).
     $ids = (object) array('entity_type' => $this->instance->entity_type, 'bundle' => $this->instance->bundle, 'entity_id' => NULL);
     $form['#entity'] = _field_create_entity_from_ids($ids);
-    $items = $form['#entity']->get($this->instance->getFieldName());
+    $items = $form['#entity']->get($this->instance->getName());
 
     if (!empty($field->locked)) {
       $form['locked'] = array(
-        '#markup' => $this->t('The field %field is locked and cannot be edited.', array('%field' => $this->instance->getFieldLabel())),
+        '#markup' => $this->t('The field %field is locked and cannot be edited.', array('%field' => $this->instance->getLabel())),
       );
       return $form;
     }
@@ -96,7 +97,7 @@ class FieldInstanceEditForm extends FormBase {
     // Build the non-configurable instance values.
     $form['instance']['field_name'] = array(
       '#type' => 'value',
-      '#value' => $this->instance->getFieldName(),
+      '#value' => $this->instance->getName(),
     );
     $form['instance']['entity_type'] = array(
       '#type' => 'value',
@@ -111,7 +112,7 @@ class FieldInstanceEditForm extends FormBase {
     $form['instance']['label'] = array(
       '#type' => 'textfield',
       '#title' => $this->t('Label'),
-      '#default_value' => $this->instance->getFieldLabel() ?: $field->getFieldName(),
+      '#default_value' => $this->instance->getLabel() ?: $field->getName(),
       '#required' => TRUE,
       '#weight' => -20,
     );
@@ -119,7 +120,7 @@ class FieldInstanceEditForm extends FormBase {
     $form['instance']['description'] = array(
       '#type' => 'textarea',
       '#title' => $this->t('Help text'),
-      '#default_value' => $this->instance->getFieldDescription(),
+      '#default_value' => $this->instance->getDescription(),
       '#rows' => 5,
       '#description' => $this->t('Instructions to present to the user below this field on the editing form.<br />Allowed HTML tags: @tags', array('@tags' => _field_filter_xss_display_allowed_tags())) . '<br />' . $this->t('This field supports tokens.'),
       '#weight' => -10,
@@ -128,7 +129,7 @@ class FieldInstanceEditForm extends FormBase {
     $form['instance']['required'] = array(
       '#type' => 'checkbox',
       '#title' => $this->t('Required field'),
-      '#default_value' => $this->instance->isFieldRequired(),
+      '#default_value' => $this->instance->isRequired(),
       '#weight' => -5,
     );
 
@@ -164,7 +165,7 @@ class FieldInstanceEditForm extends FormBase {
    */
   public function validateForm(array &$form, array &$form_state) {
     if (isset($form['instance']['default_value'])) {
-      $items = $form['#entity']->get($this->instance->getFieldName());
+      $items = $form['#entity']->get($this->instance->getName());
       $items->defaultValuesFormValidate($form['instance']['default_value'], $form, $form_state);
     }
   }
@@ -176,7 +177,7 @@ class FieldInstanceEditForm extends FormBase {
     // Handle the default value.
     $default_value = array();
     if (isset($form['instance']['default_value'])) {
-      $items = $form['#entity']->get($this->instance->getFieldName());
+      $items = $form['#entity']->get($this->instance->getName());
       $default_value = $items->defaultValuesFormSubmit($form['instance']['default_value'], $form, $form_state);
     }
     $this->instance->default_value = $default_value;
@@ -187,7 +188,7 @@ class FieldInstanceEditForm extends FormBase {
     }
     $this->instance->save();
 
-    drupal_set_message($this->t('Saved %label configuration.', array('%label' => $this->instance->getFieldLabel())));
+    drupal_set_message($this->t('Saved %label configuration.', array('%label' => $this->instance->getLabel())));
 
     if ($next_destination = FieldUI::getNextDestination($this->getRequest())) {
       $form_state['redirect'] = $next_destination;
@@ -218,6 +219,19 @@ class FieldInstanceEditForm extends FormBase {
         'query' => $destination,
       ),
     );
+  }
+
+  /**
+   * The _title_callback for the field instance settings form.
+   *
+   * @param \Drupal\field\FieldInstanceInterface $field_instance
+   *   The field instance.
+   *
+   * @return string
+   *   The label of the field instance.
+   */
+  public function getTitle(FieldInstanceInterface $field_instance) {
+    return String::checkPlain($field_instance->label());
   }
 
 }

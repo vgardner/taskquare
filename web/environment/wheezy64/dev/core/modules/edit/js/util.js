@@ -2,6 +2,7 @@
  * @file
  * Provides utility functions for Edit.
  */
+
 (function ($, Drupal) {
 
 "use strict";
@@ -31,7 +32,39 @@ Drupal.edit.util.buildUrl = function (id, urlFormat) {
   });
 };
 
+/**
+ * Shows a network error modal dialog.
+ *
+ * @param String title
+ *   The title to use in the modal dialog.
+ * @param String message
+ *   The message to use in the modal dialog.
+ */
+Drupal.edit.util.networkErrorModal = function (title, message) {
+  var networkErrorModal = Drupal.dialog('<div>' + message + '</div>', {
+    title: title,
+    dialogClass: 'edit-network-error',
+    buttons: [
+      {
+        text: Drupal.t('OK'),
+        click: function() {
+          networkErrorModal.close();
+        }
+      }
+    ],
+    create: function () {
+      $(this).parent().find('.ui-dialog-titlebar-close').remove();
+    },
+    close: function (event) {
+      // Automatically destroy the DOM element that was used for the dialog.
+      $(event.target).remove();
+    }
+  });
+  networkErrorModal.showModal();
+};
+
 Drupal.edit.util.form = {
+
   /**
    * Loads a form, calls a callback to insert.
    *
@@ -65,7 +98,20 @@ Drupal.edit.util.form = {
         nocssjs : options.nocssjs,
         reset : options.reset
       },
-      progress: { type : null } // No progress indicator.
+      progress: { type : null }, // No progress indicator.
+      error: function (xhr, url) {
+        $el.off('edit-internal.edit');
+
+        // Show a modal to inform the user of the network error.
+        var fieldLabel = Drupal.edit.metadata.get(fieldID, 'label');
+        var message = Drupal.t('Could not load the form for <q>@field-label</q>, either due to a website problem or a network connection problem.<br>Please try again.', { '@field-label' : fieldLabel });
+        Drupal.edit.util.networkErrorModal(Drupal.t('Sorry!'), message);
+
+        // Change the state back to "candidate", to allow the user to start
+        // in-place editing of the field again.
+        var fieldModel = Drupal.edit.app.model.get('activeField');
+        fieldModel.set('state', 'candidate');
+      }
     });
     // Implement a scoped editFieldForm AJAX command: calls the callback.
     formLoaderAjax.commands.editFieldForm = function (ajax, response, status) {
@@ -84,6 +130,8 @@ Drupal.edit.util.form = {
    *   An object with the following keys:
    *    - nocssjs: (required) boolean indicating whether no CSS and JS should be
    *      returned (necessary when the form is invisible to the user).
+   *    - other_view_modes: (required) array containing view mode IDs (of other
+   *      instances of this field on the page).
    * @return Drupal.ajax
    *   A Drupal.ajax instance.
    */
@@ -94,7 +142,10 @@ Drupal.edit.util.form = {
       setClick: true,
       event: 'click.edit',
       progress: { type: null },
-      submit: { nocssjs : options.nocssjs },
+      submit: {
+        nocssjs : options.nocssjs,
+        other_view_modes : options.other_view_modes
+      },
       // Reimplement the success handler to ensure Drupal.attachBehaviors() does
       // not get called on the form.
       success: function (response, status) {
@@ -118,6 +169,7 @@ Drupal.edit.util.form = {
   unajaxifySaving: function (ajax) {
     $(ajax.element).off('click.edit');
   }
+
 };
 
 })(jQuery, Drupal);

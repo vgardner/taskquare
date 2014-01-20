@@ -80,7 +80,7 @@ class SearchForm extends FormBase {
       '#type' => 'search',
       '#title' => $prompt,
       '#default_value' => $plugin->getKeywords(),
-      '#size' => $prompt ? 40 : 20,
+      '#size' => $prompt ? 30 : 20,
       '#maxlength' => 255,
     );
     // processed_keys is used to coordinate keyword passing between other forms
@@ -112,7 +112,7 @@ class SearchForm extends FormBase {
   public function submitForm(array &$form, array &$form_state) {
     $keys = $form_state['values']['processed_keys'];
     if ($keys == '') {
-      form_set_error('keys', t('Please enter some keywords.'));
+      $this->setFormError('keys', $form_state, $this->t('Please enter some keywords.'));
       // Fall through to the form redirect.
     }
 

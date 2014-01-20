@@ -2,6 +2,7 @@
  * @file
  * Form-based in-place editor. Works for any field type.
  */
+
 (function ($, Drupal) {
 
 "use strict";
@@ -65,7 +66,7 @@ Drupal.edit.editors.form = Drupal.edit.EditorView.extend({
     var fieldModel = this.fieldModel;
 
     // Generate a DOM-compatible ID for the form container DOM element.
-    var id = 'edit-form-for-' + fieldModel.id.replace(/\//g, '_');
+    var id = 'edit-form-for-' + fieldModel.id.replace(/[\/\[\]]/g, '_');
 
     // Render form container.
     var $formContainer = this.$formContainer = $(Drupal.theme('editFormContainer', {
@@ -90,7 +91,7 @@ Drupal.edit.editors.form = Drupal.edit.EditorView.extend({
 
     // Load form, insert it into the form container and attach event handlers.
     var formOptions = {
-      fieldID: fieldModel.id,
+      fieldID: fieldModel.get('fieldID'),
       $el: this.$el,
       nocssjs: false,
       // Reset an existing entry for this entity in the TempStore (if any) when
@@ -167,7 +168,8 @@ Drupal.edit.editors.form = Drupal.edit.EditorView.extend({
 
     // Create an AJAX object for the form associated with the field.
     var formSaveAjax = Drupal.edit.util.form.ajaxifySaving({
-      nocssjs: false
+      nocssjs: false,
+      other_view_modes: fieldModel.findOtherViewModes()
     }, $submit);
 
     // Successfully saved.
@@ -175,8 +177,12 @@ Drupal.edit.editors.form = Drupal.edit.EditorView.extend({
       cleanUpAjax();
       // First, transition the state to 'saved'.
       fieldModel.set('state', 'saved');
-      // Then, set the 'html' attribute on the field model. This will cause the
-      // field to be rerendered.
+      // Second, set the 'htmlForOtherViewModes' attribute, so that when this
+      // field is rerendered, the change can be propagated to other instances of
+      // this field, which may be displayed in different view modes.
+      fieldModel.set('htmlForOtherViewModes', response.other_view_modes);
+      // Finally, set the 'html' attribute on the field model. This will cause
+      // the field to be rerendered.
       fieldModel.set('html', response.data);
     };
 

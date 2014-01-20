@@ -15,7 +15,7 @@ function scrollValue(position) {
   return document.documentElement[position] || document.body[position];
 }
 
-// Select and initilize sticky table headers.
+// Select and initialize sticky table headers.
 function tableHeaderInitHandler(e) {
   var $tables = $(e.data.context).find('table.sticky-enabled').once('tableheader');
   for (var i = 0, il = $tables.length; i < il; i++) {
@@ -93,7 +93,7 @@ function TableHeader(table) {
   this.tableOffset = this.$originalTable.offset();
 
   // React to columns change to avoid making checks in the scroll callback.
-  this.$originalTable.bind('columnschange', {tableHeader: this}, function (e, display) {
+  this.$originalTable.on('columnschange', {tableHeader: this}, function (e, display) {
     var tableHeader = e.data.tableHeader;
     if (tableHeader.displayWeight === null || tableHeader.displayWeight !== display) {
       tableHeader.recalculateSticky();

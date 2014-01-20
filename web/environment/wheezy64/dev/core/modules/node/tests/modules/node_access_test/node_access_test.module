@@ -10,6 +10,7 @@
  */
 
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Field\FieldDefinition;
 use Drupal\node\NodeInterface;
 
 /**
@@ -82,12 +83,10 @@ function node_access_test_permission() {
  */
 function node_access_test_entity_field_info($entity_type) {
   if ($entity_type === 'node') {
-    $info['definitions']['private'] = array(
-      'type' => 'field_item:boolean',
-      'label' => t('Private'),
-      'computed' => TRUE,
-      'list' => TRUE,
-    );
+      $info['definitions']['private'] = FieldDefinition::create('boolean')
+        ->setLabel(t('Private'))
+        ->setComputed(TRUE);
+
     return $info;
   }
 }
@@ -111,7 +110,7 @@ function node_access_test_form_node_form_alter(&$form, $form_state) {
 /**
  * Implements hook_node_load().
  */
-function node_access_test_node_load($nodes, $types) {
+function node_access_test_node_load($nodes) {
   $result = db_query('SELECT nid, private FROM {node_access_test} WHERE nid IN(:nids)', array(':nids' => array_keys($nodes)));
   foreach ($result as $record) {
     $nodes[$record->nid]->private = $record->private;

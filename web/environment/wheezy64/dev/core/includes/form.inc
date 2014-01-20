@@ -274,8 +274,8 @@ function form_execute_handlers($type, &$form, &$form_state) {
  *
  * @deprecated as of Drupal 8.0. Use \Drupal::formBuilder()->setErrorByName()
  */
-function form_set_error($name = NULL, $message = '', $limit_validation_errors = NULL) {
-  return \Drupal::formBuilder()->setErrorByName($name, $message, $limit_validation_errors);
+function form_set_error($name, array &$form_state, $message = '') {
+  \Drupal::formBuilder()->setErrorByName($name, $form_state, $message);
 }
 
 /**
@@ -283,8 +283,8 @@ function form_set_error($name = NULL, $message = '', $limit_validation_errors = 
  *
  * @deprecated as of Drupal 8.0. Use \Drupal::formBuilder()->clearErrors()
  */
-function form_clear_error() {
-  \Drupal::formBuilder()->clearErrors();
+function form_clear_error(array &$form_state) {
+  \Drupal::formBuilder()->clearErrors($form_state);
 }
 
 /**
@@ -292,8 +292,8 @@ function form_clear_error() {
  *
  * @deprecated as of Drupal 8.0. Use \Drupal::formBuilder()->getErrors()
  */
-function form_get_errors() {
-  return \Drupal::formBuilder()->getErrors();
+function form_get_errors(array &$form_state) {
+  return \Drupal::formBuilder()->getErrors($form_state);
 }
 
 /**
@@ -301,8 +301,8 @@ function form_get_errors() {
  *
  * @deprecated as of Drupal 8.0. Use \Drupal::formBuilder()->getError()
  */
-function form_get_error($element) {
-  return \Drupal::formBuilder()->getError($element);
+function form_get_error($element, array &$form_state) {
+  return \Drupal::formBuilder()->getError($element, $form_state);
 }
 
 /**
@@ -310,8 +310,8 @@ function form_get_error($element) {
  *
  * @deprecated as of Drupal 8.0. Use \Drupal::formBuilder()->setError()
  */
-function form_error(&$element, $message = '') {
-  \Drupal::formBuilder()->setError($element, $message);
+function form_error(&$element, array &$form_state, $message = '') {
+  \Drupal::formBuilder()->setError($element, $form_state, $message);
 }
 
 /**
@@ -495,7 +495,8 @@ function form_type_checkboxes_value($element, $input = FALSE) {
     // NULL elements from the array before constructing the return value, to
     // simulate the behavior of web browsers (which do not send unchecked
     // checkboxes to the server at all). This will not affect non-programmatic
-    // form submissions, since all values in $_POST are strings.
+    // form submissions, since all values in \Drupal::request()->request are
+    // strings.
     foreach ($input as $key => $value) {
       if (!isset($value)) {
         unset($input[$key]);
@@ -735,34 +736,11 @@ function form_set_value($element, $value, &$form_state) {
  *
  * @return
  *   An array with all hierarchical elements flattened to a single array.
+ *
+ * @deprecated as of Drupal 8.0. Use \Drupal::formBuilder()->flattenOptions()
  */
 function form_options_flatten($array) {
-  // Always reset static var when first entering the recursion.
-  drupal_static_reset('_form_options_flatten');
-  return _form_options_flatten($array);
-}
-
-/**
- * Iterates over an array and returns a flat array with duplicate keys removed.
- *
- * This function also handles cases where objects are passed as array values.
- */
-function _form_options_flatten($array) {
-  $return = &drupal_static(__FUNCTION__);
-
-  foreach ($array as $key => $value) {
-    if (is_object($value)) {
-      _form_options_flatten($value->option);
-    }
-    elseif (is_array($value)) {
-      _form_options_flatten($value);
-    }
-    else {
-      $return[$key] = 1;
-    }
-  }
-
-  return $return;
+  return \Drupal::formBuilder()->flattenOptions($array);
 }
 
 /**
@@ -1131,11 +1109,11 @@ function password_confirm_validate($element, &$element_state) {
   $pass2 = trim($element['pass2']['#value']);
   if (!empty($pass1) || !empty($pass2)) {
     if (strcmp($pass1, $pass2)) {
-      form_error($element, t('The specified passwords do not match.'));
+      form_error($element, $element_state, t('The specified passwords do not match.'));
     }
   }
   elseif ($element['#required'] && !empty($element_state['input'])) {
-    form_error($element, t('Password field is required.'));
+    form_error($element, $element_state, t('Password field is required.'));
   }
 
   // Password field must be converted from a two-element array into a single
@@ -1480,7 +1458,7 @@ function form_validate_pattern($element, &$form_state) {
     $pattern = '{^(?:' . $element['#pattern'] . ')$}';
 
     if (!preg_match($pattern, $element['#value'])) {
-      form_error($element, t('%name field is not in the right format.', array('%name' => $element['#title'])));
+      form_error($element, $form_state, t('%name field is not in the right format.', array('%name' => $element['#title'])));
     }
   }
 }
@@ -1790,11 +1768,11 @@ function form_validate_table($element, &$form_state) {
   }
   if ($element['#multiple']) {
     if (!is_array($element['#value']) || !count(array_filter($element['#value']))) {
-      form_error($element, t('No items selected.'));
+      form_error($element, $form_state, t('No items selected.'));
     }
   }
   elseif (!isset($element['#value']) || $element['#value'] === '') {
-    form_error($element, t('No item selected.'));
+    form_error($element, $form_state, t('No item selected.'));
   }
 }
 
@@ -1917,7 +1895,7 @@ function form_process_machine_name($element, &$form_state) {
 function form_validate_machine_name(&$element, &$form_state) {
   // Verify that the machine name not only consists of replacement tokens.
   if (preg_match('@^' . $element['#machine_name']['replace'] . '+$@', $element['#value'])) {
-    form_error($element, t('The machine-readable name must contain unique characters.'));
+    form_error($element, $form_state, t('The machine-readable name must contain unique characters.'));
   }
 
   // Verify that the machine name contains no disallowed characters.
@@ -1926,15 +1904,15 @@ function form_validate_machine_name(&$element, &$form_state) {
       // Since a hyphen is the most common alternative replacement character,
       // a corresponding validation error message is supported here.
       if ($element['#machine_name']['replace'] == '-') {
-        form_error($element, t('The machine-readable name must contain only lowercase letters, numbers, and hyphens.'));
+        form_error($element, $form_state, t('The machine-readable name must contain only lowercase letters, numbers, and hyphens.'));
       }
       // Otherwise, we assume the default (underscore).
       else {
-        form_error($element, t('The machine-readable name must contain only lowercase letters, numbers, and underscores.'));
+        form_error($element, $form_state, t('The machine-readable name must contain only lowercase letters, numbers, and underscores.'));
       }
     }
     else {
-      form_error($element, $element['#machine_name']['error']);
+      form_error($element, $form_state, $element['#machine_name']['error']);
     }
   }
 
@@ -1942,7 +1920,7 @@ function form_validate_machine_name(&$element, &$form_state) {
   if ($element['#default_value'] !== $element['#value']) {
     $function = $element['#machine_name']['exists'];
     if (call_user_func($function, $element['#value'], $element, $form_state)) {
-      form_error($element, t('The machine-readable name is already in use. It must be unique.'));
+      form_error($element, $form_state, t('The machine-readable name is already in use. It must be unique.'));
     }
   }
 }
@@ -2181,20 +2159,8 @@ function form_process_autocomplete($element, &$form_state) {
   if ($access) {
     $element['#attributes']['class'][] = 'form-autocomplete';
     $element['#attached']['library'][] = array('system', 'drupal.autocomplete');
-    // Provide a hidden element for the JavaScript behavior to bind to. Since
-    // this element is for client-side functionality only, do not process input.
-    // @todo Refactor autocomplete.js to accept drupalSettings instead of
-    //   requiring extraneous markup.
-    $element['autocomplete'] = array(
-      '#type' => 'hidden',
-      '#input' => FALSE,
-      '#value' => $path,
-      '#disabled' => TRUE,
-      '#attributes' => array(
-        'class' => array('autocomplete'),
-        'id' => $element['#id'] . '-autocomplete',
-      ),
-    );
+    // Provide a data attribute for the JavaScript behavior to bind to.
+    $element['#attributes']['data-autocomplete-path'] = $path;
   }
   return $element;
 }
@@ -2248,13 +2214,13 @@ function form_pre_render_button($element) {
 
   $element['#attributes']['class'][] = 'button';
   if (!empty($element['#button_type'])) {
-    $element['#attributes']['class'][] = 'button-' . $element['#button_type'];
+    $element['#attributes']['class'][] = 'button--' . $element['#button_type'];
   }
   // @todo Various JavaScript depends on this button class.
   $element['#attributes']['class'][] = 'form-submit';
 
   if (!empty($element['#attributes']['disabled'])) {
-    $element['#attributes']['class'][] = 'form-button-disabled';
+    $element['#attributes']['class'][] = 'is-disabled';
   }
 
   return $element;
@@ -2285,13 +2251,13 @@ function form_pre_render_image_button($element) {
 
   $element['#attributes']['class'][] = 'image-button';
   if (!empty($element['#button_type'])) {
-    $element['#attributes']['class'][] = 'image-button-' . $element['#button_type'];
+    $element['#attributes']['class'][] = 'image-button--' . $element['#button_type'];
   }
   // @todo Various JavaScript depends on this button class.
   $element['#attributes']['class'][] = 'form-submit';
 
   if (!empty($element['#attributes']['disabled'])) {
-    $element['#attributes']['class'][] = 'image-button-disabled';
+    $element['#attributes']['class'][] = 'is-disabled';
   }
 
   return $element;
@@ -2362,7 +2328,7 @@ function form_validate_email(&$element, &$form_state) {
   form_set_value($element, $value, $form_state);
 
   if ($value !== '' && !valid_email_address($value)) {
-    form_error($element, t('The e-mail address %mail is not valid.', array('%mail' => $value)));
+    form_error($element, $form_state, t('The e-mail address %mail is not valid.', array('%mail' => $value)));
   }
 }
 
@@ -2438,18 +2404,18 @@ function form_validate_number(&$element, &$form_state) {
 
   // Ensure the input is numeric.
   if (!is_numeric($value)) {
-    form_error($element, t('%name must be a number.', array('%name' => $name)));
+    form_error($element, $form_state, t('%name must be a number.', array('%name' => $name)));
     return;
   }
 
   // Ensure that the input is greater than the #min property, if set.
   if (isset($element['#min']) && $value < $element['#min']) {
-    form_error($element, t('%name must be higher than or equal to %min.', array('%name' => $name, '%min' => $element['#min'])));
+    form_error($element, $form_state, t('%name must be higher than or equal to %min.', array('%name' => $name, '%min' => $element['#min'])));
   }
 
   // Ensure that the input is less than the #max property, if set.
   if (isset($element['#max']) && $value > $element['#max']) {
-    form_error($element, t('%name must be lower than or equal to %max.', array('%name' => $name, '%max' => $element['#max'])));
+    form_error($element, $form_state, t('%name must be lower than or equal to %max.', array('%name' => $name, '%max' => $element['#max'])));
   }
 
   if (isset($element['#step']) && strtolower($element['#step']) != 'any') {
@@ -2458,7 +2424,7 @@ function form_validate_number(&$element, &$form_state) {
     $offset = isset($element['#min']) ? $element['#min'] : 0.0;
 
     if (!Number::validStep($value, $element['#step'], $offset)) {
-      form_error($element, t('%name is not a valid number.', array('%name' => $name)));
+      form_error($element, $form_state, t('%name is not a valid number.', array('%name' => $name)));
     }
   }
 }
@@ -2541,7 +2507,7 @@ function form_validate_url(&$element, &$form_state) {
   form_set_value($element, $value, $form_state);
 
   if ($value !== '' && !valid_url($value, TRUE)) {
-    form_error($element, t('The URL %url is not valid.', array('%url' => $value)));
+    form_error($element, $form_state, t('The URL %url is not valid.', array('%url' => $value)));
   }
 }
 
@@ -2562,7 +2528,7 @@ function form_validate_color(&$element, &$form_state) {
       form_set_value($element, Color::rgbToHex(Color::hexToRgb($value)), $form_state);
     }
     catch (InvalidArgumentException $e) {
-      form_error($element, t('%name must be a valid color.', array('%name' => empty($element['#title']) ? $element['#parents'][0] : $element['#title'])));
+      form_error($element, $form_state, t('%name must be a valid color.', array('%name' => empty($element['#title']) ? $element['#parents'][0] : $element['#title'])));
     }
   }
 }
@@ -2848,9 +2814,9 @@ function theme_form_element($variables) {
 function theme_form_required_marker($variables) {
   $attributes = array(
     'class' => 'form-required',
-    'title' => t('This field is required.'),
+    'aria-hidden' => 'true',
   );
-  return '<abbr' . new Attribute($attributes) . '>*</abbr>';
+  return '<span' . new Attribute($attributes) . '>*</span>';
 }
 
 /**
@@ -2931,7 +2897,7 @@ function _form_set_attributes(&$element, $class = array()) {
     $element['#attributes']['required'] = 'required';
     $element['#attributes']['aria-required'] = 'true';
   }
-  if (isset($element['#parents']) && form_get_error($element) !== NULL && !empty($element['#validated'])) {
+  if (isset($element['#parents']) && isset($element['#errors']) && !empty($element['#validated'])) {
     $element['#attributes']['class'][] = 'error';
     $element['#attributes']['aria-invalid'] = 'true';
   }

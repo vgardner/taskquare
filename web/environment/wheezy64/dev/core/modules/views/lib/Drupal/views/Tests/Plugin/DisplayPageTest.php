@@ -59,6 +59,7 @@ class DisplayPageTest extends ViewUnitTestBase {
     // Setup the needed tables in order to make the drupal router working.
     $this->installSchema('system', array('router', 'menu_router', 'url_alias'));
     $this->installSchema('menu_link', 'menu_links');
+    $this->installSchema('user', 'users');
   }
 
   /**
@@ -96,9 +97,7 @@ class DisplayPageTest extends ViewUnitTestBase {
    * Checks that the router items are properly registered
    */
   public function testPageRouterItems() {
-    $subscriber = new RouteSubscriber($this->container->get('entity.manager'), $this->container->get('state'));
-    $collection = new RouteCollection();
-    $subscriber->onDynamicRoutes(new RouteBuildEvent($collection, 'dynamic_routes'));
+    $collection = \Drupal::service('views.route_subscriber')->routes();
 
     // Check the controller defaults.
     foreach ($collection as $id => $route) {

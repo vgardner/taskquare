@@ -7,6 +7,7 @@
 
 namespace Drupal\comment\Plugin\views\field;
 
+use Drupal\comment\CommentInterface;
 use Drupal\views\ResultRow;
 use Drupal\Component\Annotation\PluginID;
 
@@ -39,11 +40,11 @@ class LinkApprove extends Link {
     $status = $this->getValue($values, 'status');
 
     // Don't show an approve link on published nodes.
-    if ($status == COMMENT_PUBLISHED) {
+    if ($status == CommentInterface::PUBLISHED) {
       return;
     }
 
-    $text = !empty($this->options['text']) ? $this->options['text'] : t('approve');
+    $text = !empty($this->options['text']) ? $this->options['text'] : t('Approve');
     $comment = $this->get_entity($values);
 
     $this->options['alter']['make_link'] = TRUE;

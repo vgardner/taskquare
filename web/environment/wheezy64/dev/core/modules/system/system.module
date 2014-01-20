@@ -123,8 +123,7 @@ function system_help($path, $arg) {
       }
       break;
     case 'admin/config/development/maintenance':
-      global $user;
-      if ($user->id() == 1) {
+      if (\Drupal::currentUser()->id() == 1) {
         return '<p>' . t('Use maintenance mode when making major updates, particularly if the updates could disrupt visitors or the update process. Examples include upgrading, importing or exporting content, modifying a theme, modifying content types, and making backups.') . '</p>';
       }
       break;
@@ -182,9 +181,6 @@ function system_theme() {
     'system_admin_index' => array(
       'variables' => array('menu_items' => NULL),
       'file' => 'system.admin.inc',
-    ),
-    'system_powered_by' => array(
-      'variables' => array(),
     ),
     'system_compact_link' => array(
       'variables' => array(),
@@ -613,12 +609,6 @@ function system_element_info() {
  * Implements hook_menu().
  */
 function system_menu() {
-  $items['system/ajax'] = array(
-    'title' => 'AHAH callback',
-    'route_name' => 'system.ajax',
-    'theme callback' => 'ajax_base_page_theme',
-    'type' => MENU_CALLBACK,
-  );
   $items['admin'] = array(
     'title' => 'Administration',
     'route_name' => 'system.admin',
@@ -738,7 +728,7 @@ function system_menu() {
     'title' => 'Date and time formats',
     'description' => 'Configure display format strings for date and time.',
     'route_name' => 'system.date_format_list',
-    'weight' => -9,
+    'weight' => -5,
   );
   $items['admin/config/regional/date-time/formats/manage/%'] = array(
     'title' => 'Edit date format',
@@ -812,13 +802,6 @@ function system_menu() {
     'route_name' => 'system.status',
   );
 
-  // Default page for batch operations.
-  $items['batch'] = array(
-    'route_name' => 'system.batch_page',
-    'theme callback' => '_system_batch_theme',
-    'type' => MENU_CALLBACK,
-  );
-
   return $items;
 }
 
@@ -868,21 +851,6 @@ function system_theme_suggestions_region(array $variables) {
     $suggestions[] = 'region__' . $variables['elements']['#region'];
   }
   return $suggestions;
-}
-
-/**
- * Theme callback for the default batch page.
- */
-function _system_batch_theme() {
-  // Retrieve the current state of the batch.
-  $batch = &batch_get();
-  if (!$batch && isset($_REQUEST['id'])) {
-    $batch = \Drupal::service('batch.storage')->load($_REQUEST['id']);
-  }
-  // Use the same theme as the page that started the batch.
-  if (!empty($batch['theme'])) {
-    return $batch['theme'];
-  }
 }
 
 /**
@@ -1091,18 +1059,20 @@ function system_library_info() {
     'title' => 'Drupal autocomplete',
     'version' => \Drupal::VERSION,
     'js' => array(
-      'core/misc/autocomplete.js' => array('group' => JS_DEFAULT),
+      'core/misc/autocomplete.js' => array('group' => JS_LIBRARY, 'weight' => -1),
     ),
     'dependencies' => array(
       array('system', 'jquery'),
       array('system', 'drupal'),
+      array('system', 'drupalSettings'),
       array('system', 'drupal.ajax'),
+      array('system', 'jquery.ui.autocomplete'),
     ),
   );
 
   // A utility that measures and reports viewport offset dimensions from
   // elements like the toolbar that can potentially displace the positioning of
-  // elements like the overlay.
+  // elements.
   $libraries['drupal.displace'] = array(
     'title' => 'Drupal displace',
     'version' => \Drupal::VERSION,
@@ -2118,29 +2088,26 @@ function system_filetransfer_info() {
 
 /**
  * Implements hook_page_build().
+ *
+ * @see template_preprocess_maintenance_page()
  */
 function system_page_build(&$page) {
-  // Note: ensure the same CSS is loaded in _drupal_maintenance_theme().
+  // Ensure the same CSS is loaded in template_preprocess_maintenance_page().
   $page['#attached']['library'][] = array('system', 'normalize');
   $path = drupal_get_path('module', 'system');
   // Adjust the weights to load these early.
-  $page['#attached']['css'][$path . '/css/system.module.css'] = array('weight' => CSS_COMPONENT - 10, 'every_page' => TRUE);
-  $page['#attached']['css'][$path . '/css/system.theme.css'] = array('weight' => CSS_SKIN - 10, 'every_page' => TRUE);
+  $page['#attached']['css'][$path . '/css/system.module.css'] = array(
+    'weight' => CSS_COMPONENT - 10,
+    'every_page' => TRUE,
+  );
+  $page['#attached']['css'][$path . '/css/system.theme.css'] = array(
+    'weight' => CSS_SKIN - 10,
+    'every_page' => TRUE,
+  );
   if (path_is_admin(current_path())) {
-    $page['#attached']['css'][$path . '/css/system.admin.css'] = array('weight' => CSS_COMPONENT - 10);
-  }
-}
-
-/**
- * Implements hook_custom_theme().
- */
-function system_custom_theme() {
-  if (drupal_container()->isScopeActive('request')) {
-    $request = \Drupal::request();
-    $path = $request->attributes->get('_system_path');
-    if (user_access('view the administration theme') && path_is_admin($path)) {
-      return \Drupal::config('system.theme')->get('admin');
-    }
+    $page['#attached']['css'][$path . '/css/system.admin.css'] = array(
+      'weight' => CSS_COMPONENT - 10,
+    );
   }
 }
 
@@ -2188,7 +2155,7 @@ function system_user_login($account) {
  * Add the time zone field to the user edit and register forms.
  */
 function system_user_timezone(&$form, &$form_state) {
-  global $user;
+  $user = \Drupal::currentUser();
 
   $account = $form_state['controller']->getEntity();
   $form['timezone'] = array(
@@ -2253,13 +2220,13 @@ function system_check_directory($form_element) {
 
   if (!is_dir($directory) && !drupal_mkdir($directory, NULL, TRUE)) {
     // If the directory does not exists and cannot be created.
-    form_set_error($form_element['#parents'][0], t('The directory %directory does not exist and could not be created.', array('%directory' => $directory)));
+    form_set_error($form_element['#parents'][0], $form_state, t('The directory %directory does not exist and could not be created.', array('%directory' => $directory)));
     watchdog('file system', 'The directory %directory does not exist and could not be created.', array('%directory' => $directory), WATCHDOG_ERROR);
   }
 
   if (is_dir($directory) && !is_writable($directory) && !drupal_chmod($directory)) {
     // If the directory is not writable and cannot be made so.
-    form_set_error($form_element['#parents'][0], t('The directory %directory exists but is not writable and could not be made writable.', array('%directory' => $directory)));
+    form_set_error($form_element['#parents'][0], $form_state, t('The directory %directory exists but is not writable and could not be made writable.', array('%directory' => $directory)));
     watchdog('file system', 'The directory %directory exists but is not writable and could not be made writable.', array('%directory' => $directory), WATCHDOG_ERROR);
   }
   elseif (is_dir($directory)) {
@@ -2459,117 +2426,11 @@ function system_rebuild_module_data() {
  *
  * @return
  *   An associative array of themes information.
+ *
+ * @deprecated as of Drupal 8.0. Use \Drupal::service('theme_handler')->rebuildThemeData().
  */
 function _system_rebuild_theme_data() {
-  // Find themes
-  $themes = drupal_system_listing('/^' . DRUPAL_PHP_FUNCTION_PATTERN . '\.info.yml$/', 'themes');
-  // Allow modules to add further themes.
-  if ($module_themes = \Drupal::moduleHandler()->invokeAll('system_theme_info')) {
-    foreach ($module_themes as $name => $uri) {
-      // @see file_scan_directory()
-      $themes[$name] = (object) array(
-        'uri' => $uri,
-        'filename' => pathinfo($uri, PATHINFO_FILENAME),
-        'name' => $name,
-      );
-    }
-  }
-
-  // Find theme engines
-  $engines = drupal_system_listing('/^' . DRUPAL_PHP_FUNCTION_PATTERN . '\.engine$/', 'themes/engines');
-
-  // Set defaults for theme info.
-  $defaults = array(
-    'engine' => 'twig',
-    'regions' => array(
-      'sidebar_first' => 'Left sidebar',
-      'sidebar_second' => 'Right sidebar',
-      'content' => 'Content',
-      'header' => 'Header',
-      'footer' => 'Footer',
-      'highlighted' => 'Highlighted',
-      'help' => 'Help',
-      'page_top' => 'Page top',
-      'page_bottom' => 'Page bottom',
-    ),
-    'description' => '',
-    'features' => _system_default_theme_features(),
-    'screenshot' => 'screenshot.png',
-    'php' => DRUPAL_MINIMUM_PHP,
-    'stylesheets' => array(),
-    'scripts' => array(),
-  );
-
-  $sub_themes = array();
-  // Read info files for each theme
-  foreach ($themes as $key => $theme) {
-    $themes[$key]->filename = $theme->uri;
-    $themes[$key]->info = \Drupal::service('info_parser')->parse($theme->uri) + $defaults;
-
-    // Skip this extension if its type is not theme.
-    if (!isset($themes[$key]->info['type']) || $themes[$key]->info['type'] != 'theme') {
-      unset($themes[$key]);
-      continue;
-    }
-
-    // Add the info file modification time, so it becomes available for
-    // contributed modules to use for ordering theme lists.
-    $themes[$key]->info['mtime'] = filemtime($theme->uri);
-
-    // Invoke hook_system_info_alter() to give installed modules a chance to
-    // modify the data in the .info.yml files if necessary.
-    $type = 'theme';
-    drupal_alter('system_info', $themes[$key]->info, $themes[$key], $type);
-
-    if (!empty($themes[$key]->info['base theme'])) {
-      $sub_themes[] = $key;
-    }
-
-    $engine = $themes[$key]->info['engine'];
-    if (isset($engines[$engine])) {
-      $themes[$key]->owner = $engines[$engine]->uri;
-      $themes[$key]->prefix = $engines[$engine]->name;
-      $themes[$key]->template = TRUE;
-    }
-
-    // Prefix stylesheets and scripts with module path.
-    $path = dirname($theme->uri);
-    $theme->info['stylesheets'] = _system_info_add_path($theme->info['stylesheets'], $path);
-    $theme->info['scripts'] = _system_info_add_path($theme->info['scripts'], $path);
-
-    // Give the screenshot proper path information.
-    if (!empty($themes[$key]->info['screenshot'])) {
-      $themes[$key]->info['screenshot'] = $path . '/' . $themes[$key]->info['screenshot'];
-    }
-  }
-
-  // Now that we've established all our master themes, go back and fill in data
-  // for subthemes.
-  foreach ($sub_themes as $key) {
-    $themes[$key]->base_themes = drupal_find_base_themes($themes, $key);
-    // Don't proceed if there was a problem with the root base theme.
-    if (!current($themes[$key]->base_themes)) {
-      continue;
-    }
-    $base_key = key($themes[$key]->base_themes);
-    foreach (array_keys($themes[$key]->base_themes) as $base_theme) {
-      $themes[$base_theme]->sub_themes[$key] = $themes[$key]->info['name'];
-    }
-    // Copy the 'owner' and 'engine' over if the top level theme uses a theme
-    // engine.
-    if (isset($themes[$base_key]->owner)) {
-      if (isset($themes[$base_key]->info['engine'])) {
-        $themes[$key]->info['engine'] = $themes[$base_key]->info['engine'];
-        $themes[$key]->owner = $themes[$base_key]->owner;
-        $themes[$key]->prefix = $themes[$base_key]->prefix;
-      }
-      else {
-        $themes[$key]->prefix = $key;
-      }
-    }
-  }
-
-  return $themes;
+  return \Drupal::service('theme_handler')->rebuildThemeData();
 }
 
 /**
@@ -2603,41 +2464,6 @@ function system_rebuild_theme_data() {
   \Drupal::state()->set('system.theme.files', $files);
 
   return $themes;
-}
-
-/**
- * Prefixes all values in an .info.yml file array with a given path.
- *
- * This helper function is mainly used to prefix all array values of an
- * .info.yml file property with a single given path (to the module or theme);
- * e.g., to prefix all values of the 'stylesheets' or 'scripts' properties with
- * the file path to the defining module/theme.
- *
- * @param $info
- *   A nested array of data of an .info.yml file to be processed.
- * @param $path
- *   A file path to prepend to each value in $info.
- *
- * @return
- *   The $info array with prefixed values.
- *
- * @see _system_rebuild_module_data()
- * @see _system_rebuild_theme_data()
- */
-function _system_info_add_path($info, $path) {
-  foreach ($info as $key => $value) {
-    // Recurse into nested values until we reach the deepest level.
-    if (is_array($value)) {
-      $info[$key] = _system_info_add_path($info[$key], $path);
-    }
-    // Unset the original value's key and set the new value with prefix, using
-    // the original value as key, so original values can still be looked up.
-    else {
-      unset($info[$key]);
-      $info[$value] = $path . '/' . $value;
-    }
-  }
-  return $info;
 }
 
 /**
@@ -2712,90 +2538,6 @@ function system_default_region($theme) {
 }
 
 /**
- * Generates a form array for a confirmation form.
- *
- * This function returns a complete form array for confirming an action. The
- * form contains a confirm button as well as a cancellation link that allows a
- * user to abort the action.
- *
- * If the submit handler for a form that implements confirm_form() is invoked,
- * the user successfully confirmed the action. You should never directly
- * inspect $_POST to see if an action was confirmed.
- *
- * Note - if the parameters $question, $description, $yes, or $no could contain
- * any user input (such as node titles or taxonomy terms), it is the
- * responsibility of the code calling confirm_form() to sanitize them first with
- * a function like check_plain() or filter_xss().
- *
- * @param $form
- *   Additional elements to add to the form. These can be regular form elements,
- *   #value elements, etc., and their values will be available to the submit
- *   handler.
- * @param $question
- *   The question to ask the user (e.g. "Are you sure you want to delete the
- *   block <em>foo</em>?"). The page title will be set to this value.
- * @param $path
- *   The page to go to if the user cancels the action. This can be either:
- *   - A string containing a Drupal path.
- *   - An associative array with a 'path' key. Additional array values are
- *     passed as the $options parameter to l().
- *   If the 'destination' query parameter is set in the URL when viewing a
- *   confirmation form, that value will be used instead of $path.
- * @param $description
- *   Additional text to display. Defaults to t('This action cannot be undone.').
- * @param $yes
- *   A caption for the button that confirms the action (e.g. "Delete",
- *   "Replace", ...). Defaults to t('Confirm').
- * @param $no
- *   A caption for the link which cancels the action (e.g. "Cancel"). Defaults
- *   to t('Cancel').
- * @param $name
- *   The internal name used to refer to the confirmation item.
- *
- * @return
- *   The form array.
- *
- * @deprecated Use \Drupal\Core\Form\ConfirmFormBase instead.
- */
-function confirm_form($form, $question, $path, $description = NULL, $yes = NULL, $no = NULL, $name = 'confirm') {
-  $description = isset($description) ? $description : t('This action cannot be undone.');
-
-  // Prepare cancel link.
-  if (isset($_GET['destination'])) {
-    $options = drupal_parse_url($_GET['destination']);
-  }
-  elseif (is_array($path)) {
-    $options = $path;
-  }
-  else {
-    $options = array('path' => $path);
-  }
-
-  drupal_set_title($question, PASS_THROUGH);
-
-  $form['#attributes']['class'][] = 'confirmation';
-  $form['description'] = array('#markup' => $description);
-  $form[$name] = array('#type' => 'hidden', '#value' => 1);
-
-  $form['actions'] = array('#type' => 'actions');
-  $form['actions']['submit'] = array(
-    '#type' => 'submit',
-    '#value' => $yes ? $yes : t('Confirm'),
-  );
-  $form['actions']['cancel'] = array(
-    '#type' => 'link',
-    '#title' => $no ? $no : t('Cancel'),
-    '#href' => $options['path'],
-    '#options' => $options,
-  );
-  // By default, render the form using theme_confirm_form().
-  if (!isset($form['#theme'])) {
-    $form['#theme'] = 'confirm_form';
-  }
-  return $form;
-}
-
-/**
  * Determines whether the current user is in compact mode.
  *
  * Compact mode shows certain administration pages with less description text,
@@ -2815,7 +2557,7 @@ function confirm_form($form, $question, $path, $description = NULL, $yes = NULL,
 function system_admin_compact_mode() {
   // PHP converts dots into underscores in cookie names to avoid problems with
   // its parser, so we use a converted cookie name.
-  return isset($_COOKIE['Drupal_visitor_admin_compact_mode']) ? $_COOKIE['Drupal_visitor_admin_compact_mode'] : \Drupal::config('system.site')->get('admin_compact_mode');
+  return \Drupal::request()->cookies->get('Drupal_visitor_admin_compact_mode', \Drupal::config('system.site')->get('admin_compact_mode'));
 }
 
 /**
@@ -2963,15 +2705,6 @@ function system_time_zones($blank = NULL) {
 }
 
 /**
- * Returns HTML for the Powered by Drupal text.
- *
- * @ingroup themeable
- */
-function theme_system_powered_by() {
-  return '<span>' . t('Powered by <a href="@poweredby">Drupal</a>', array('@poweredby' => 'http://drupal.org')) . '</span>';
-}
-
-/**
  * Returns HTML for a link to show or hide inline help descriptions.
  *
  * @ingroup themeable
@@ -3114,40 +2847,6 @@ function theme_confirm_form($variables) {
  */
 function theme_system_config_form($variables) {
   return drupal_render_children($variables['form']);
-}
-
-/**
- * Returns HTML for an exposed filter form.
- *
- * @param $variables
- *   An associative array containing:
- *   - form: An associative array containing the structure of the form.
- *
- * @return
- *   A string containing an HTML-formatted form.
- *
- * @ingroup themeable
- */
-function theme_exposed_filters($variables) {
-  $form = $variables['form'];
-  $output = '';
-
-  if (isset($form['current'])) {
-    $items = array();
-    foreach (element_children($form['current']) as $key) {
-      $items[] = $form['current'][$key];
-    }
-    $item_list = array(
-      '#theme' => 'item_list',
-      '#items' => $items,
-      '#attributes' => array('class' => array('clearfix', 'current-filters')),
-    );
-    $output .= drupal_render($item_list);
-  }
-
-  $output .= drupal_render_children($form);
-
-  return '<div class="exposed-filters">' . $output . '</div>';
 }
 
 /**

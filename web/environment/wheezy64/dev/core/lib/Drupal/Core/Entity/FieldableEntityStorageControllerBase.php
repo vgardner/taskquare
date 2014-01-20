@@ -27,15 +27,18 @@ abstract class FieldableEntityStorageControllerBase extends EntityStorageControl
    *
    * @param array $entities
    *   An array of entities keyed by entity ID.
-   * @param int $age
-   *   EntityStorageControllerInterface::FIELD_LOAD_CURRENT to load the most
-   *   recent revision for all fields, or
-   *   EntityStorageControllerInterface::FIELD_LOAD_REVISION to load the version
-   *   indicated by each entity.
    */
-  protected function loadFieldItems(array $entities, $age) {
+  protected function loadFieldItems(array $entities) {
     if (empty($entities)) {
       return;
+    }
+
+    $age = static::FIELD_LOAD_CURRENT;
+    foreach ($entities as $entity) {
+      if (!$entity->isDefaultRevision()) {
+        $age = static::FIELD_LOAD_REVISION;
+        break;
+      }
     }
 
     // Only the most current revision of non-deleted fields for cacheable entity
@@ -263,9 +266,7 @@ abstract class FieldableEntityStorageControllerBase extends EntityStorageControl
    */
   public function onFieldItemsPurge(EntityInterface $entity, FieldInstanceInterface $instance) {
     if ($values = $this->readFieldItemsToPurge($entity, $instance)) {
-      $field = $instance->getField();
-      $definition = _field_generate_entity_field_definition($field, $instance);
-      $items = \Drupal::typedData()->create($definition, $values, $field->getFieldName(), $entity);
+      $items = \Drupal::typedData()->create($instance, $values, $instance->getName(), $entity);
       $items->delete();
     }
     $this->purgeFieldItems($entity, $instance);
@@ -336,7 +337,7 @@ abstract class FieldableEntityStorageControllerBase extends EntityStorageControl
   protected function invokeFieldMethod($method, ContentEntityInterface $entity) {
     foreach (array_keys($entity->getTranslationLanguages()) as $langcode) {
       $translation = $entity->getTranslation($langcode);
-      foreach ($translation as $field) {
+      foreach ($translation->getProperties(TRUE) as $field) {
         $field->$method();
       }
     }

@@ -269,7 +269,7 @@ abstract class FieldPluginBase extends HandlerBase {
    *
    * This function can be overridden by fields that want more or fewer
    * elements available, though this seems like it would be an incredibly
-   * rare occurence.
+   * rare occurrence.
    */
   public function getElements() {
     static $elements = NULL;
@@ -850,6 +850,8 @@ abstract class FieldPluginBase extends HandlerBase {
       foreach ($previous as $id => $label) {
         $options[t('Fields')]["[$id]"] = $label;
       }
+      // Add the field to the list of options.
+      $options[t('Fields')]["[{$this->options['id']}]"] = $this->label();
 
       $count = 0; // This lets us prepare the key as we want it printed.
       foreach ($this->view->display_handler->getHandlers('argument') as $arg => $handler) {
@@ -1252,7 +1254,7 @@ abstract class FieldPluginBase extends HandlerBase {
         $more_link_path = $this->options['alter']['more_link_path'];
         $more_link_path = strip_tags(decode_entities(strtr($more_link_path, $tokens)));
 
-        // Take sure that paths which was runned through url() does work as well.
+        // Make sure that paths which were run through url() work as well.
         $base_path = base_path();
         // Checks whether the path starts with the base_path.
         if (strpos($more_link_path, $base_path) === 0) {
@@ -1482,7 +1484,7 @@ abstract class FieldPluginBase extends HandlerBase {
       $tokens['!' . $count] = isset($this->view->args[$count - 1]) ? strip_tags(decode_entities($this->view->args[$count - 1])) : '';
     }
 
-    // Get flattened set of tokens for any array depth in $_GET parameters.
+    // Get flattened set of tokens for any array depth in query parameters.
     $tokens += $this->getTokenValuesRecursive(\Drupal::request()->query->all());
 
     // Now add replacements for our fields.
@@ -1642,10 +1644,10 @@ abstract class FieldPluginBase extends HandlerBase {
    *
    * @param array $alter
    *   The alter array of options to use.
-   *     - max_length: Maximum lenght of the string, the rest gets truncated.
+   *     - max_length: Maximum length of the string, the rest gets truncated.
    *     - word_boundary: Trim only on a word boundary.
    *     - ellipsis: Show an ellipsis (...) at the end of the trimmed string.
-   *     - html: Take sure that the html is correct.
+   *     - html: Make sure that the html is correct.
    *
    * @param string $value
    *   The string which should be trimmed.

@@ -280,8 +280,8 @@ abstract class HandlerBase extends PluginBase {
     // Some form elements belong in a fieldset for presentation, but can't
     // be moved into one because of the form_state['values'] hierarchy. Those
     // elements can add a #fieldset => 'fieldset_name' property, and they'll
-    // be moved to their fieldset during preRender.
-    $form['#pre_render'][] = 'views_ui_pre_render_add_fieldset_markup';
+    // be moved to their fieldset during pre_render.
+    $form['#pre_render'][] = array(get_class($this), 'preRenderAddFieldsetMarkup');
 
     parent::buildOptionsForm($form, $form_state);
 
@@ -446,7 +446,7 @@ abstract class HandlerBase extends PluginBase {
     $this->buildExposeForm($form, $form_state);
 
     // When we click the expose button, we add new gadgets to the form but they
-    // have no data in $_POST so their defaults get wiped out. This prevents
+    // have no data in POST so their defaults get wiped out. This prevents
     // these defaults from getting wiped out. This setting will only be TRUE
     // during a 2nd pass rerender.
     if (!empty($form_state['force_expose_options'])) {

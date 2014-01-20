@@ -88,8 +88,8 @@ class CommentNonNodeTest extends WebTestBase {
     $edit['comment_body[0][value]'] = $comment;
 
     $instance = $this->container->get('field.info')->getInstance('entity_test', 'entity_test', 'comment');
-    $preview_mode = $instance->getFieldSetting('preview');
-    $subject_mode = $instance->getFieldSetting('subject');
+    $preview_mode = $instance->getSetting('preview');
+    $subject_mode = $instance->getSetting('subject');
 
     // Must get the page before we test for fields.
     if ($entity !== NULL) {
@@ -307,7 +307,7 @@ class CommentNonNodeTest extends WebTestBase {
     ));
     // We've changed role permissions, so need to reset render cache.
     // @todo Revisit after https://drupal.org/node/2099105
-    \Drupal::entityManager()->getViewBuilder('entity_test')->resetCache(array($this->entity->id()));
+    \Drupal::entityManager()->getViewBuilder('entity_test')->resetCache(array($this->entity));
     $this->drupalGet('entity_test/' . $this->entity->id());
     $this->assertPattern('@<h2[^>]*>Comments</h2>@', 'Comments were displayed.');
     $this->assertLink('Log in', 0, 'Link to log in was found.');
@@ -326,7 +326,7 @@ class CommentNonNodeTest extends WebTestBase {
     ));
     // We've changed role permissions, so need to reset render cache.
     // @todo Revisit after https://drupal.org/node/2099105
-    \Drupal::entityManager()->getViewBuilder('entity_test')->resetCache(array($this->entity->id()));
+    \Drupal::entityManager()->getViewBuilder('entity_test')->resetCache(array($this->entity));
     $this->drupalGet('entity_test/' . $this->entity->id());
     $this->assertNoPattern('@<h2[^>]*>Comments</h2>@', 'Comments were not displayed.');
     $this->assertFieldByName('subject', '', 'Subject field found.');

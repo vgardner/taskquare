@@ -72,7 +72,7 @@ class ImageStyleEditForm extends ImageStyleFormBase {
       // Render effects below parent elements.
       '#weight' => 5,
     );
-    foreach ($this->entity->getEffects()->sort() as $effect) {
+    foreach ($this->entity->getEffects() as $effect) {
       $key = $effect->getUuid();
       $form['effects'][$key]['#weight'] = isset($form_state['input']['effects']) ? $form_state['input']['effects'][$key]['weight'] : NULL;
       $form['effects'][$key]['label'] = array(
@@ -156,7 +156,7 @@ class ImageStyleEditForm extends ImageStyleFormBase {
    */
   public function effectValidate($form, &$form_state) {
     if (!$form_state['values']['new']) {
-      form_error($form['effects']['new']['new'], $this->t('Select an effect to add.'));
+      $this->setFormError('new', $form_state, $this->t('Select an effect to add.'));
     }
   }
 

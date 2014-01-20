@@ -149,8 +149,8 @@ class DisplayTest extends PluginTestBase {
 
     // mark is as overridden, yes FALSE, means overridden.
     $view->displayHandlers->get('page')->setOverride('filter_groups', FALSE);
-    $this->assertFalse($view->displayHandlers->get('page')->isDefaulted('filter_groups'), "Take sure that 'filter_groups' is marked as overridden.");
-    $this->assertFalse($view->displayHandlers->get('page')->isDefaulted('filters'), "Take sure that 'filters'' is marked as overridden.");
+    $this->assertFalse($view->displayHandlers->get('page')->isDefaulted('filter_groups'), "Make sure that 'filter_groups' is marked as overridden.");
+    $this->assertFalse($view->displayHandlers->get('page')->isDefaulted('filters'), "Make sure that 'filters'' is marked as overridden.");
   }
 
   /**
@@ -225,6 +225,10 @@ class DisplayTest extends PluginTestBase {
     $this->drupalSetContent($output);
     $result = $this->xpath('//div[@class=:class]/a', array(':class' => 'more-link'));
     $this->assertTrue(empty($result), 'The more link is not shown when view has more records.');
+
+    // Test the default value of use_more_always.
+    $view = entity_create('view', array())->getExecutable();
+    $this->assertTrue($view->getDisplay()->getOption('use_more_always'), 'Always display the more link by default.');
   }
 
   /**

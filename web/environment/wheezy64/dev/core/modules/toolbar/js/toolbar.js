@@ -100,7 +100,7 @@ Drupal.behaviors.toolbar = {
       // Trigger an initial attempt to load menu subitems. This first attempt
       // is made after the media query handlers have had an opportunity to
       // process. The toolbar starts in the vertical orientation by default,
-      // unless the viewport is wide enough to accomodate a horizontal
+      // unless the viewport is wide enough to accommodate a horizontal
       // orientation. Thus we give the Toolbar a chance to determine if it
       // should be set to horizontal orientation before attempting to load menu
       // subtrees.
@@ -110,15 +110,6 @@ Drupal.behaviors.toolbar = {
         // Update the model when the viewport offset changes.
         .on('drupalViewportOffsetChange.toolbar', function (event, offsets) {
           model.set('offsets', offsets);
-        })
-        // The overlay will hide viewport overflow, potentially stranding tray
-        // items that are offscreen. The toolbar will adjust tray presentation
-        // to prevent this when viewport overflow is hidden.
-        .on('drupalOverlayOpen.toolbar', function () {
-          model.set('isViewportOverflowConstrained', true);
-        })
-        .on('drupalOverlayClose.toolbar', function () {
-          model.set('isViewportOverflowConstrained', false);
         });
 
       // Broadcast model changes to other modules.
@@ -203,10 +194,10 @@ Drupal.toolbar = {
     defaults: {
       // The active toolbar tab. All other tabs should be inactive under
       // normal circumstances. It will remain active across page loads. The
-      // active item is stored as a DOM element, not a jQuery set.
+      // active item is stored as an ID selector e.g. '#toolbar-item--1'.
       activeTab: null,
-      // Represents whether a tray is open or not. Stored as a DOM element, not
-      // a jQuery set.
+      // Represents whether a tray is open or not. Stored as an ID selector e.g.
+      // '#toolbar-item--1-tray'.
       activeTray: null,
       // Indicates whether the toolbar is displayed in an oriented fashion,
       // either horizontal or vertical.
@@ -217,9 +208,9 @@ Drupal.toolbar = {
       // Menu subtrees are loaded through an AJAX request only when the Toolbar
       // is set to a vertical orientation.
       areSubtreesLoaded: false,
-      // If the viewport overflow becomes constrained, such as when the overlay
-      // is open, isFixed must be true so that elements in the trays aren't
-      // lost offscreen and impossible to get to.
+      // If the viewport overflow becomes constrained, isFixed must be true so
+      // that elements in the trays aren't lost off-screen and impossible to
+      // get to.
       isViewportOverflowConstrained: false,
       // The orientation of the active tray.
       orientation: 'vertical',
@@ -375,8 +366,9 @@ Drupal.toolbar = {
       // activatable tab.
       if (event.target.hasAttribute('data-toolbar-tray')) {
         var tab = this.model.get('activeTab');
+        var id = '#' + event.target.id;
         // Set the event target as the active item if it is not already.
-        this.model.set('activeTab', (!tab || event.target !== tab) ? event.target : null);
+        this.model.set('activeTab', (!tab || id !== tab) ? id : null);
 
         event.preventDefault();
         event.stopPropagation();
@@ -517,8 +509,8 @@ Drupal.toolbar = {
         $trays.removeClass('toolbar-tray-horizontal').addClass('toolbar-tray-vertical');
       }
       else {
-        // The navbar container is invisible. Its placement is used to determine
-        // the container for the trays.
+        // The toolbar container is invisible. Its placement is used to
+        // determine the container for the trays.
         $trays.css('padding-top', this.$el.find('.toolbar-bar').outerHeight());
       }
     },

@@ -136,10 +136,6 @@ function filter_menu() {
     'description' => 'Configure how content input by users is filtered, including allowed HTML tags. Also allows enabling of module-provided filters.',
     'route_name' => 'filter.admin_overview',
   );
-  $items['admin/config/content/formats/list'] = array(
-    'title' => 'List',
-    'type' => MENU_DEFAULT_LOCAL_TASK,
-  );
   $items['admin/config/content/formats/manage/%'] = array(
     'title callback' => 'entity_page_label',
     'title arguments' => array(5),
@@ -1377,10 +1373,9 @@ function _filter_html_image_secure_process($text) {
   $images = $html_dom->getElementsByTagName('img');
   foreach ($images as $image) {
     $src = $image->getAttribute('src');
-    // Remove absolute URLs pointing to the local domain to prevent mixed
-    // content errors.
-    $request = \Drupal::request();
-    $image->setAttribute('src', preg_replace('|^https?://' . $request->getHttpHost() . '|', '', $src));
+    // Transform absolute image URLs to relative image URLs: prevent problems on
+    // multisite set-ups and prevent mixed content errors.
+    $image->setAttribute('src', file_url_transform_relative($src));
 
     // Verify that $src starts with $base_path.
     // This also ensures that external images cannot be referenced.

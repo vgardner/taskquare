@@ -48,12 +48,6 @@ class TextItem extends TextItemBase {
       'indexes' => array(
         'format' => array('format'),
       ),
-      'foreign keys' => array(
-        'format' => array(
-          'table' => 'filter_format',
-          'columns' => array('format' => 'format'),
-        ),
-      ),
     );
   }
 
@@ -69,7 +63,7 @@ class TextItem extends TextItemBase {
         'value' => array(
           'Length' => array(
             'max' => $max_length,
-            'maxMessage' => t('%name: the text may not be longer than @max characters.', array('%name' => $this->getFieldDefinition()->getFieldLabel(), '@max' => $max_length)),
+            'maxMessage' => t('%name: the text may not be longer than @max characters.', array('%name' => $this->getFieldDefinition()->getLabel(), '@max' => $max_length)),
           )
         ),
       ));

@@ -62,31 +62,25 @@ class CommonTestController implements ContainerInjectionInterface {
   }
 
   /**
-   * Renders an element with an invalid render array key.
-   *
-   * @return array
-   *   A render array.
-   */
-  public function drupalRenderInvalidKeys() {
-    define('SIMPLETEST_COLLECT_ERRORS', FALSE);
-    // Keys that begin with # may contain a value of any type, otherwise they must
-    // contain arrays.
-    $element = array('child' => 'This should be an array.');
-    return drupal_render($element);
-  }
-
-  /**
    * Adds a JavaScript file and a CSS file with a query string appended.
    *
    * @return string
    *   An empty string.
    */
   public function jsAndCssQuerystring() {
-    drupal_add_library('system', 'drupalSettings');
-    drupal_add_js(drupal_get_path('module', 'node') . '/node.js');
-    drupal_add_css(drupal_get_path('module', 'node') . '/css/node.admin.css');
-    // A relative URI may have a query string.
-    drupal_add_css('/' . drupal_get_path('module', 'node') . '/node-fake.css?arg1=value1&arg2=value2');
+    $attached = array(
+      '#attached' => array(
+        'library' => array(
+          array('node', 'drupal.node'),
+        ),
+        'css' => array(
+          drupal_get_path('module', 'node') . '/css/node.admin.css' => array(),
+          // A relative URI may have a query string.
+          '/' . drupal_get_path('module', 'node') . '/node-fake.css?arg1=value1&arg2=value2' => array(),
+        ),
+      ),
+    );
+    drupal_render($attached);
     return '';
   }
 

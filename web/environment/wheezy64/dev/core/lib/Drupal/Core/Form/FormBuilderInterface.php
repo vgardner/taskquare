@@ -12,7 +12,7 @@ use Symfony\Component\HttpFoundation\Request;
 /**
  * Provides an interface for form building and processing.
  */
-interface FormBuilderInterface {
+interface FormBuilderInterface extends FormErrorInterface {
 
   /**
    * Determines the form ID.
@@ -154,8 +154,9 @@ interface FormBuilderInterface {
    *     understanding of security implications. In almost all cases, code
    *     should use the data in the 'values' array exclusively. The most common
    *     use of this key is for multi-step forms that need to clear some of the
-   *     user input when setting 'rebuild'. The values correspond to $_POST or
-   *     $_GET, depending on the 'method' chosen.
+   *     user input when setting 'rebuild'. The values correspond to
+   *     \Drupal::request()->request or \Drupal::request()->query, depending on
+   *     the 'method' chosen.
    *   - always_process: If TRUE and the method is GET, a form_id is not
    *     necessary. This should only be used on RESTful GET forms that do NOT
    *     write data, as this could lead to security issues. It is useful so that
@@ -169,8 +170,8 @@ interface FormBuilderInterface {
    *     invoked via self::submitForm(). Defaults to FALSE.
    *   - process_input: Boolean flag. TRUE signifies correct form submission.
    *     This is always TRUE for programmed forms coming from self::submitForm()
-   *     (see 'programmed' key), or if the form_id coming from the $_POST data
-   *     is set and matches the current form_id.
+   *     (see 'programmed' key), or if the form_id coming from the
+   *     \Drupal::request()->request data is set and matches the current form_id.
    *   - submitted: If TRUE, the form has been submitted. Defaults to FALSE.
    *   - executed: If TRUE, the form was submitted and has been processed and
    *     executed. Defaults to FALSE.
@@ -309,11 +310,12 @@ interface FormBuilderInterface {
    * @param $form_state
    *   A keyed array containing the current state of the form. Most important is
    *   the $form_state['values'] collection, a tree of data used to simulate the
-   *   incoming $_POST information from a user's form submission. If a key is
-   *   not filled in $form_state['values'], then the default value of the
-   *   respective element is used. To submit an unchecked checkbox or other
-   *   control that browsers submit by not having a $_POST entry, include the
-   *   key, but set the value to NULL.
+   *   incoming \Drupal::request()->request information from a user's form
+   *   submission. If a key is not filled in $form_state['values'], then the
+   *   default value of the respective element is used. To submit an unchecked
+   *   checkbox or other control that browsers submit by not having a
+   *   \Drupal::request()->request entry, include the key, but set the value to
+   *   NULL.
    * @param ...
    *   Any additional arguments are passed on to the functions called by
    *   self::submitForm(), including the unique form constructor function.
@@ -378,8 +380,8 @@ interface FormBuilderInterface {
    *   A keyed array containing the current state of the form. This
    *   includes the current persistent storage data for the form, and
    *   any data passed along by earlier steps when displaying a
-   *   multi-step form. Additional information, like the sanitized $_POST
-   *   data, is also accumulated here.
+   *   multi-step form. Additional information, like the sanitized
+   *   \Drupal::request()->request data, is also accumulated here.
    *
    * @return \Symfony\Component\HttpFoundation\RedirectResponse|null
    */
@@ -477,8 +479,9 @@ interface FormBuilderInterface {
    *   redirect is accomplished by returning a RedirectResponse, passing in the
    *   value of $form_state['redirect'] if it is set, or the current path if it
    *   is not. RedirectResponse preferentially uses the value of
-   *   $_GET['destination'] (the 'destination' URL query string) if it is
-   *   present, so this will override any values set by $form_state['redirect'].
+   *   \Drupal::request->query->get('destination') (the 'destination' URL query
+   *   string) if it is present, so this will override any values set by
+   *   $form_state['redirect'].
    *
    * @param $form_state
    *   An associative array containing the current state of the form.
@@ -507,128 +510,6 @@ interface FormBuilderInterface {
    *   defined, those handlers will be stored here.
    */
   public function executeHandlers($type, &$form, &$form_state);
-
-  /**
-   * Files an error against a form element.
-   *
-   * When a validation error is detected, the validator calls form_set_error()
-   * to indicate which element needs to be changed and provide an error message.
-   * This causes the Form API to not execute the form submit handlers, and
-   * instead to re-display the form to the user with the corresponding elements
-   * rendered with an 'error' CSS class (shown as red by default).
-   *
-   * The standard form_set_error() behavior can be changed if a button provides
-   * the #limit_validation_errors property. Multistep forms not wanting to
-   * validate the whole form can set #limit_validation_errors on buttons to
-   * limit validation errors to only certain elements. For example, pressing the
-   * "Previous" button in a multistep form should not fire validation errors
-   * just because the current step has invalid values. If
-   * #limit_validation_errors is set on a clicked button, the button must also
-   * define a #submit property (may be set to an empty array). Any #submit
-   * handlers will be executed even if there is invalid input, so extreme care
-   * should be taken with respect to any actions taken by them. This is
-   * typically not a problem with buttons like "Previous" or "Add more" that do
-   * not invoke persistent storage of the submitted form values. Do not use the
-   * #limit_validation_errors property on buttons that trigger saving of form
-   * values to the database.
-   *
-   * The #limit_validation_errors property is a list of "sections" within
-   * $form_state['values'] that must contain valid values. Each "section" is an
-   * array with the ordered set of keys needed to reach that part of
-   * $form_state['values'] (i.e., the #parents property of the element).
-   *
-   * Example 1: Allow the "Previous" button to function, regardless of whether
-   * any user input is valid.
-   *
-   * @code
-   *   $form['actions']['previous'] = array(
-   *     '#type' => 'submit',
-   *     '#value' => t('Previous'),
-   *     '#limit_validation_errors' => array(),       // No validation.
-   *     '#submit' => array('some_submit_function'),  // #submit required.
-   *   );
-   * @endcode
-   *
-   * Example 2: Require some, but not all, user input to be valid to process the
-   * submission of a "Previous" button.
-   *
-   * @code
-   *   $form['actions']['previous'] = array(
-   *     '#type' => 'submit',
-   *     '#value' => t('Previous'),
-   *     '#limit_validation_errors' => array(
-   *       array('step1'),      // Validate $form_state['values']['step1'].
-   *       array('foo', 'bar'), // Validate $form_state['values']['foo']['bar'].
-   *     ),
-   *     '#submit' => array('some_submit_function'), // #submit required.
-   *   );
-   * @endcode
-   *
-   * This will require $form_state['values']['step1'] and everything within it
-   * (for example, $form_state['values']['step1']['choice']) to be valid, so
-   * calls to form_set_error('step1', $message) or
-   * form_set_error('step1][choice', $message) will prevent the submit handlers
-   * from running, and result in the error message being displayed to the user.
-   * However, calls to form_set_error('step2', $message) and
-   * form_set_error('step2][groupX][choiceY', $message) will be suppressed,
-   * resulting in the message not being displayed to the user, and the submit
-   * handlers will run despite $form_state['values']['step2'] and
-   * $form_state['values']['step2']['groupX']['choiceY'] containing invalid
-   * values. Errors for an invalid $form_state['values']['foo'] will be
-   * suppressed, but errors flagging invalid values for
-   * $form_state['values']['foo']['bar'] and everything within it will be
-   * flagged and submission prevented.
-   *
-   * Partial form validation is implemented by suppressing errors rather than by
-   * skipping the input processing and validation steps entirely, because some
-   * forms have button-level submit handlers that call Drupal API functions that
-   * assume that certain data exists within $form_state['values'], and while not
-   * doing anything with that data that requires it to be valid, PHP errors
-   * would be triggered if the input processing and validation steps were fully
-   * skipped.
-   *
-   * @param $name
-   *   The name of the form element. If the #parents property of your form
-   *   element is array('foo', 'bar', 'baz') then you may set an error on 'foo'
-   *   or 'foo][bar][baz'. Setting an error on 'foo' sets an error for every
-   *   element where the #parents array starts with 'foo'.
-   * @param $message
-   *   The error message to present to the user.
-   * @param $limit_validation_errors
-   *   Internal use only. The #limit_validation_errors property of the clicked
-   *   button, if it exists.
-   *
-   * @return mixed
-   *   Return value is for internal use only. To get a list of errors, use
-   *   form_get_errors() or form_get_error().
-   *
-   * @see http://drupal.org/node/370537
-   * @see http://drupal.org/node/763376
-   */
-  public function setErrorByName($name = NULL, $message = '', $limit_validation_errors = NULL);
-
-  /**
-   * Clears all errors against all form elements made by form_set_error().
-   */
-  public function clearErrors();
-
-  /**
-   * Returns an associative array of all errors.
-   */
-  public function getErrors();
-
-  /**
-   * Returns the error message filed against the given form element.
-   *
-   * Form errors higher up in the form structure override deeper errors as well
-   * as errors on the element itself.
-   */
-  public function getError($element);
-
-  /**
-   * Flags an element as having an error.
-   */
-  public function setError(&$element, $message = '');
 
   /**
    * Builds and processes all elements in the structured form array.
@@ -721,7 +602,7 @@ interface FormBuilderInterface {
    *   A keyed array containing the current state of the form. In this
    *   context, it is used to accumulate information about which button
    *   was clicked when the form was submitted, as well as the sanitized
-   *   $_POST data.
+   *   \Drupal::request()->request data.
    *
    * @return array
    */
@@ -755,6 +636,21 @@ interface FormBuilderInterface {
    *   Form state array where the value change should be recorded.
    */
   public function setValue($element, $value, &$form_state);
+
+  /**
+   * Allows PHP array processing of multiple select options with the same value.
+   *
+   * Used for form select elements which need to validate HTML option groups
+   * and multiple options which may return the same value. Associative PHP
+   * arrays cannot handle these structures, since they share a common key.
+   *
+   * @param array $array
+   *   The form options array to process.
+   *
+   * @return array
+   *   An array with all hierarchical elements flattened to a single array.
+   */
+  public function flattenOptions(array $array);
 
   /**
    * Sets the request object to use.

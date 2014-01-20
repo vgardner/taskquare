@@ -35,9 +35,6 @@ field.field.*.*:
     module:
       type: string
       label: 'Module'
-    active:
-      type: boolean
-      label: 'Active'
     locked:
       type: boolean
       label: 'Locked'
@@ -76,6 +73,9 @@ field.instance.*.*.*:
     field_uuid:
       type: string
       label: 'Field UUID'
+    field_name:
+      type: string
+      label: 'Field name'
     bundle:
       type: string
       label: 'Bundle'

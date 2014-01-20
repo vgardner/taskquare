@@ -12,11 +12,34 @@
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Database\Query\AlterableInterface;
 use Drupal\Core\Language\Language;
+use Drupal\views\Plugin\Derivative\ViewsLocalTask;
 use Drupal\views\ViewExecutable;
 use Drupal\Component\Plugin\Exception\PluginException;
 use Drupal\views\Entity\View;
 use Drupal\views\Views;
 use Drupal\field\FieldInstanceInterface;
+
+/**
+ * Implements hook_help().
+ */
+function views_help($path, $arg) {
+  switch($path) {
+    case 'admin/help#views':
+      $output = '';
+      $output .= '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('The Views module provides a back end to fetch information from content, user accounts, taxonomy terms, and other entities from the database and present it to the user as a grid, HTML list, table, unformatted list, etc. The resulting displays are known generally as <em>views</em>.') . '</p>';
+      $output .= '<p>' . t('For more information, see the <a href="!views">online documentation for the Views module</a>.', array('!views' => 'https://drupal.org/documentation/modules/views')) . '</p>';
+      $output .= '<p>' . t('In order to create and modify your own views using the administration and configuration user interface, you will need to enable either the Views UI module in core or a contributed module that provides a user interface for Views. See the <a href="!views-ui">Views UI module help page</a> for more information.', array('!views-ui' => \Drupal::url('help.page', array('name' => 'views_ui')))) . '</p>';
+      $output .= '<h3>' . t('Uses') . '</h3>';
+      $output .= '<dl>';
+      $output .= '<dt>' . t('Adding functionality to administrative pages') . '</dt>';
+      $output .= '<dd>' . t('The Views module adds functionality to some core administration pages. For example, <em>admin/content</em> uses Views to filter and sort content. With Views uninstalled, <em>admin/content</em> is more limited.') . '</dd>';
+      $output .= '<dt>' . t('Expanding Views functionality') . '</dt>';
+      $output .= '<dd>' . t('Contributed projects that support the Views module can be found in the <a href="!node">online documentation for Views-related contributed modules</a>.', array('!node' => 'https://drupal.org/documentation/modules/views/add-ons')) . '</dd>';
+      $output .= '</dl>';
+      return $output;
+  }
+}
 
 /**
  * Implements hook_element_info().
@@ -244,20 +267,6 @@ function views_permission() {
       'restrict access' => TRUE,
     ),
   );
-}
-
-/**
- * Implement hook_menu().
- */
-function views_menu() {
-  $items = array();
-  $items['views/ajax'] = array(
-    'title' => 'Views',
-    'theme callback' => 'ajax_base_page_theme',
-    'route_name' => 'views.ajax',
-    'type' => MENU_CALLBACK,
-  );
-  return $items;
 }
 
 /**
@@ -990,14 +999,14 @@ function views_get_view($name) {
  */
 function views_view_has_form_elements($view) {
   foreach ($view->field as $field) {
-    if (property_exists($field, 'views_form_callback') || method_exists($field, 'views_form')) {
+    if (property_exists($field, 'views_form_callback') || method_exists($field, 'viewsForm')) {
       return TRUE;
     }
   }
   $area_handlers = array_merge(array_values($view->header), array_values($view->footer));
   $empty = empty($view->result);
   foreach ($area_handlers as $area) {
-    if (method_exists($area, 'views_form') && !$area->views_form_empty($empty)) {
+    if (method_exists($area, 'viewsForm') && !$area->viewsFormEmpty($empty)) {
       return TRUE;
     }
   }
@@ -1099,7 +1108,7 @@ function views_exposed_form($form, &$form_state) {
 
   $form['actions'] = array('#type' => 'actions');
   $form['actions']['submit'] = array(
-    // Prevent from showing up in $_GET.
+    // Prevent from showing up in \Drupal::request()->query.
     '#name' => '',
     '#type' => 'submit',
     '#value' => t('Apply'),
@@ -1217,7 +1226,7 @@ function views_query_views_alter(AlterableInterface $query) {
     }
   }
 
-  // Replaces substitions in filter criterias.
+  // Replaces substitions in filter criteria.
   _views_query_tag_alter_condition($query, $where, $substitutions);
 }
 
@@ -1235,7 +1244,7 @@ function _views_query_tag_alter_condition(AlterableInterface $query, &$condition
         _views_query_tag_alter_condition($query, $sub_conditions, $substitutions);
       }
       // $condition['value'] is a subquery so alter the subquery recursive.
-      // Therefore take sure to get the metadata of the main query.
+      // Therefore make sure to get the metadata of the main query.
       if (is_object($condition['value'])) {
         $subquery = $condition['value'];
         $subquery->addMetaData('views_substitutions', $query->getMetaData('views_substitutions'));
@@ -1350,57 +1359,17 @@ function views_element_validate_tags($element, &$form_state) {
   $values = array_map('trim', explode(',', $element['#value']));
   foreach ($values as $value) {
     if (preg_match("/[^a-z_]/", $value)) {
-      form_error($element, t('The query tags may only contain lower-case alphabetical characters and underscores.'));
+      form_error($element, $form_state, t('The query tags may only contain lower-case alphabetical characters and underscores.'));
       return;
     }
   }
 }
 
 /**
- * Set a cached item in the views cache.
- *
- * This is just a convenience wrapper around cache_set().
- *
- * @param $cid
- *   The cache ID of the data to store.
- * @param $data
- *   The data to store in the cache. Complex data types will be automatically serialized before insertion.
- *   Strings will be stored as plain text and not serialized.
- * @param $use_language
- *   If TRUE, the data will be cached specific to the currently active language.
+ * Implements hook_local_tasks_alter().
  */
-function views_cache_set($cid, $data, $use_language = FALSE) {
-  if (\Drupal::config('views.settings')->get('skip_cache')) {
-    return;
-  }
-  if ($use_language) {
-    $cid .= ':' . language(Language::TYPE_INTERFACE)->id;
-  }
-
-  cache('views_info')->set($cid, $data);
+function views_local_tasks_alter(&$local_tasks) {
+  $container = \Drupal::getContainer();
+  $local_task = ViewsLocalTask::create($container, 'views_view');
+  $local_task->alterLocalTasks($local_tasks);
 }
-
-/**
- * Return data from the persistent views cache.
- *
- * This is just a convenience wrapper around cache_get().
- *
- * @param int $cid
- *   The cache ID of the data to retrieve.
- * @param bool $use_language
- *   If TRUE, the data will be requested specific to the currently active language.
- *
- * @return stdClass|bool
- *   The cache or FALSE on failure.
- */
-function views_cache_get($cid, $use_language = FALSE) {
-  if (\Drupal::config('views.settings')->get('skip_cache')) {
-    return FALSE;
-  }
-  if ($use_language) {
-    $cid .= ':' . language(Language::TYPE_INTERFACE)->id;
-  }
-
-  return cache('views_info')->get($cid);
-}
-

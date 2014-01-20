@@ -103,6 +103,13 @@ abstract class DisplayPluginBase extends PluginBase {
   protected $usesAreas = TRUE;
 
   /**
+   * Static cache for unpackOptions, but not if we are in the UI.
+   *
+   * @var array
+   */
+  protected static $unpackOptions = array();
+
+  /**
    * Constructs a new DisplayPluginBase object.
    *
    * Because DisplayPluginBase::initDisplay() takes the display configuration by
@@ -124,12 +131,10 @@ abstract class DisplayPluginBase extends PluginBase {
 
     // Load extenders as soon as possible.
     $this->extender = array();
-    $extenders = views_get_enabled_display_extenders();
-    if (!empty($extenders)) {
+    if ($extenders = Views::getEnabledDisplayExtenders()) {
       $manager = Views::pluginManager('display_extender');
       foreach ($extenders as $extender) {
-        $plugin = $manager->createInstance($extender);
-        if ($plugin) {
+        if ($plugin = $manager->createInstance($extender)) {
           $plugin->init($this->view, $this);
           $this->extender[$extender] = $plugin;
         }
@@ -148,23 +153,23 @@ abstract class DisplayPluginBase extends PluginBase {
       unset($options['defaults']);
     }
 
-    // Cache for unpackOptions, but not if we are in the ui.
-    static $unpack_options = array();
-    if (empty($view->editing)) {
-      $cid = 'unpackOptions:' . hash('sha256', serialize(array($this->options, $options)));
-      if (empty($unpack_options[$cid])) {
-        $cache = views_cache_get($cid, TRUE);
+    $skip_cache = \Drupal::config('views.settings')->get('skip_cache');
+
+    if (empty($view->editing) || !$skip_cache) {
+      $cid = 'unpackOptions:' . hash('sha256', serialize(array($this->options, $options))) . ':' . \Drupal::languageManager()->getLanguage()->id;
+      if (empty(static::$unpackOptions[$cid])) {
+        $cache = \Drupal::cache('views_info')->get($cid);
         if (!empty($cache->data)) {
           $this->options = $cache->data;
         }
         else {
           $this->unpackOptions($this->options, $options);
-          views_cache_set($cid, $this->options, TRUE);
+          \Drupal::cache('views_info')->set($cid, $this->options);
         }
-        $unpack_options[$cid] = $this->options;
+        static::$unpackOptions[$cid] = $this->options;
       }
       else {
-        $this->options = $unpack_options[$cid];
+        $this->options = static::$unpackOptions[$cid];
       }
     }
     else {
@@ -219,7 +224,7 @@ abstract class DisplayPluginBase extends PluginBase {
   public function usesExposed() {
     if (!isset($this->has_exposed)) {
       foreach ($this->handlers as $type => $value) {
-        foreach ($this->view->$type as $id => $handler) {
+        foreach ($this->view->$type as $handler) {
           if ($handler->canExpose() && $handler->isExposed()) {
             // one is all we need; if we find it, return true.
             $this->has_exposed = TRUE;
@@ -368,7 +373,7 @@ abstract class DisplayPluginBase extends PluginBase {
     }
 
     if (!empty($this->view->argument) && $this->getOption('hide_attachment_summary')) {
-      foreach ($this->view->argument as $argument_id => $argument) {
+      foreach ($this->view->argument as $argument) {
         if ($argument->needsStylePlugin() && empty($argument->argument_validated)) {
           return FALSE;
         }
@@ -485,7 +490,7 @@ abstract class DisplayPluginBase extends PluginBase {
           'exposed_form' => TRUE,
 
           'link_display' => TRUE,
-          'link_url' => '',
+          'link_url' => TRUE,
           'group_by' => TRUE,
 
           'style' => TRUE,
@@ -541,7 +546,7 @@ abstract class DisplayPluginBase extends PluginBase {
         'bool' => TRUE,
       ),
       'use_more_always' => array(
-        'default' => FALSE,
+        'default' => TRUE,
         'bool' => TRUE,
       ),
       'use_more_text' => array(
@@ -776,13 +781,6 @@ abstract class DisplayPluginBase extends PluginBase {
   public function getUrl() {
     return $this->view->getUrl();
   }
-
-  /**
-   * Check to see if the display needs a breadcrumb
-   *
-   * By default, displays do not need breadcrumbs
-   */
-  public function usesBreadcrumb() { return FALSE; }
 
   /**
    * Determine if a given option is set to use the default display or the
@@ -1032,17 +1030,17 @@ abstract class DisplayPluginBase extends PluginBase {
     if (!empty($this->view->build_info['substitutions'])) {
       $tokens = $this->view->build_info['substitutions'];
     }
-    $count = 0;
-    foreach ($this->view->display_handler->getHandlers('argument') as $arg => $handler) {
-      $token = '%' . ++$count;
-      if (!isset($tokens[$token])) {
-        $tokens[$token] = '';
-      }
 
-      // Use strip tags as there should never be HTML in the path.
-      // However, we need to preserve special characters like " that
-      // were removed by check_plain().
-      $tokens['!' . $count] = isset($this->view->args[$count - 1]) ? strip_tags(decode_entities($this->view->args[$count - 1])) : '';
+    // Add tokens for every argument (contextual filter) and path arg.
+    $handlers = count($this->view->display_handler->getHandlers('argument'));
+    for ($count = 1; $count <= $handlers; $count++) {
+      if (!isset($tokens["%$count"])) {
+        $tokens["%$count"] = '';
+      }
+       // Use strip tags as there should never be HTML in the path.
+       // However, we need to preserve special characters like " that
+       // were removed by check_plain().
+      $tokens["!$count"] = isset($this->view->args[$count - 1]) ? strip_tags(decode_entities($this->view->args[$count - 1])) : '';
     }
 
     return $tokens;
@@ -1130,8 +1128,6 @@ abstract class DisplayPluginBase extends PluginBase {
     $style_plugin_instance = $this->getPlugin('style');
     $style_summary = empty($style_plugin_instance->definition['title']) ? t('Missing style plugin') : $style_plugin_instance->summaryTitle();
     $style_title = empty($style_plugin_instance->definition['title']) ? t('Missing style plugin') : $style_plugin_instance->pluginTitle();
-
-    $style = '';
 
     $options['style'] = array(
       'category' => 'format',
@@ -1466,7 +1462,7 @@ abstract class DisplayPluginBase extends PluginBase {
         $form['use_more'] = array(
           '#type' => 'checkbox',
           '#title' => t('Create more link'),
-          '#description' => t("This will add a more link to the bottom of this view, which will link to the page view. If you have more than one page view, the link will point to the display specified in 'Link display' section under advanced. You can override the url at the link display setting."),
+          '#description' => t("This will add a more link to the bottom of this view, which will link to the page view. If you have more than one page view, the link will point to the display specified in 'Link display' section under pager. You can override the url at the link display setting."),
           '#default_value' => $this->getOption('use_more'),
         );
         $form['use_more_always'] = array(
@@ -1717,7 +1713,7 @@ abstract class DisplayPluginBase extends PluginBase {
 
         $options = array();
         $count = 0; // This lets us prepare the key as we want it printed.
-        foreach ($this->view->display_handler->getHandlers('argument') as $arg => $handler) {
+        foreach ($this->view->display_handler->getHandlers('argument') as $handler) {
           $options[t('Arguments')]['%' . ++$count] = t('@argument title', array('@argument' => $handler->adminLabel()));
           $options[t('Arguments')]['!' . $count] = t('@argument input', array('@argument' => $handler->adminLabel()));
         }
@@ -2075,7 +2071,6 @@ abstract class DisplayPluginBase extends PluginBase {
     $registry = $this->theme_registry;
     $extension = $this->theme_extension;
 
-    $output = '';
     $picked = FALSE;
     foreach ($themes as $theme) {
       $template = strtr($theme, '_', '-') . $extension;
@@ -2106,24 +2101,24 @@ abstract class DisplayPluginBase extends PluginBase {
     switch ($form_state['section']) {
       case 'display_title':
         if (empty($form_state['values']['display_title'])) {
-          form_error($form['display_title'], t('Display title may not be empty.'));
+          form_error($form['display_title'], $form_state, t('Display title may not be empty.'));
         }
         break;
       case 'css_class':
         $css_class = $form_state['values']['css_class'];
         if (preg_match('/[^a-zA-Z0-9-_ ]/', $css_class)) {
-          form_error($form['css_class'], t('CSS classes must be alphanumeric or dashes only.'));
+          form_error($form['css_class'], $form_state, t('CSS classes must be alphanumeric or dashes only.'));
         }
       break;
       case 'display_id':
         if ($form_state['values']['display_id']) {
           if (preg_match('/[^a-z0-9_]/', $form_state['values']['display_id'])) {
-            form_error($form['display_id'], t('Display name must be letters, numbers, or underscores only.'));
+            form_error($form['display_id'], $form_state, t('Display name must be letters, numbers, or underscores only.'));
           }
 
           foreach ($this->view->display as $id => $display) {
             if ($id != $this->view->current_display && ($form_state['values']['display_id'] == $id || (isset($display->new_id) && $form_state['values']['display_id'] == $display->new_id))) {
-              form_error($form['display_id'], t('Display id should be unique.'));
+              form_error($form['display_id'], $form_state, t('Display id should be unique.'));
             }
           }
         }

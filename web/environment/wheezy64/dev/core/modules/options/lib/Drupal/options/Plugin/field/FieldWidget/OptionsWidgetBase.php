@@ -47,7 +47,7 @@ abstract class OptionsWidgetBase extends WidgetBase {
    */
   public function __construct($plugin_id, array $plugin_definition, FieldDefinitionInterface $field_definition, array $settings) {
     parent::__construct($plugin_id, $plugin_definition, $field_definition, $settings);
-    $property_names = $this->fieldDefinition->getFieldPropertyNames();
+    $property_names = $this->fieldDefinition->getPropertyNames();
     $this->column = $property_names[0];
   }
 
@@ -58,7 +58,7 @@ abstract class OptionsWidgetBase extends WidgetBase {
     // Prepare some properties for the child methods to build the actual form
     // element.
     $this->required = $element['#required'];
-    $this->multiple = $this->fieldDefinition->isFieldMultiple();
+    $this->multiple = $this->fieldDefinition->isMultiple();
     $this->has_value = isset($items[0]->{$this->column});
 
     // Add our custom validator.
@@ -80,7 +80,7 @@ abstract class OptionsWidgetBase extends WidgetBase {
    */
   public static function validateElement(array $element, array &$form_state) {
     if ($element['#required'] && $element['#value'] == '_none') {
-      form_error($element, t('!name field is required.', array('!name' => $element['#title'])));
+      form_error($element, $form_state, t('!name field is required.', array('!name' => $element['#title'])));
     }
 
     // Massage submitted form values.

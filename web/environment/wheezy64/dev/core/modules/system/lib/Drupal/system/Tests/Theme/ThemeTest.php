@@ -39,7 +39,7 @@ class ThemeTest extends WebTestBase {
    * Test attribute merging.
    *
    * Render arrays that use a render element and templates (and hence call
-   * template_preprocess()) must ensure the attributes at different occassions
+   * template_preprocess()) must ensure the attributes at different occasions
    * are all merged correctly:
    *   - $variables['attributes'] as passed in to theme()
    *   - the render element's #attributes
@@ -116,6 +116,17 @@ class ThemeTest extends WebTestBase {
       $this->drupalGet('theme-test/suggestion');
       $this->assertText('Theme hook implementor=test_theme_theme_test__suggestion(). Foo=template_preprocess_theme_test', 'Theme hook suggestion ran with data available from a preprocess function for the base hook.');
     }
+  }
+
+  /**
+   * Tests the priority of some theme negotiators.
+   */
+  public function testNegotiatorPriorities() {
+    $this->drupalGet('theme-test/priority');
+
+    // Ensure that the custom theme negotiator was not able to set the theme.
+
+    $this->assertNoText('Theme hook implementor=test_theme_theme_test__suggestion(). Foo=template_preprocess_theme_test', 'Theme hook suggestion ran with data available from a preprocess function for the base hook.');
   }
 
   /**
@@ -267,6 +278,5 @@ class ThemeTest extends WebTestBase {
     $this->assertTrue(count($attributes) == 1, 'In template_preprocess_html(), the page variable is still an array (not rendered yet).');
     $this->assertText('theme test page bottom markup', 'Modules are able to set the page bottom region.');
   }
-
 
 }

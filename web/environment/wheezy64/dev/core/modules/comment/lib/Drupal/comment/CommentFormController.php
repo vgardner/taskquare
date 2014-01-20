@@ -86,7 +86,7 @@ class CommentFormController extends ContentEntityFormController {
     $form['#id'] = drupal_html_id('comment_form');
     $form['#theme'] = array('comment_form__' . $entity->entityType() . '__' . $entity->bundle() . '__' . $field_name, 'comment_form');
 
-    $anonymous_contact = $instance->getFieldSetting('anonymous');
+    $anonymous_contact = $instance->getSetting('anonymous');
     $is_admin = $comment->id() && $this->currentUser->hasPermission('administer comments');
 
     if (!$this->currentUser->isAuthenticated() && $anonymous_contact != COMMENT_ANONYMOUS_MAYNOT_CONTACT) {
@@ -117,7 +117,7 @@ class CommentFormController extends ContentEntityFormController {
     // Prepare default values for form elements.
     if ($is_admin) {
       $author = $comment->name->value;
-      $status = (isset($comment->status->value) ? $comment->status->value : COMMENT_NOT_PUBLISHED);
+      $status = (isset($comment->status->value) ? $comment->status->value : CommentInterface::NOT_PUBLISHED);
       if (empty($form_state['comment_preview'])) {
         $form['#title'] = $this->t('Edit comment %title', array(
           '%title' => $comment->subject->value,
@@ -131,7 +131,7 @@ class CommentFormController extends ContentEntityFormController {
       else {
         $author = ($comment->name->value ? $comment->name->value : '');
       }
-      $status = ($this->currentUser->hasPermission('skip comment approval') ? COMMENT_PUBLISHED : COMMENT_NOT_PUBLISHED);
+      $status = ($this->currentUser->hasPermission('skip comment approval') ? CommentInterface::PUBLISHED : CommentInterface::NOT_PUBLISHED);
     }
 
     $date = '';
@@ -195,8 +195,8 @@ class CommentFormController extends ContentEntityFormController {
       '#title' => $this->t('Status'),
       '#default_value' => $status,
       '#options' => array(
-        COMMENT_PUBLISHED => $this->t('Published'),
-        COMMENT_NOT_PUBLISHED => $this->t('Not published'),
+        CommentInterface::PUBLISHED => $this->t('Published'),
+        CommentInterface::NOT_PUBLISHED => $this->t('Not published'),
       ),
       '#access' => $is_admin,
     );
@@ -206,7 +206,7 @@ class CommentFormController extends ContentEntityFormController {
       '#title' => $this->t('Subject'),
       '#maxlength' => 64,
       '#default_value' => $comment->subject->value,
-      '#access' => $instance->getFieldSetting('subject'),
+      '#access' => $instance->getSetting('subject'),
     );
 
     // Used for conditional validation of author fields.
@@ -233,7 +233,7 @@ class CommentFormController extends ContentEntityFormController {
     $comment = $this->entity;
     $entity = $this->entityManager->getStorageController($comment->entity_type->value)->load($comment->entity_id->value);
     $instance = $this->fieldInfo->getInstance($comment->entity_type->value, $entity->bundle(), $comment->field_name->value);
-    $preview_mode = $instance->getFieldSetting('preview');
+    $preview_mode = $instance->getSetting('preview');
 
     // No delete action on the comment form.
     unset($element['delete']);
@@ -275,10 +275,10 @@ class CommentFormController extends ContentEntityFormController {
 
       $date = $form_state['values']['date'];
       if ($date instanceOf DrupalDateTime && $date->hasErrors()) {
-        form_set_error('date', $this->t('You have to specify a valid date.'));
+        $this->setFormError('date', $form_state, $this->t('You have to specify a valid date.'));
       }
       if ($form_state['values']['name'] && !$form_state['values']['is_anonymous'] && !$account) {
-        form_set_error('name', $this->t('You have to specify a valid author.'));
+        $this->setFormError('name', $form_state, $this->t('You have to specify a valid author.'));
       }
     }
     elseif ($form_state['values']['is_anonymous']) {
@@ -288,7 +288,7 @@ class CommentFormController extends ContentEntityFormController {
       if ($form_state['values']['name']) {
         $accounts = $this->entityManager->getStorageController('user')->loadByProperties(array('name' => $form_state['values']['name']));
         if (!empty($accounts)) {
-          form_set_error('name', $this->t('The name you used belongs to a registered user.'));
+          $this->setFormError('name', $form_state, $this->t('The name you used belongs to a registered user.'));
         }
       }
     }
@@ -356,7 +356,7 @@ class CommentFormController extends ContentEntityFormController {
    */
   public function preview(array $form, array &$form_state) {
     $comment = $this->entity;
-    $form_state['comment_preview'] = comment_preview($comment);
+    $form_state['comment_preview'] = comment_preview($comment, $form_state);
     $form_state['comment_preview']['#title'] = $this->t('Preview comment');
     $form_state['rebuild'] = TRUE;
   }
@@ -383,7 +383,7 @@ class CommentFormController extends ContentEntityFormController {
       watchdog('content', 'Comment posted: %subject.', array('%subject' => $comment->subject->value), WATCHDOG_NOTICE, l(t('view'), 'comment/' . $comment->id(), array('fragment' => 'comment-' . $comment->id())));
 
       // Explain the approval queue if necessary.
-      if ($comment->status->value == COMMENT_NOT_PUBLISHED) {
+      if ($comment->status->value == CommentInterface::NOT_PUBLISHED) {
         if (!$this->currentUser->hasPermission('administer comments')) {
           drupal_set_message($this->t('Your comment has been queued for review by site administrators and will be published after approval.'));
         }
@@ -411,6 +411,6 @@ class CommentFormController extends ContentEntityFormController {
     // Clear the block and page caches so that anonymous users see the comment
     // they have posted.
     Cache::invalidateTags(array('content' => TRUE));
-    $this->entityManager->getViewBuilder($entity->entityType())->resetCache(array($entity->id()));
+    $this->entityManager->getViewBuilder($entity->entityType())->resetCache(array($entity));
   }
 }

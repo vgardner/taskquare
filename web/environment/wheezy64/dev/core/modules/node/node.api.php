@@ -1,6 +1,7 @@
 <?php
 
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\node\Entity\NodeInterface;
 use Drupal\Component\Utility\String;
 use Drupal\Component\Utility\Xss;
 
@@ -501,20 +502,23 @@ function hook_node_create(\Drupal\Core\Entity\EntityInterface $node) {
  *
  * @param $nodes
  *   An array of the nodes being loaded, keyed by nid.
- * @param $types
- *   An array containing the node types present in $nodes. Allows for an early
- *   return for modules that only support certain node types.
  *
  * For a detailed usage example, see nodeapi_example.module.
  *
  * @ingroup node_api_hooks
  */
-function hook_node_load($nodes, $types) {
+function hook_node_load($nodes) {
   // Decide whether any of $types are relevant to our purposes.
   $types_we_want_to_process = \Drupal::config('my_types')->get('types');
-  if (count(array_intersect($types_we_want_to_process, $types))) {
+  $nids = array();
+  foreach ($nodes as $node) {
+    if (in_array($node->bundle(), $types_we_want_to_process)) {
+      $nids = $node->id();
+    }
+  }
+  if ($nids) {
     // Gather our extra data for each of these nodes.
-    $result = db_query('SELECT nid, foo FROM {mytable} WHERE nid IN(:nids)', array(':nids' => array_keys($nodes)));
+    $result = db_query('SELECT nid, foo FROM {mytable} WHERE nid IN(:nids)', array(':nids' => $nids));
     // Add our extra data to the node objects.
     foreach ($result as $record) {
       $nodes[$record->nid]->foo = $record->foo;
@@ -737,7 +741,7 @@ function hook_node_update_index(\Drupal\Core\Entity\EntityInterface $node, $lang
 function hook_node_validate(\Drupal\Core\Entity\EntityInterface $node, $form, &$form_state) {
   if (isset($node->end) && isset($node->start)) {
     if ($node->start > $node->end) {
-      form_set_error('time', t('An event may not end before it starts.'));
+      form_set_error('time', $form_state, t('An event may not end before it starts.'));
     }
   }
 }
@@ -784,7 +788,7 @@ function hook_node_submit(\Drupal\Core\Entity\EntityInterface $node, $form, &$fo
  *
  * @param \Drupal\Core\Entity\EntityInterface $node
  *   The node that is being assembled for rendering.
- * @param \Drupal\entity\Entity\EntityDisplay $display
+ * @param \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display
  *   The entity_display object holding the display options configured for the
  *   node components.
  * @param string $view_mode
@@ -797,7 +801,7 @@ function hook_node_submit(\Drupal\Core\Entity\EntityInterface $node, $form, &$fo
  *
  * @ingroup node_api_hooks
  */
-function hook_node_view(\Drupal\Core\Entity\EntityInterface $node, \Drupal\entity\Entity\EntityDisplay $display, $view_mode, $langcode) {
+function hook_node_view(\Drupal\Core\Entity\EntityInterface $node, \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display, $view_mode, $langcode) {
   // Only do the extra work if the component is configured to be displayed.
   // This assumes a 'mymodule_addition' extra field has been defined for the
   // node type in hook_field_extra_fields().
@@ -826,7 +830,7 @@ function hook_node_view(\Drupal\Core\Entity\EntityInterface $node, \Drupal\entit
  *   A renderable array representing the node content.
  * @param \Drupal\Core\Entity\EntityInterface $node
  *   The node being rendered.
- * @param \Drupal\entity\Entity\EntityDisplay $display
+ * @param \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display
  *   The entity_display object holding the display options configured for the
  *   node components.
  *
@@ -835,7 +839,7 @@ function hook_node_view(\Drupal\Core\Entity\EntityInterface $node, \Drupal\entit
  *
  * @ingroup node_api_hooks
  */
-function hook_node_view_alter(&$build, \Drupal\Core\Entity\EntityInterface $node, \Drupal\entity\Entity\EntityDisplay $display) {
+function hook_node_view_alter(&$build, \Drupal\Core\Entity\EntityInterface $node, \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display) {
   if ($build['#view_mode'] == 'full' && isset($build['an_additional_field'])) {
     // Change its weight.
     $build['an_additional_field']['#weight'] = -10;
@@ -937,6 +941,37 @@ function hook_node_type_update(\Drupal\node\NodeTypeInterface $type) {
  */
 function hook_node_type_delete(\Drupal\node\NodeTypeInterface $type) {
   drupal_set_message(t('You have just deleted a content type with the machine name %type.', array('%type' => $type->id())));
+}
+
+/**
+ * Alter the links of a node.
+ *
+ * @param array &$links
+ *   A renderable array representing the node links.
+ * @param \Drupal\node\NodeInterface $entity
+ *   The node being rendered.
+ * @param array &$context
+ *   Various aspects of the context in which the node links are going to be
+ *   displayed, with the following keys:
+ *   - 'view_mode': the view mode in which the comment is being viewed
+ *   - 'langcode': the language in which the comment is being viewed
+ *
+ * @see \Drupal\node\NodeViewBuilder::renderLinks()
+ * @see \Drupal\node\NodeViewBuilder::buildLinks()
+ */
+function hook_node_links_alter(array &$links, NodeInterface $entity, array &$context) {
+  $links['mymodule'] = array(
+    '#theme' => 'links__node__mymodule',
+    '#attributes' => array('class' => array('links', 'inline')),
+    '#links' => array(
+      'node-report' => array(
+        'title' => t('Report'),
+        'href' => "node/{$entity->id()}/report",
+        'html' => TRUE,
+        'query' => array('token' => \Drupal::getContainer()->get('csrf_token')->get("node/{$entity->id()}/report")),
+      ),
+    ),
+  );
 }
 
 /**

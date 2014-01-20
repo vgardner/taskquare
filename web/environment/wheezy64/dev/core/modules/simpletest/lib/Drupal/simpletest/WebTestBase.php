@@ -714,7 +714,7 @@ abstract class WebTestBase extends TestBase {
    * @see \Drupal\simpletest\WebTestBase::prepareEnvironment()
    */
   protected function setUp() {
-    global $user, $conf;
+    global $conf;
 
     // When running tests through the Simpletest UI (vs. on the command line),
     // Simpletest's batch conflicts with the installer's batch. Batch API does
@@ -1008,6 +1008,7 @@ abstract class WebTestBase extends TestBase {
     // Clear the tag cache.
     drupal_static_reset('Drupal\Core\Cache\CacheBackendInterface::tagCache');
     \Drupal::service('config.factory')->reset();
+    \Drupal::state()->resetCache();
   }
 
   /**
@@ -1139,13 +1140,16 @@ abstract class WebTestBase extends TestBase {
     // debug the code running on the child site. In order to make debuggers work
     // this bit of information is forwarded. Make sure that the debugger listens
     // to at least three external connections.
-    if (isset($_COOKIE['XDEBUG_SESSION'])) {
-      $cookies[] = 'XDEBUG_SESSION=' . $_COOKIE['XDEBUG_SESSION'];
+    $request = \Drupal::request();
+    $cookie_params = $request->cookies;
+    if ($cookie_params->has('XDEBUG_SESSION')) {
+      $cookies[] = 'XDEBUG_SESSION=' . $cookie_params->get('XDEBUG_SESSION');
     }
     // For CLI requests, the information is stored in $_SERVER.
-    if (isset($_SERVER['XDEBUG_CONFIG'])) {
+    $server = $request->server;
+    if ($server->has('XDEBUG_CONFIG')) {
       // $_SERVER['XDEBUG_CONFIG'] has the form "key1=value1 key2=value2 ...".
-      $pairs = explode(' ', $_SERVER['XDEBUG_CONFIG']);
+      $pairs = explode(' ', $server->get('XDEBUG_CONFIG'));
       foreach ($pairs as $pair) {
         list($key, $value) = explode('=', $pair);
         // Account for key-value pairs being separated by multiple spaces.
@@ -2273,7 +2277,7 @@ abstract class WebTestBase extends TestBase {
    */
   protected function clickLink($label, $index = 0) {
     $url_before = $this->getUrl();
-    $urls = $this->xpath('//a[normalize-space(text())=:label]', array(':label' => $label));
+    $urls = $this->xpath('//a[normalize-space()=:label]', array(':label' => $label));
 
     if (isset($urls[$index])) {
       $url_target = $this->getAbsoluteUrl($urls[$index]['href']);

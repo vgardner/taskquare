@@ -14,7 +14,7 @@ use Drupal\Core\Access\AccessInterface;
 use Drupal\Tests\UnitTestCase;
 
 /**
- * Tests the CSRF access checker..
+ * Tests the CSRF access checker.
  *
  * @group Drupal
  * @group Access
@@ -75,13 +75,12 @@ class CsrfAccessCheckTest extends UnitTestCase {
   public function testAccessTokenPass() {
     $this->csrfToken->expects($this->once())
       ->method('validate')
-      ->with('test_query', 'test')
+      ->with('test_query', '/test-path')
       ->will($this->returnValue(TRUE));
 
-    $route = new Route('', array(), array('_csrf_token' => 'test'));
-    $request = new Request(array(
-      'token' => 'test_query',
-    ));
+    $route = new Route('/test-path', array(), array('_csrf_token' => 'TRUE'));
+    $request = Request::create('/test-path?token=test_query');
+    $request->attributes->set('_system_path', '/test-path');
     // Set the _controller_request flag so tokens are validated.
     $request->attributes->set('_controller_request', TRUE);
 
@@ -94,13 +93,12 @@ class CsrfAccessCheckTest extends UnitTestCase {
   public function testAccessTokenFail() {
     $this->csrfToken->expects($this->once())
       ->method('validate')
-      ->with('test_query', 'test')
+      ->with('test_query', '/test-path')
       ->will($this->returnValue(FALSE));
 
-    $route = new Route('', array(), array('_csrf_token' => 'test'));
-    $request = new Request(array(
-      'token' => 'test_query',
-    ));
+    $route = new Route('/test-path', array(), array('_csrf_token' => 'TRUE'));
+    $request = Request::create('/test-path?token=test_query');
+    $request->attributes->set('_system_path', '/test-path');
     // Set the _controller_request flag so tokens are validated.
     $request->attributes->set('_controller_request', TRUE);
 
@@ -110,13 +108,13 @@ class CsrfAccessCheckTest extends UnitTestCase {
   /**
    * Tests the access() method with no _controller_request attribute set.
    *
-   * This will default to the 'ANY' access conjuction.
+   * This will default to the 'ANY' access conjunction.
    */
   public function testAccessTokenMissAny() {
     $this->csrfToken->expects($this->never())
       ->method('validate');
 
-    $route = new Route('', array(), array('_csrf_token' => 'test'));
+    $route = new Route('/test-path', array(), array('_csrf_token' => 'TRUE'));
     $request = new Request(array(
       'token' => 'test_query',
     ));
@@ -127,13 +125,13 @@ class CsrfAccessCheckTest extends UnitTestCase {
   /**
    * Tests the access() method with no _controller_request attribute set.
    *
-   * This will use the 'ALL' access conjuction.
+   * This will use the 'ALL' access conjunction.
    */
   public function testAccessTokenMissAll() {
     $this->csrfToken->expects($this->never())
       ->method('validate');
 
-    $route = new Route('', array(), array('_csrf_token' => 'test'), array('_access_mode' => 'ALL'));
+    $route = new Route('/test-path', array(), array('_csrf_token' => 'TRUE'), array('_access_mode' => 'ALL'));
     $request = new Request(array(
       'token' => 'test_query',
     ));

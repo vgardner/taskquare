@@ -10,7 +10,7 @@
  */
 
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\entity\Entity\EntityDisplay;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 
 /**
  * Entities changed before this time are always shown as read.
@@ -100,10 +100,9 @@ function history_read_multiple($nids) {
  *   current user.
  */
 function history_write($nid, $account = NULL) {
-  global $user;
 
   if (!isset($account)) {
-    $account = $user;
+    $account = \Drupal::currentUser();
   }
 
   if ($account->isAuthenticated()) {
@@ -132,7 +131,7 @@ function history_cron() {
 /**
  * Implements hook_node_view_alter().
  */
-function history_node_view_alter(&$build, EntityInterface $node, EntityDisplay $display) {
+function history_node_view_alter(&$build, EntityInterface $node, EntityViewDisplayInterface $display) {
   // Update the history table, stating that this user viewed this node.
   if (($display->originalMode === 'full') && \Drupal::currentUser()->isAuthenticated()) {
     $build['#attached'] = array(

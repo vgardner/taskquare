@@ -29,7 +29,8 @@ use Drupal\field\FieldUpdateForbiddenException;
  *   'display'). The keys are the name of the elements as appearing in the
  *   renderable array (either the entity form or the displayed entity). The
  *   value is an associative array:
- *   - label: The human readable name of the element.
+ *   - label: The human readable name of the element. Make sure you sanitize
+ *     this appropriately.
  *   - description: A short description of the element contents.
  *   - weight: The default weight of the element.
  *   - visible: (optional) The default visibility of the element. Defaults to
@@ -49,7 +50,7 @@ function hook_field_extra_fields() {
   foreach (node_type_get_types() as $bundle) {
     if ($bundle->has_title) {
       $extra['node'][$bundle->type]['form']['title'] = array(
-        'label' => $bundle->title_label,
+        'label' => check_plain($bundle->title_label),
         'description' => $description,
         'weight' => -5,
       );
@@ -210,7 +211,7 @@ function hook_field_widget_info_alter(array &$info) {
 function hook_field_widget_form_alter(&$element, &$form_state, $context) {
   // Add a css class to widget form elements for all fields of type mytype.
   $field_definition = $context['items']->getFieldDefinition();
-  if ($field_definition->getFieldType() == 'mytype') {
+  if ($field_definition->getType() == 'mytype') {
     // Be sure not to overwrite existing attributes.
     $element['#attributes']['class'][] = 'myclass';
   }

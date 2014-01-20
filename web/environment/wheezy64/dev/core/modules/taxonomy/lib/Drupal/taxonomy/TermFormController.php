@@ -74,7 +74,7 @@ class TermFormController extends ContentEntityFormController {
       '#type' => 'text_format',
       '#title' => $this->t('Description'),
       '#default_value' => $term->description->value,
-      '#format' => $term->format->value,
+      '#format' => $term->description->format,
       '#weight' => 0,
     );
     $language_configuration = $this->moduleHandler->moduleExists('language') ? language_get_default_configuration('taxonomy_term', $vocabulary->id()) : FALSE;
@@ -161,7 +161,7 @@ class TermFormController extends ContentEntityFormController {
 
     // Ensure numeric values.
     if (isset($form_state['values']['weight']) && !is_numeric($form_state['values']['weight'])) {
-      form_set_error('weight', $this->t('Weight value must be numeric.'));
+      $this->setFormError('weight', $form_state, $this->t('Weight value must be numeric.'));
     }
   }
 
@@ -178,7 +178,7 @@ class TermFormController extends ContentEntityFormController {
     // \Drupal\Core\Entity\Entity::save() method.
     $description = $form_state['values']['description'];
     $term->description->value = $description['value'];
-    $term->format->value = $description['format'];
+    $term->description->format = $description['format'];
 
     // Assign parents with proper delta values starting from 0.
     $term->parent = array_keys($form_state['values']['parent']);

@@ -54,7 +54,7 @@ class NodeRevisionRevertForm extends ConfirmFormBase implements ContainerInjecti
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'node_revision_revert_confirm';
   }
 
@@ -68,8 +68,7 @@ class NodeRevisionRevertForm extends ConfirmFormBase implements ContainerInjecti
   /**
    * {@inheritdoc}
    */
-  public function getCancelPath() {
-    return 'node/' . $this->revision->id() . '/revisions';
+  public function getCancelRoute() {
   }
 
   /**
@@ -91,7 +90,11 @@ class NodeRevisionRevertForm extends ConfirmFormBase implements ContainerInjecti
    */
   public function buildForm(array $form, array &$form_state, $node_revision = NULL) {
     $this->revision = $this->nodeStorage->loadRevision($node_revision);
-    return parent::buildForm($form, $form_state);
+    $form = parent::buildForm($form, $form_state);
+
+    // @todo Convert to getCancelRoute() after http://drupal.org/node/1863906.
+    $form['actions']['cancel']['#href'] = 'node/' . $this->revision->id() . '/revisions';
+    return $form;
   }
 
   /**
@@ -112,7 +115,12 @@ class NodeRevisionRevertForm extends ConfirmFormBase implements ContainerInjecti
 
     watchdog('content', '@type: reverted %title revision %revision.', array('@type' => $this->revision->bundle(), '%title' => $this->revision->label(), '%revision' => $this->revision->getRevisionId()));
     drupal_set_message(t('@type %title has been reverted back to the revision from %revision-date.', array('@type' => node_get_type_label($this->revision), '%title' => $this->revision->label(), '%revision-date' => format_date($original_revision_timestamp))));
-    $form_state['redirect'] = 'node/' . $this->revision->id() . '/revisions';
+    $form_state['redirect_route'] = array(
+      'route_name' => 'node.revision_overview',
+      'route_parameters' => array(
+        'node' => $this->revision->id(),
+      ),
+    );
   }
 
 }

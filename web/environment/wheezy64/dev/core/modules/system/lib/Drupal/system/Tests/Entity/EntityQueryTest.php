@@ -7,7 +7,9 @@
 
 namespace Drupal\system\Tests\Entity;
 
+use Drupal\Core\Entity\EntityStorageControllerInterface;
 use Drupal\Core\Language\Language;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Tests the basic Entity API.
@@ -55,7 +57,7 @@ class EntityQueryTest extends EntityUnitTestBase {
 
   function setUp() {
     parent::setUp();
-    $this->installSchema('entity_test', array('entity_test_mulrev', 'entity_test_mulrev_property_data', 'entity_test_mulrev_property_revision'));
+    $this->installSchema('entity_test', array('entity_test_mulrev', 'entity_test_mulrev_revision', 'entity_test_mulrev_property_data', 'entity_test_mulrev_property_revision'));
     $this->installSchema('system', array('variable'));
     $this->installConfig(array('language'));
 
@@ -250,7 +252,7 @@ class EntityQueryTest extends EntityUnitTestBase {
     $this->assertResult();
     $this->queryResults = $this->factory->get('entity_test_mulrev')
       ->condition("$greetings.value", 'merhaba')
-      ->age(FIELD_LOAD_REVISION)
+      ->age(EntityStorageControllerInterface::FIELD_LOAD_REVISION)
       ->sort('revision_id')
       ->execute();
     // Bit 2 needs to be set.
@@ -280,7 +282,7 @@ class EntityQueryTest extends EntityUnitTestBase {
     $this->assertIdentical($results, array_slice($assert, 4, 8, TRUE));
     $results = $this->factory->get('entity_test_mulrev')
       ->condition("$greetings.value", 'a', 'ENDS_WITH')
-      ->age(FIELD_LOAD_REVISION)
+      ->age(EntityStorageControllerInterface::FIELD_LOAD_REVISION)
       ->sort('id')
       ->execute();
     // Now we get everything.
@@ -309,7 +311,7 @@ class EntityQueryTest extends EntityUnitTestBase {
       ->sort("$greetings.format")
       ->sort('id');
     // As we do not have any conditions, here are the possible colors and
-    // language codes, already in order, with the first occurence of the
+    // language codes, already in order, with the first occurrence of the
     // entity id marked with *:
     // 8  NULL pl *
     // 12 NULL pl *
@@ -349,7 +351,11 @@ class EntityQueryTest extends EntityUnitTestBase {
 
     // Test the pager by setting element #1 to page 2 with a page size of 4.
     // Results will be #8-12 from above.
-    $_GET['page'] = '0,2';
+    $request = Request::createFromGlobals();
+    $request->query->replace(array(
+      'page' => '0,2',
+    ));
+    \Drupal::getContainer()->set('request', $request);
     $this->queryResults = $this->factory->get('entity_test_mulrev')
       ->sort("$figures.color")
       ->sort("$greetings.format")
@@ -376,8 +382,13 @@ class EntityQueryTest extends EntityUnitTestBase {
     // While ordering on bundles do not give us a definite order, we can still
     // assert that all entities from one bundle are after the other as the
     // order dictates.
-    $_GET['sort'] = 'asc';
-    $_GET['order'] = 'Type';
+    $request = Request::createFromGlobals();
+    $request->query->replace(array(
+      'sort' => 'asc',
+      'order' => 'Type',
+    ));
+    \Drupal::getContainer()->set('request', $request);
+
     $header = array(
       'id' => array('data' => 'Id', 'specifier' => 'id'),
       'type' => array('data' => 'Type', 'specifier' => 'type'),
@@ -387,7 +398,12 @@ class EntityQueryTest extends EntityUnitTestBase {
       ->tableSort($header)
       ->execute());
     $this->assertBundleOrder('asc');
-    $_GET['sort'] = 'desc';
+
+    $request->query->add(array(
+      'sort' => 'desc',
+    ));
+    \Drupal::getContainer()->set('request', $request);
+
     $header = array(
       'id' => array('data' => 'Id', 'specifier' => 'id'),
       'type' => array('data' => 'Type', 'specifier' => 'type'),
@@ -396,8 +412,12 @@ class EntityQueryTest extends EntityUnitTestBase {
       ->tableSort($header)
       ->execute());
     $this->assertBundleOrder('desc');
+
     // Ordering on ID is definite, however.
-    $_GET['order'] = 'Id';
+    $request->query->add(array(
+      'order' => 'Id',
+    ));
+    \Drupal::getContainer()->set('request', $request);
     $this->queryResults = $this->factory->get('entity_test_mulrev')
       ->tableSort($header)
       ->execute();
@@ -487,7 +507,7 @@ class EntityQueryTest extends EntityUnitTestBase {
   /**
    * Test adding a tag and metadata to the Entity query object.
    *
-   * The tags and metadata should propogate to the SQL query object.
+   * The tags and metadata should propagate to the SQL query object.
    */
   function testMetaData() {
     $query = \Drupal::entityQuery('entity_test_mulrev');
@@ -497,6 +517,6 @@ class EntityQueryTest extends EntityUnitTestBase {
       ->execute();
 
     global $efq_test_metadata;
-    $this->assertEqual($efq_test_metadata, 'bar', 'Tag and metadata propogated to the SQL query object.');
+    $this->assertEqual($efq_test_metadata, 'bar', 'Tag and metadata propagated to the SQL query object.');
   }
 }

@@ -43,7 +43,7 @@ class ConfigItemGroup extends ViewsFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'views_ui_config_item_group_form';
   }
 
@@ -51,7 +51,7 @@ class ConfigItemGroup extends ViewsFormBase {
    * {@inheritdoc}
    */
   public function buildForm(array $form, array &$form_state) {
-    $view = &$form_state['view'];
+    $view = $form_state['view'];
     $display_id = $form_state['display_id'];
     $type = $form_state['type'];
     $id = $form_state['id'];
@@ -60,7 +60,7 @@ class ConfigItemGroup extends ViewsFormBase {
       'options' => array(
         '#tree' => TRUE,
         '#theme_wrappers' => array('container'),
-        '#attributes' => array('class' => array('scroll')),
+        '#attributes' => array('class' => array('scroll'), 'data-drupal-views-scroll' => TRUE),
       ),
     );
     $executable = $view->getExecutable();
@@ -84,7 +84,7 @@ class ConfigItemGroup extends ViewsFormBase {
         $form['#title'] = $this->t('Configure aggregation settings for @type %item', array('@type' => $types[$type]['lstitle'], '%item' => $handler->adminLabel()));
 
         $handler->buildGroupByForm($form['options'], $form_state);
-        $form_state['handler'] = &$handler;
+        $form_state['handler'] = $handler;
       }
 
       $view->getStandardButtons($form, $form_state, 'views_ui_config_item_group_form');
@@ -98,7 +98,6 @@ class ConfigItemGroup extends ViewsFormBase {
   public function submitForm(array &$form, array &$form_state) {
     $item = &$form_state['handler']->options;
     $type = $form_state['type'];
-    $id = $form_state['id'];
 
     $handler = Views::handlerManager($type)->getHandler($item);
     $executable = $form_state['view']->getExecutable();

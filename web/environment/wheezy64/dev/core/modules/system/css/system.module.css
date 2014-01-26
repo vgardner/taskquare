@@ -8,25 +8,6 @@
  *
  * @see autocomplete.js
  */
-/* Suggestion list */
-#autocomplete {
-  border: 1px solid;
-  overflow: hidden;
-  position: absolute;
-  z-index: 100;
-}
-#autocomplete ul {
-  list-style: none;
-  list-style-image: none;
-  margin: 0;
-  padding: 0;
-}
-#autocomplete li {
-  background: #fff;
-  color: #000;
-  cursor: default;
-  white-space: pre;
-}
 
 /* Animated throbber */
 .js input.form-autocomplete {
@@ -37,10 +18,10 @@
 .js[dir="rtl"] input.form-autocomplete {
   background-position: 0% 2px;
 }
-.js input.throbbing {
+.js input.form-autocomplete.ui-autocomplete-loading {
   background-position: 100% -18px; /* LTR */
 }
-.js[dir="rtl"] input.throbbing {
+.js[dir="rtl"] input.form-autocomplete.ui-autocomplete-loading {
   background-position: 0% -18px;
 }
 
@@ -106,15 +87,14 @@ a.tabledrag-handle:hover {
   text-decoration: none;
 }
 a.tabledrag-handle .handle {
-  background: url(../../../misc/draggable.png) no-repeat 6px 9px;
-  height: 13px;
-  margin: -0.4em 0.5em; /* LTR */
-  padding: 0.42em 0.5em; /* LTR */
-  width: 13px;
-}
-[dir="rtl"] a.tabledrag-handle .handle {
-  margin: -0.4em 0.5em;
+  background: url(../../../misc/icons/787878/move.svg) no-repeat 6px 7px;
+  height: 14px;
+  margin: -0.4em 0.5em 0;
   padding: 0.42em 0.5em;
+  width: 14px;
+}
+.no-svg a.tabledrag-handle .handle {
+  background-image: url(../../../misc/icons/787878/move.png);
 }
 .touch .draggable td {
   padding: 0 10px;

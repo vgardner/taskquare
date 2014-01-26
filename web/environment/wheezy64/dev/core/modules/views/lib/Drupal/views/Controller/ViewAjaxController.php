@@ -17,6 +17,7 @@ use Drupal\views\ViewExecutableFactory;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
  * Defines a controller to load a view via AJAX.
@@ -94,19 +95,19 @@ class ViewAjaxController implements ContainerInjectionInterface {
       }
 
       // Load the view.
-      $result = $this->storageController->load(array($name));
-      if (!$entity = reset($result)) {
+      if (!$entity = $this->storageController->load($name)) {
         throw new NotFoundHttpException();
       }
       $view = $this->executableFactory->get($entity);
       if ($view && $view->access($display_id)) {
+        $response->setView($view);
         // Fix the current path for paging.
         if (!empty($path)) {
           $request->attributes->set('_system_path', $path);
         }
 
-        // Add all $_POST data, because AJAX is always a post and many things,
-        // such as tablesorts, exposed filters and paging assume $_GET.
+        // Add all POST data, because AJAX is always a post and many things,
+        // such as tablesorts, exposed filters and paging assume GET.
         $request_all = $request->request->all();
         $query_all = $request->query->all();
         $request->query->replace($request_all + $query_all);
@@ -126,13 +127,16 @@ class ViewAjaxController implements ContainerInjectionInterface {
           $response->addCommand(new ScrollTopCommand(".view-dom-id-$dom_id"));
           $view->displayHandlers->get($display_id)->setOption('pager_element', $pager_element);
         }
-        // Reuse the same DOM id so it matches that in Drupal.settings.
+        // Reuse the same DOM id so it matches that in drupalSettings.
         $view->dom_id = $dom_id;
 
         $preview = $view->preview($display_id, $args);
         $response->addCommand(new ReplaceCommand(".view-dom-id-$dom_id", drupal_render($preview)));
+        return $response;
       }
-      return $response;
+      else {
+        throw new AccessDeniedHttpException();
+      }
     }
     else {
       throw new NotFoundHttpException();

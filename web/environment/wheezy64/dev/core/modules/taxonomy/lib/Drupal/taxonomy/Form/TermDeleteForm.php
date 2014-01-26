@@ -8,45 +8,19 @@
 namespace Drupal\taxonomy\Form;
 
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Drupal\taxonomy\VocabularyStorageControllerInterface;
-use Drupal\Core\Entity\EntityNGConfirmFormBase;
+use Drupal\Core\Entity\EntityManagerInterface;
+use Drupal\Core\Entity\ContentEntityConfirmFormBase;
 use Drupal\Core\Cache\Cache;
 
 /**
  * Provides a deletion confirmation form for taxonomy term.
  */
-class TermDeleteForm extends EntityNGConfirmFormBase {
-
-  /**
-   * The taxonomy vocabulary storage controller.
-   *
-   * @var \Drupal\taxonomy\VocabularyStorageControllerInterface
-   */
-  protected $vocabularyStorageController;
-
-  /**
-   * Constructs a new TermDelete object.
-   *
-   * @param \Drupal\taxonomy\VocabularyStorageControllerInterface $storage_controller
-   *   The Entity manager.
-   */
-  public function __construct(VocabularyStorageControllerInterface $storage_controller) {
-    $this->vocabularyStorageController = $storage_controller;
-  }
+class TermDeleteForm extends ContentEntityConfirmFormBase {
 
   /**
    * {@inheritdoc}
    */
-  public static function create(ContainerInterface $container) {
-    return new static(
-      $container->get('entity.manager')->getStorageController('taxonomy_vocabulary')
-    );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getFormID() {
+  public function getFormId() {
     return 'taxonomy_term_confirm_delete';
   }
 
@@ -60,8 +34,10 @@ class TermDeleteForm extends EntityNGConfirmFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getCancelPath() {
-    return 'admin/structure/taxonomy';
+  public function getCancelRoute() {
+    return array(
+      'route_name' => 'taxonomy.vocabulary_list',
+    );
   }
 
   /**
@@ -83,14 +59,15 @@ class TermDeleteForm extends EntityNGConfirmFormBase {
    */
   public function submit(array $form, array &$form_state) {
     $this->entity->delete();
-    $vocabulary = $this->vocabularyStorageController->load($this->entity->bundle());
+    $storage_controller = $this->entityManager->getStorageController('taxonomy_vocabulary');
+    $vocabulary = $storage_controller->load($this->entity->bundle());
 
     // @todo Move to storage controller http://drupal.org/node/1988712
     taxonomy_check_vocabulary_hierarchy($vocabulary, array('tid' => $this->entity->id()));
 
     drupal_set_message($this->t('Deleted term %name.', array('%name' => $this->entity->label())));
     watchdog('taxonomy', 'Deleted term %name.', array('%name' => $this->entity->label()), WATCHDOG_NOTICE);
-    $form_state['redirect'] = 'admin/structure/taxonomy';
+    $form_state['redirect_route']['route_name'] = 'taxonomy.vocabulary_list';
     Cache::invalidateTags(array('content' => TRUE));
   }
 

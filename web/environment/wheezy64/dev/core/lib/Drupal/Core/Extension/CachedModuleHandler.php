@@ -8,7 +8,7 @@
 namespace Drupal\Core\Extension;
 
 use Drupal\Core\Cache\CacheBackendInterface;
-use Drupal\Core\KeyValueStore\KeyValueStoreInterface;
+use Drupal\Core\KeyValueStore\StateInterface;
 
 /**
  * Class that manages enabled modules in a Drupal installation.
@@ -18,7 +18,7 @@ class CachedModuleHandler extends ModuleHandler implements CachedModuleHandlerIn
   /**
    * State key/value store.
    *
-   * @var \Drupal\Core\KeyValueStore\KeyValueStoreInterface
+   * @var \Drupal\Core\KeyValueStore\StateInterface
    */
   protected $state;
 
@@ -39,7 +39,7 @@ class CachedModuleHandler extends ModuleHandler implements CachedModuleHandlerIn
   /**
    * Constructs a new CachedModuleHandler object.
    */
-  public function __construct(array $module_list = array(), KeyValueStoreInterface $state, CacheBackendInterface $bootstrap_cache) {
+  public function __construct(array $module_list = array(), StateInterface $state, CacheBackendInterface $bootstrap_cache) {
     parent::__construct($module_list);
     $this->state = $state;
     $this->bootstrapCache = $bootstrap_cache;
@@ -81,7 +81,7 @@ class CachedModuleHandler extends ModuleHandler implements CachedModuleHandlerIn
     // $this->bootstrapCache->get() is more or less constant and reduced further when
     // non-database caching backends are used, so there will be more significant
     // gains when a large number of modules are installed or hooks invoked, since
-    // this can quickly lead to Drupal::moduleHandler()->implementsHook() being
+    // this can quickly lead to \Drupal::moduleHandler()->implementsHook() being
     // called several thousand times per request.
     parent::resetImplementations();
     $this->bootstrapCache->set('module_implements', array());
@@ -121,7 +121,7 @@ class CachedModuleHandler extends ModuleHandler implements CachedModuleHandlerIn
         // It is possible that a module removed a hook implementation without the
         // implementations cache being rebuilt yet, so we check whether the
         // function exists on each request to avoid undefined function errors.
-        // Since Drupal::moduleHandler()->implementsHook() may needlessly try to
+        // Since \Drupal::moduleHandler()->implementsHook() may needlessly try to
         // load the include file again, function_exists() is used directly here.
         if (!function_exists($module . '_' . $hook)) {
           // Clear out the stale implementation from the cache and force a cache

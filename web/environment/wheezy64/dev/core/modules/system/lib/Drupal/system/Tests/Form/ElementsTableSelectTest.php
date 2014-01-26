@@ -105,7 +105,7 @@ class ElementsTableSelectTest extends WebTestBase {
     // Test a submission with one checkbox checked.
     $edit = array();
     $edit['tableselect[row1]'] = TRUE;
-    $this->drupalPost('form_test/tableselect/multiple-true', $edit, 'Submit');
+    $this->drupalPostForm('form_test/tableselect/multiple-true', $edit, 'Submit');
 
     $this->assertText(t('Submitted: row1 = row1'), 'Checked checkbox row1');
     $this->assertText(t('Submitted: row2 = 0'), 'Unchecked checkbox row2.');
@@ -114,7 +114,7 @@ class ElementsTableSelectTest extends WebTestBase {
     // Test a submission with multiple checkboxes checked.
     $edit['tableselect[row1]'] = TRUE;
     $edit['tableselect[row3]'] = TRUE;
-    $this->drupalPost('form_test/tableselect/multiple-true', $edit, 'Submit');
+    $this->drupalPostForm('form_test/tableselect/multiple-true', $edit, 'Submit');
 
     $this->assertText(t('Submitted: row1 = row1'), 'Checked checkbox row1.');
     $this->assertText(t('Submitted: row2 = 0'), 'Unchecked checkbox row2.');
@@ -127,7 +127,7 @@ class ElementsTableSelectTest extends WebTestBase {
    */
   function testMultipleFalseSubmit() {
     $edit['tableselect'] = 'row1';
-    $this->drupalPost('form_test/tableselect/multiple-false', $edit, 'Submit');
+    $this->drupalPostForm('form_test/tableselect/multiple-false', $edit, 'Submit');
     $this->assertText(t('Submitted: row1'), 'Selected radio button');
   }
 
@@ -216,6 +216,9 @@ class ElementsTableSelectTest extends WebTestBase {
     $form_state = form_state_defaults();
 
     $form['op'] = array('#type' => 'submit', '#value' => t('Submit'));
+    // The form token CSRF protection should not interfere with this test, so we
+    // bypass it by setting the token to FALSE.
+    $form['#token'] = FALSE;
 
     $form_state['input'] = $edit;
     $form_state['input']['form_id'] = $form_id;
@@ -224,11 +227,11 @@ class ElementsTableSelectTest extends WebTestBase {
 
     drupal_process_form($form_id, $form, $form_state);
 
-    $errors = form_get_errors();
+    $errors = form_get_errors($form_state);
 
     // Clear errors and messages.
     drupal_get_messages();
-    form_clear_error();
+    $form_state['errors'] = array();
 
     // Return the processed form together with form_state and errors
     // to allow the caller lowlevel access to the form.

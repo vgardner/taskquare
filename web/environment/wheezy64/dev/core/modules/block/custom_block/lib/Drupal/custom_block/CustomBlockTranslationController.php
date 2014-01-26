@@ -8,12 +8,12 @@
 namespace Drupal\custom_block;
 
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\content_translation\ContentTranslationControllerNG;
+use Drupal\content_translation\ContentTranslationController;
 
 /**
  * Defines the translation controller class for custom blocks.
  */
-class CustomBlockTranslationController extends ContentTranslationControllerNG {
+class CustomBlockTranslationController extends ContentTranslationController {
 
   /**
    * Overrides ContentTranslationController::entityFormAlter().
@@ -36,7 +36,7 @@ class CustomBlockTranslationController extends ContentTranslationControllerNG {
    * Overrides ContentTranslationController::entityFormTitle().
    */
   protected function entityFormTitle(EntityInterface $entity) {
-    $block_type = entity_load('custom_block_type', $entity->type->value);
+    $block_type = entity_load('custom_block_type', $entity->bundle());
     return t('<em>Edit @type</em> @title', array('@type' => $block_type->label(), '@title' => $entity->label()));
   }
 

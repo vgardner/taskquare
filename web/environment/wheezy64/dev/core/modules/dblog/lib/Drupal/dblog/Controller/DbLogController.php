@@ -15,7 +15,7 @@ use Drupal\Core\Database\Connection;
 use Drupal\Core\Datetime\Date;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\user\UserStorageControllerInterface;
+use Drupal\Core\Form\FormBuilderInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -43,10 +43,13 @@ class DbLogController extends ControllerBase implements ContainerInjectionInterf
    * @var \Drupal\Core\Datetime\Date
    */
   protected $date;
+
   /**
-   * @var \Drupal\user\UserStorageControllerInterface
+   * The form builder service.
+   *
+   * @var \Drupal\Core\Form\FormBuilderInterface
    */
-  protected $userStorage;
+  protected $formBuilder;
 
   /**
    * {@inheritdoc}
@@ -56,23 +59,27 @@ class DbLogController extends ControllerBase implements ContainerInjectionInterf
       $container->get('database'),
       $container->get('module_handler'),
       $container->get('date'),
-      $container->get('entity.manager')->getStorageController('user')
+      $container->get('form_builder')
     );
   }
 
   /**
    * Constructs a DbLogController object.
    *
-   * @param Connection $database
+   * @param \Drupal\Core\Database\Connection $database
    *   A database connection.
-   * @param ModuleHandlerInterface $module_handler
+   * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
    *   A module handler.
+   * @param \Drupal\Core\Datetime\Date $date
+   *   The date service.
+   * @param \Drupal\Core\Form\FormBuilderInterface $form_builder
+   *   The form builder service.
    */
-  public function __construct(Connection $database, ModuleHandlerInterface $module_handler, Date $date, UserStorageControllerInterface $user_storage) {
+  public function __construct(Connection $database, ModuleHandlerInterface $module_handler, Date $date, FormBuilderInterface $form_builder) {
     $this->database = $database;
     $this->moduleHandler = $module_handler;
     $this->date = $date;
-    $this->userStorage = $user_storage;
+    $this->formBuilder = $form_builder;
   }
 
   /**
@@ -105,7 +112,6 @@ class DbLogController extends ControllerBase implements ContainerInjectionInterf
    *
    * @see dblog_clear_log_form()
    * @see dblog_event()
-   * @see dblog_filter_form()
    */
   public function overview() {
 
@@ -116,8 +122,8 @@ class DbLogController extends ControllerBase implements ContainerInjectionInterf
 
     $this->moduleHandler->loadInclude('dblog', 'admin.inc');
 
-    $build['dblog_filter_form'] = drupal_get_form('dblog_filter_form');
-    $build['dblog_clear_log_form'] = drupal_get_form('dblog_clear_log_form');
+    $build['dblog_filter_form'] = $this->formBuilder->getForm('Drupal\dblog\Form\DblogFilterForm');
+    $build['dblog_clear_log_form'] = $this->formBuilder->getForm('Drupal\dblog\Form\DblogClearLogForm');
 
     $header = array(
       // Icon column.
@@ -177,7 +183,7 @@ class DbLogController extends ControllerBase implements ContainerInjectionInterf
         if (isset($dblog->wid)) {
           // Truncate link_text to 56 chars of message.
           $log_text = Unicode::truncate(filter_xss($message, array()), 56, TRUE, TRUE);
-          $message = $this->l($log_text, 'dblog_event',  array('event_id' => $dblog->wid), array('html' => TRUE));
+          $message = $this->l($log_text, 'dblog.event',  array('event_id' => $dblog->wid), array('html' => TRUE));
         }
       }
       $username = array(
@@ -317,6 +323,30 @@ class DbLogController extends ControllerBase implements ContainerInjectionInterf
       'where' => $where,
       'args' => $args,
     );
+  }
+
+  /**
+   * @todo Remove dblog_top().
+   */
+  public function pageNotFound() {
+    module_load_include('admin.inc', 'dblog');
+    return dblog_top('page not found');
+  }
+
+  /**
+   * @todo Remove dblog_top().
+   */
+  public function accessDenied() {
+    module_load_include('admin.inc', 'dblog');
+    return dblog_top('access denied');
+  }
+
+  /**
+   * @todo Remove dblog_top().
+   */
+  public function search() {
+    module_load_include('admin.inc', 'dblog');
+    return dblog_top('search');
   }
 
 }

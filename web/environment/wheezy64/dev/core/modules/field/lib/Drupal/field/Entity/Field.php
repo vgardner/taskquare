@@ -8,10 +8,10 @@
 namespace Drupal\field\Entity;
 
 use Drupal\Component\Utility\Unicode;
-use Drupal\Core\Entity\Annotation\EntityType;
-use Drupal\Core\Annotation\Translation;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityStorageControllerInterface;
+use Drupal\Core\TypedData\DataDefinition;
 use Drupal\field\FieldException;
 use Drupal\field\FieldInterface;
 
@@ -24,7 +24,6 @@ use Drupal\field\FieldInterface;
  * @EntityType(
  *   id = "field_entity",
  *   label = @Translation("Field"),
- *   module = "field",
  *   controllers = {
  *     "storage" = "Drupal\field\FieldStorageController"
  *   },
@@ -102,13 +101,6 @@ class Field extends ConfigEntityBase implements FieldInterface {
   public $module;
 
   /**
-   * Flag indicating whether the field type module is enabled.
-   *
-   * @var bool
-   */
-  public $active;
-
-  /**
    * Field-type specific settings.
    *
    * An array of key/value pairs, The keys and default values are defined by the
@@ -122,7 +114,8 @@ class Field extends ConfigEntityBase implements FieldInterface {
    * The field cardinality.
    *
    * The maximum number of values the field can hold. Possible values are
-   * positive integers or FIELD_CARDINALITY_UNLIMITED. Defaults to 1.
+   * positive integers or FieldDefinitionInterface::CARDINALITY_UNLIMITED.
+   * Defaults to 1.
    *
    * @var integer
    */
@@ -199,6 +192,13 @@ class Field extends ConfigEntityBase implements FieldInterface {
   public $original = NULL;
 
   /**
+   * The data definition of a field item.
+   *
+   * @var \Drupal\Core\TypedData\DataDefinition
+   */
+  protected $itemDefinition;
+
+  /**
    * Constructs a Field object.
    *
    * @param array $values
@@ -258,7 +258,6 @@ class Field extends ConfigEntityBase implements FieldInterface {
       'type',
       'settings',
       'module',
-      'active',
       'locked',
       'cardinality',
       'translatable',
@@ -272,42 +271,35 @@ class Field extends ConfigEntityBase implements FieldInterface {
   }
 
   /**
-   * Overrides \Drupal\Core\Entity\Entity::save().
-   *
-   * @return int
-   *   Either SAVED_NEW or SAVED_UPDATED, depending on the operation performed.
+   * Overrides \Drupal\Core\Entity\Entity::preSave().
    *
    * @throws \Drupal\field\FieldException
    *   If the field definition is invalid.
    * @throws \Drupal\Core\Entity\EntityStorageException
    *   In case of failures at the configuration storage level.
    */
-  public function save() {
+  public function preSave(EntityStorageControllerInterface $storage_controller) {
     // Clear the derived data about the field.
     unset($this->schema);
 
     if ($this->isNew()) {
-      return $this->saveNew();
+      return $this->preSaveNew($storage_controller);
     }
     else {
-      return $this->saveUpdated();
+      return $this->preSaveUpdated($storage_controller);
     }
   }
 
   /**
-   * Saves a new field definition.
+   * Prepares saving a new field definition.
    *
-   * @return int
-   *   SAVED_NEW if the definition was saved.
+   * @param \Drupal\Core\Entity\EntityStorageControllerInterface $storage_controller
+   *   The entity storage controller.
    *
-   * @throws \Drupal\field\FieldException
-   *   If the field definition is invalid.
-   * @throws \Drupal\Core\Entity\EntityStorageException
-   *   In case of failures at the configuration storage level.
+   * @throws \Drupal\field\FieldException If the field definition is invalid.
    */
-  protected function saveNew() {
+   protected function preSaveNew(EntityStorageControllerInterface $storage_controller) {
     $entity_manager = \Drupal::entityManager();
-    $storage_controller = $entity_manager->getStorageController($this->entityType);
 
     // Assign the ID.
     $this->id = $this->id();
@@ -326,9 +318,7 @@ class Field extends ConfigEntityBase implements FieldInterface {
 
     // Ensure the field name is unique (we do not care about deleted fields).
     if ($prior_field = $storage_controller->load($this->id)) {
-      $message = $prior_field->active ?
-        'Attempt to create field name %name which already exists and is active.' :
-        'Attempt to create field name %name which already exists, although it is inactive.';
+      $message = 'Attempt to create field name %name which already exists.';
       throw new FieldException(format_string($message, array('%name' => $this->name)));
     }
 
@@ -342,12 +332,11 @@ class Field extends ConfigEntityBase implements FieldInterface {
     }
 
     // Check that the field type is known.
-    $field_type = \Drupal::service('plugin.manager.entity.field.field_type')->getDefinition($this->type);
+    $field_type = \Drupal::service('plugin.manager.field.field_type')->getDefinition($this->type);
     if (!$field_type) {
       throw new FieldException(format_string('Attempt to create a field of unknown type %type.', array('%type' => $this->type)));
     }
     $this->module = $field_type['provider'];
-    $this->active = TRUE;
 
     // Make sure all settings are present, so that a complete field
     // definition is passed to the various hooks and written to config.
@@ -355,100 +344,103 @@ class Field extends ConfigEntityBase implements FieldInterface {
 
     // Notify the entity storage controller.
     $entity_manager->getStorageController($this->entity_type)->onFieldCreate($this);
-
-    // Save the configuration.
-    $result = parent::save();
-    field_cache_clear();
-
-    return $result;
   }
 
   /**
-   * Saves an updated field definition.
+   * Prepares saving an updated field definition.
    *
-   * @return int
-   *   SAVED_UPDATED if the definition was saved.
-   *
-   * @throws \Drupal\field\FieldException
-   *   If the field definition is invalid.
-   * @throws \Drupal\Core\Entity\EntityStorageException
-   *   In case of failures at the configuration storage level.
+   * @param \Drupal\Core\Entity\EntityStorageControllerInterface $storage_controller
+   *   The entity storage controller.
    */
-  protected function saveUpdated() {
+  protected function preSaveUpdated(EntityStorageControllerInterface $storage_controller) {
     $module_handler = \Drupal::moduleHandler();
     $entity_manager = \Drupal::entityManager();
-    $storage_controller = $entity_manager->getStorageController($this->entityType);
-
-    $original = $storage_controller->loadUnchanged($this->id());
-    $this->original = $original;
+    $field_type_manager = \Drupal::service('plugin.manager.field.field_type');
 
     // Some updates are always disallowed.
-    if ($this->type != $original->type) {
+    if ($this->type != $this->original->type) {
       throw new FieldException("Cannot change an existing field's type.");
     }
-    if ($this->entity_type != $original->entity_type) {
+    if ($this->entity_type != $this->original->entity_type) {
       throw new FieldException("Cannot change an existing field's entity_type.");
     }
 
-    // Make sure all settings are present, so that a complete field definition
-    // is saved. This allows calling code to perform partial updates on field
-    // objects.
-    $this->settings += $original->settings;
+    // Make sure all settings are present, so that a complete field
+    // definition is passed to the various hooks and written to config.
+    $this->settings += $field_type_manager->getDefaultSettings($this->type);
 
     // See if any module forbids the update by throwing an exception. This
     // invokes hook_field_update_forbid().
-    $module_handler->invokeAll('field_update_forbid', array($this, $original));
+    $module_handler->invokeAll('field_update_forbid', array($this, $this->original));
 
     // Notify the storage controller. The controller can reject the definition
     // update as invalid by raising an exception, which stops execution before
     // the definition is written to config.
-    $entity_manager->getStorageController($this->entity_type)->onFieldUpdate($this, $original);
-
-    // Save the configuration.
-    $result = parent::save();
-    field_cache_clear();
-
-    return $result;
+    $entity_manager->getStorageController($this->entity_type)->onFieldUpdate($this);
   }
 
   /**
    * {@inheritdoc}
    */
-  public function delete() {
-    if (!$this->deleted) {
-      $instance_controller = \Drupal::entityManager()->getStorageController('field_instance');
-      $state = \Drupal::state();
+  public function postSave(EntityStorageControllerInterface $storage_controller, $update = TRUE) {
+    // Clear the cache.
+    field_cache_clear();
+  }
 
-      // Delete all non-deleted instances.
-      $instance_ids = array();
-      foreach ($this->getBundles() as $bundle) {
-        $instance_ids[] = "{$this->entity_type}.$bundle.{$this->name}";
+  /**
+   * {@inheritdoc}
+   */
+  public static function preDelete(EntityStorageControllerInterface $storage_controller, array $fields) {
+    $state = \Drupal::state();
+    $instance_controller = \Drupal::entityManager()->getStorageController('field_instance');
+
+    // Delete instances first. Note: when deleting a field through
+    // FieldInstance::postDelete(), the instances have been deleted already, so
+    // no instances will be found here.
+    $instance_ids = array();
+    foreach ($fields as $field) {
+      if (!$field->deleted) {
+        foreach ($field->getBundles() as $bundle) {
+          $instance_ids[] = "{$field->entity_type}.$bundle.{$field->name}";
+        }
       }
-      foreach ($instance_controller->loadMultiple($instance_ids) as $instance) {
-        // By default, FieldInstance::delete() will automatically try to delete
-        // a field definition when it is deleting the last instance of the
-        // field. Since the whole field is being deleted here, pass FALSE as
-        // the $field_cleanup parameter to prevent a loop.
-        $instance->delete(FALSE);
-      }
-
-      \Drupal::entityManager()->getStorageController($this->entity_type)->onFieldDelete($this);
-
-      // Delete the configuration of this field and save the field configuration
-      // in the key_value table so we can use it later during
-      // field_purge_batch(). This makes sure a new field can be created
-      // immediately with the same name.
-      $deleted_fields = $state->get('field.field.deleted') ?: array();
-      $config = $this->getExportProperties();
-      $config['deleted'] = TRUE;
-      $deleted_fields[$this->uuid] = $config;
-      $state->set('field.field.deleted', $deleted_fields);
-
-      parent::delete();
-
-      // Clear the cache.
-      field_cache_clear();
     }
+    if ($instance_ids) {
+      $instances = $instance_controller->loadMultiple($instance_ids);
+      // Tag the objects to preserve recursive deletion of the field.
+      foreach ($instances as $instance) {
+        $instance->noFieldDelete = TRUE;
+      }
+      $instance_controller->delete($instances);
+    }
+
+    // Keep the field definitions in the state storage so we can use them later
+    // during field_purge_batch().
+    $deleted_fields = $state->get('field.field.deleted') ?: array();
+    foreach ($fields as $field) {
+      if (!$field->deleted) {
+        $config = $field->getExportProperties();
+        $config['deleted'] = TRUE;
+        $config['bundles'] = $field->getBundles();
+        $deleted_fields[$field->uuid] = $config;
+      }
+    }
+    $state->set('field.field.deleted', $deleted_fields);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function postDelete(EntityStorageControllerInterface $storage_controller, array $fields) {
+    // Notify the storage.
+    foreach ($fields as $field) {
+      if (!$field->deleted) {
+        \Drupal::entityManager()->getStorageController($field->entity_type)->onFieldDelete($field);
+      }
+    }
+
+    // Clear the cache.
+    field_cache_clear();
   }
 
   /**
@@ -457,7 +449,7 @@ class Field extends ConfigEntityBase implements FieldInterface {
   public function getSchema() {
     if (!isset($this->schema)) {
       // Get the schema from the field item class.
-      $definition = \Drupal::service('plugin.manager.entity.field.field_type')->getDefinition($this->type);
+      $definition = \Drupal::service('plugin.manager.field.field_type')->getDefinition($this->type);
       $class = $definition['class'];
       $schema = $class::schema($this);
       // Fill in default values for optional entries.
@@ -508,26 +500,26 @@ class Field extends ConfigEntityBase implements FieldInterface {
   /**
    * {@inheritdoc}
    */
-  public function getFieldName() {
+  public function getName() {
     return $this->name;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getFieldType() {
+  public function getType() {
     return $this->type;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getFieldSettings() {
+  public function getSettings() {
     // @todo field_info_field_types() calls _field_info_collate_types() which
     //   maintains its own static cache. However, do some CPU and memory
     //   profiling to see if it's worth statically caching $field_type_info, or
     //   the default field and instance settings, within $this.
-    $field_type_info = \Drupal::service('plugin.manager.entity.field.field_type')->getDefinition($this->type);
+    $field_type_info = \Drupal::service('plugin.manager.field.field_type')->getDefinition($this->type);
 
     $settings = $this->settings + $field_type_info['settings'] + $field_type_info['instance_settings'];
     return $settings;
@@ -536,27 +528,30 @@ class Field extends ConfigEntityBase implements FieldInterface {
   /**
    * {@inheritdoc}
    */
-  public function getFieldSetting($setting_name) {
-    // @todo See getFieldSettings() about potentially statically caching this.
-    $field_type_info = \Drupal::service('plugin.manager.entity.field.field_type')->getDefinition($this->type);
+  public function getSetting($setting_name) {
+    // @todo See getSettings() about potentially statically caching this.
+    $field_type_info = \Drupal::service('plugin.manager.field.field_type')->getDefinition($this->type);
 
     // We assume here that consecutive array_key_exists() is more efficient than
-    // calling getFieldSettings() when all we need is a single setting.
+    // calling getSettings() when all we need is a single setting.
     if (array_key_exists($setting_name, $this->settings)) {
       return $this->settings[$setting_name];
     }
     elseif (array_key_exists($setting_name, $field_type_info['settings'])) {
       return $field_type_info['settings'][$setting_name];
     }
-    else {
+    elseif (array_key_exists($setting_name, $field_type_info['instance_settings'])) {
       return $field_type_info['instance_settings'][$setting_name];
+    }
+    else {
+      return NULL;
     }
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getFieldPropertyNames() {
+  public function getPropertyNames() {
     $schema = $this->getSchema();
     return array_keys($schema['columns']);
   }
@@ -564,93 +559,77 @@ class Field extends ConfigEntityBase implements FieldInterface {
   /**
    * {@inheritdoc}
    */
-  public function isFieldTranslatable() {
+  public function isTranslatable() {
     return $this->translatable;
+  }
+
+  /**
+   * Sets whether the field is translatable.
+   *
+   * @param bool $translatable
+   *   Whether the field is translatable.
+   *
+   * @return \Drupal\field\Entity\Field
+   *   The object itself for chaining.
+   */
+  public function setTranslatable($translatable) {
+    $this->translatable = $translatable;
+    return $this;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getFieldLabel() {
+  public function getLabel() {
     return $this->label();
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getFieldDescription() {
-    return '';
+  public function getDescription() {
+    return NULL;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getFieldCardinality() {
+  public function getCardinality() {
     return $this->cardinality;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function isFieldRequired() {
+  public function isRequired() {
     return FALSE;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getFieldDefaultValue(EntityInterface $entity) { }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function offsetExists($offset) {
-    return isset($this->{$offset}) || in_array($offset, array('columns', 'foreign keys', 'bundles', 'storage_details'));
+  public function isMultiple() {
+    $cardinality = $this->getCardinality();
+    return ($cardinality == static::CARDINALITY_UNLIMITED) || ($cardinality > 1);
   }
 
   /**
    * {@inheritdoc}
    */
-  public function &offsetGet($offset) {
-    switch ($offset) {
-      case 'id':
-        return $this->uuid;
+  public function getDefaultValue(EntityInterface $entity) { }
 
-      case 'field_name':
-        return $this->name;
-
-      case 'columns':
-        $this->getSchema();
-        return $this->schema['columns'];
-
-      case 'foreign keys':
-        $this->getSchema();
-        return $this->schema['foreign keys'];
-
-      case 'bundles':
-        $bundles = $this->getBundles();
-        return $bundles;
-    }
-
-    return $this->{$offset};
+  /**
+   * {@inheritdoc}
+   */
+  public function isConfigurable() {
+    return TRUE;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function offsetSet($offset, $value) {
-    if (!in_array($offset, array('columns', 'foreign keys', 'bundles', 'storage_details'))) {
-      $this->{$offset} = $value;
-    }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function offsetUnset($offset) {
-    if (!in_array($offset, array('columns', 'foreign keys', 'bundles', 'storage_details'))) {
-      unset($this->{$offset});
-    }
+  public function isQueryable() {
+    return TRUE;
   }
 
   /**
@@ -716,6 +695,69 @@ class Field extends ConfigEntityBase implements FieldInterface {
     // Run the values from getExportProperties() through __construct().
     $values = array_intersect_key($this->getExportProperties(), get_object_vars($this));
     $this->__construct($values);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getDataType() {
+    return 'list';
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function isList() {
+    return TRUE;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function isReadOnly() {
+    return FALSE;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function isComputed() {
+    return FALSE;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getClass() {
+    // Derive list class from the field type.
+    $type_definition = \Drupal::service('plugin.manager.field.field_type')
+      ->getDefinition($this->getType());
+    return $type_definition['list_class'];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getConstraints() {
+    return array();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getConstraint($constraint_name) {
+    return NULL;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getItemDefinition() {
+    if (!isset($this->itemDefinition)) {
+      $this->itemDefinition = DataDefinition::create('field_item:' . $this->type)
+        ->setSettings($this->getSettings());
+    }
+    return $this->itemDefinition;
   }
 
 }

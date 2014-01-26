@@ -54,7 +54,7 @@ abstract class AggregatorTestBase extends WebTestBase {
    */
   function createFeed($feed_url = NULL, array $edit = array()) {
     $edit = $this->getFeedEditArray($feed_url, $edit);
-    $this->drupalPost('admin/config/services/aggregator/add/feed', $edit, t('Save'));
+    $this->drupalPostForm('admin/config/services/aggregator/add/feed', $edit, t('Save'));
     $this->assertRaw(t('The feed %name has been added.', array('%name' => $edit['title'])), format_string('The feed !name has been added.', array('!name' => $edit['title'])));
 
     $fid = db_query("SELECT fid FROM {aggregator_feed} WHERE title = :title AND url = :url", array(':title' => $edit['title'], ':url' => $edit['url']))->fetchField();
@@ -69,7 +69,7 @@ abstract class AggregatorTestBase extends WebTestBase {
    *   Feed object representing the feed.
    */
   function deleteFeed(Feed $feed) {
-    $this->drupalPost('admin/config/services/aggregator/delete/feed/' . $feed->id(), array(), t('Delete'));
+    $this->drupalPostForm('admin/config/services/aggregator/delete/feed/' . $feed->id(), array(), t('Delete'));
     $this->assertRaw(t('The feed %title has been deleted.', array('%title' => $feed->label())), 'Feed deleted successfully.');
   }
 
@@ -167,7 +167,6 @@ abstract class AggregatorTestBase extends WebTestBase {
 
     // Ensure we have the right number of items.
     $result = db_query('SELECT iid FROM {aggregator_item} WHERE fid = :fid', array(':fid' => $feed->id()));
-    $items = array();
     $feed->items = array();
     foreach ($result as $item) {
       $feed->items[] = $item->iid;
@@ -186,7 +185,7 @@ abstract class AggregatorTestBase extends WebTestBase {
    *   Feed object representing the feed.
    */
   function removeFeedItems(Feed $feed) {
-    $this->drupalPost('admin/config/services/aggregator/remove/' . $feed->id(), array(), t('Remove items'));
+    $this->drupalPostForm('admin/config/services/aggregator/remove/' . $feed->id(), array(), t('Remove items'));
     $this->assertRaw(t('The news items from %title have been removed.', array('%title' => $feed->label())), 'Feed items removed.');
   }
 
@@ -205,37 +204,6 @@ abstract class AggregatorTestBase extends WebTestBase {
     $this->removeFeedItems($feed);
     $count = db_query('SELECT COUNT(*) FROM {aggregator_item} WHERE fid = :fid', array(':fid' => $feed->id()))->fetchField();
     $this->assertTrue($count == 0);
-  }
-
-  /**
-   * Pulls feed categories from {aggregator_category_feed} table.
-   *
-   * @param \Drupal\aggregator\Entity\Feed $feed
-   *   Feed object representing the feed.
-   */
-  function getFeedCategories(Feed $feed) {
-    // add the categories to the feed so we can use them
-    $result = db_query('SELECT cid FROM {aggregator_category_feed} WHERE fid = :fid', array(':fid' => $feed->id()));
-
-    foreach ($result as $category) {
-      $feed->categories[] = $category->cid;
-    }
-  }
-
-  /**
-   * Pulls categories from {aggregator_category} table.
-   *
-   * @return array
-   *   An associative array keyed by category ID and values are set to the
-   *   category names.
-   */
-  function getCategories() {
-    $categories = array();
-    $result = db_query('SELECT * FROM {aggregator_category}');
-    foreach ($result as $category) {
-      $categories[$category->cid] = $category;
-    }
-    return $categories;
   }
 
   /**
@@ -356,13 +324,12 @@ EOF;
    *   (optional) The number of nodes to generate. Defaults to five.
    */
   function createSampleNodes($count = 5) {
-    $langcode = Language::LANGCODE_NOT_SPECIFIED;
     // Post $count article nodes.
     for ($i = 0; $i < $count; $i++) {
       $edit = array();
-      $edit['title'] = $this->randomName();
-      $edit["body[$langcode][0][value]"] = $this->randomName();
-      $this->drupalPost('node/add/article', $edit, t('Save'));
+      $edit['title[0][value]'] = $this->randomName();
+      $edit['body[0][value]'] = $this->randomName();
+      $this->drupalPostForm('node/add/article', $edit, t('Save'));
     }
   }
 

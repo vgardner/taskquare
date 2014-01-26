@@ -8,7 +8,6 @@
 namespace Drupal\statistics\Tests;
 
 use Drupal\simpletest\WebTestBase;
-use PDO;
 
 /**
  * Tests that logging via statistics_exit() works for all pages.
@@ -76,10 +75,6 @@ class StatisticsLoggingTest extends WebTestBase {
    */
   function testLogging() {
     $path = 'node/' . $this->node->id();
-    $expected = array(
-      'title' => $this->node->label(),
-      'path' => $path,
-    );
 
     // Verify logging of an uncached page.
     $this->drupalGet($path);

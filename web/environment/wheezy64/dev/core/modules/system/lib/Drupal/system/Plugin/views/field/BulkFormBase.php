@@ -7,7 +7,7 @@
 
 namespace Drupal\system\Plugin\views\field;
 
-use Drupal\Core\Entity\EntityManager;
+use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\views\Plugin\views\field\FieldPluginBase;
 use Drupal\views\Plugin\views\style\Table;
 use Drupal\views\ResultRow;
@@ -26,6 +26,30 @@ abstract class BulkFormBase extends FieldPluginBase {
   protected $actions = array();
 
   /**
+   * {@inheritdoc }
+   */
+  protected function defineOptions() {
+    $options = parent::defineOptions();
+    $options['action_title'] = array('default' => 'With selection', 'translatable' => TRUE);
+    return $options;
+  }
+
+  /**
+   * {@inheritdoc }
+   */
+  public function buildOptionsForm(&$form, &$form_state) {
+    $form['action_title'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Action title'),
+      '#default_value' => $this->options['action_title'],
+      '#description' => t('The title shown above the actions dropdown.'),
+    );
+
+    parent::buildOptionsForm($form, $form_state);
+  }
+
+
+  /**
    * Constructs a new BulkForm object.
    *
    * @param array $configuration
@@ -34,10 +58,10 @@ abstract class BulkFormBase extends FieldPluginBase {
    *   The plugin ID for the plugin instance.
    * @param array $plugin_definition
    *   The plugin implementation definition.
-   * @param \Drupal\Core\Entity\EntityManager $manager
+   * @param \Drupal\Core\Entity\EntityManagerInterface $manager
    *   The entity manager.
    */
-  public function __construct(array $configuration, $plugin_id, array $plugin_definition, EntityManager $manager) {
+  public function __construct(array $configuration, $plugin_id, array $plugin_definition, EntityManagerInterface $manager) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
 
     $this->actions = $manager->getStorageController('action')->loadMultiple();
@@ -81,7 +105,7 @@ abstract class BulkFormBase extends FieldPluginBase {
    * @param array $form_state
    *   An associative array containing the current state of the form.
    */
-  public function views_form(&$form, &$form_state) {
+  public function viewsForm(&$form, &$form_state) {
     // Add the tableselect javascript.
     $form['#attached']['library'][] = array('system', 'drupal.tableselect');
 
@@ -116,7 +140,7 @@ abstract class BulkFormBase extends FieldPluginBase {
       );
       $form['header'][$this->options['id']]['action'] = array(
         '#type' => 'select',
-        '#title' => t('With selection'),
+        '#title' => $this->options['action_title'],
         '#options' => $this->getBulkOptions(),
       );
 
@@ -149,7 +173,7 @@ abstract class BulkFormBase extends FieldPluginBase {
    * @param array $form_state
    *   An associative array containing the current state of the form.
    */
-  public function views_form_submit(&$form, &$form_state) {
+  public function viewsFormSubmit(&$form, &$form_state) {
     if ($form_state['step'] == 'views_form_views_form') {
       // Filter only selected checkboxes.
       $selected = array_filter($form_state['values'][$this->options['id']]);

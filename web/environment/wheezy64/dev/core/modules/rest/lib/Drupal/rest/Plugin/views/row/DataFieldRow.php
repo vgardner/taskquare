@@ -20,7 +20,6 @@ use Drupal\Core\Annotation\Translation;
  *
  * @ViewsRow(
  *   id = "data_field",
- *   module = "rest",
  *   title = @Translation("Fields"),
  *   help = @Translation("Use fields as row data."),
  *   display_types = {"data"}
@@ -95,11 +94,15 @@ class DataFieldRow extends RowPluginBase {
           '#markup' => $id,
         );
         $form['field_options'][$id]['alias'] = array(
+          '#title' => t('Alias for @id', array('@id' => $id)),
+          '#title_display' => 'invisible',
           '#type' => 'textfield',
           '#default_value' => isset($options[$id]['alias']) ? $options[$id]['alias'] : '',
           '#element_validate' => array(array($this, 'validateAliasName')),
         );
         $form['field_options'][$id]['raw_output'] = array(
+          '#title' => t('Raw output for @id', array('@id' => $id)),
+          '#title_display' => 'invisible',
           '#type' => 'checkbox',
           '#default_value' => isset($options[$id]['raw_output']) ? $options[$id]['raw_output'] : '',
         );
@@ -112,7 +115,7 @@ class DataFieldRow extends RowPluginBase {
    */
   public function validateAliasName($element, &$form_state) {
     if (preg_match('@[^A-Za-z0-9_-]+@', $element['#value'])) {
-      form_error($element, t('The machine-readable name must contain only letters, numbers, dashes and underscores.'));
+      form_error($element, $form_state, t('The machine-readable name must contain only letters, numbers, dashes and underscores.'));
     }
   }
 
@@ -126,7 +129,7 @@ class DataFieldRow extends RowPluginBase {
     // If array filter returns empty, no values have been entered. Unique keys
     // should only be validated if we have some.
     if (($filtered = array_filter($aliases)) && (array_unique($filtered) !== $filtered)) {
-      form_set_error('aliases', t('All field aliases must be unique'));
+      form_set_error('aliases', $form_state, t('All field aliases must be unique'));
     }
   }
 

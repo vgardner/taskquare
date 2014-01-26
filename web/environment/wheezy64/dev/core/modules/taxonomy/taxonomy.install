@@ -5,25 +5,8 @@
  * Install, update and uninstall functions for the taxonomy module.
  */
 
-use Drupal\Component\Uuid\Uuid;
-use Drupal\Core\Entity\DatabaseStorageController;
+use Drupal\Core\Entity\FieldableDatabaseStorageController;
 use Drupal\field\Entity\Field;
-
-/**
- * Implements hook_uninstall().
- */
-function taxonomy_uninstall() {
-  Drupal::entityManager()->addNamespaces(new ArrayIterator(array(
-    'Drupal\taxonomy' => DRUPAL_ROOT . '/core/modules/taxonomy/lib',
-  )));
-  drupal_classloader_register('taxonomy', 'core/modules/taxonomy');
-  // Remove taxonomy_term bundles.
-  $config_names = config_get_storage_names_with_prefix('taxonomy.vocabulary.');
-  foreach ($config_names as $config_name) {
-    $vid = substr($config_name, strlen('taxonomy.vocabulary.'));
-    entity_invoke_bundle_hook('delete', 'taxonomy_term', $vid);
-  }
-}
 
 /**
  * Implements hook_schema().
@@ -65,13 +48,13 @@ function taxonomy_schema() {
         'default' => '',
         'description' => 'The term name.',
       ),
-      'description' => array(
+      'description__value' => array(
         'type' => 'text',
         'not null' => FALSE,
         'size' => 'big',
         'description' => 'A description of the term.',
       ),
-      'format' => array(
+      'description__format' => array(
         'type' => 'varchar',
         'length' => 255,
         'not null' => FALSE,
@@ -82,6 +65,12 @@ function taxonomy_schema() {
         'not null' => TRUE,
         'default' => 0,
         'description' => 'The weight of this term in relation to other terms.',
+      ),
+      'changed' => array(
+        'description' => 'The Unix timestamp when the term was most recently saved.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
       ),
     ),
     'primary key' => array('tid'),
@@ -173,30 +162,6 @@ function taxonomy_schema() {
   );
 
   return $schema;
-}
-
-/**
- * Implements hook_field_schema().
- */
-function taxonomy_field_schema($field) {
-  return array(
-    'columns' => array(
-      'target_id' => array(
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => FALSE,
-      ),
-    ),
-    'indexes' => array(
-      'target_id' => array('target_id'),
-    ),
-    'foreign keys' => array(
-      'target_id' => array(
-        'table' => 'taxonomy_term_data',
-        'columns' => array('target_id' => 'tid'),
-      ),
-    ),
-  );
 }
 
 /**
@@ -313,11 +278,11 @@ function taxonomy_update_8004() {
  * Convert vocabularies into configuration.
  */
 function taxonomy_update_8005() {
-  $uuid = new Uuid();
+  $uuid = \Drupal::service('uuid');
 
   $result = db_query('SELECT * FROM {taxonomy_vocabulary}');
   foreach ($result as $vocabulary) {
-    $config = Drupal::config('taxonomy.vocabulary.' . $vocabulary->machine_name)
+    $config = \Drupal::config('taxonomy.vocabulary.' . $vocabulary->machine_name)
       ->set('vid', $vocabulary->machine_name)
       ->set('name', $vocabulary->name)
       ->set('uuid', !empty($vocabulary->uuid) ? $vocabulary->uuid : $uuid->generate())
@@ -359,15 +324,15 @@ function taxonomy_update_8006() {
  */
 function taxonomy_update_8007() {
   foreach (config_get_storage_names_with_prefix('field.field.') as $config_name) {
-    $field_config = Drupal::config($config_name);
+    $field_config = \Drupal::config($config_name);
     // Only update taxonomy reference fields that use the default SQL storage.
     if ($field_config->get('type') == 'taxonomy_term_reference') {
       $field = new Field($field_config->get());
 
-      if (db_table_exists(DatabaseStorageController::_fieldTableName($field))) {
+      if (db_table_exists(FieldableDatabaseStorageController::_fieldTableName($field))) {
         $tables = array(
-          DatabaseStorageController::_fieldTableName($field),
-          DatabaseStorageController::_fieldRevisionTableName($field),
+          FieldableDatabaseStorageController::_fieldTableName($field),
+          FieldableDatabaseStorageController::_fieldRevisionTableName($field),
         );
 
         foreach ($tables as $table_name) {
@@ -392,4 +357,71 @@ function taxonomy_update_8007() {
       }
     }
   }
+}
+
+/**
+ * Add a changed column for taxonomy terms.
+ */
+function taxonomy_update_8008() {
+  $spec = array(
+    'description' => 'The Unix timestamp when the term was most recently saved.',
+    'type' => 'int',
+    'not null' => TRUE,
+    'default' => 0,
+    'initial' => REQUEST_TIME,
+  );
+  db_add_field('taxonomy_term_data', 'changed', $spec);
+}
+
+/**
+ * Convert numeric IDs to UUIDs to ensure config deployability.
+ */
+function taxonomy_update_8009() {
+  foreach (config_get_storage_names_with_prefix('field.instance.') as $instance_config_name) {
+    $instance_config = \Drupal::config($instance_config_name);
+    if ($instance_config->get('field_type') == 'taxonomy_term_reference') {
+      $default_value = $instance_config->get('default_value');
+      $ids = array();
+      // Load all referenced taxonomy_terms in default_value.
+      foreach ($default_value as $delta => $value) {
+        $ids[] = $value['tid'];
+      }
+      if ($ids) {
+        $entities = db_select('taxonomy_term_data', 't')
+          ->fields('t', array('tid', 'uuid'))
+          ->condition('t.tid', $ids)
+          ->execute()->fetchAllAssoc('tid');
+
+        // Convert IDs to UUIDs and save the new default_value.
+        foreach ($default_value as $delta => &$value) {
+          $value = array(
+            'target_uuid' => $entities[$value['tid']]->uuid,
+            'revision_id' => '',
+          );
+        }
+        $instance_config->set('default_value', $default_value)->save();
+      }
+    }
+  }
+}
+
+/**
+ * Rename the 'description' and 'format' columns for taxonomy terms.
+ */
+function taxonomy_update_8010() {
+  $description = array(
+    'type' => 'text',
+    'not null' => FALSE,
+    'size' => 'big',
+    'description' => 'A description of the term.',
+  );
+  db_change_field('taxonomy_term_data', 'description', 'description__value', $description);
+
+  $format = array(
+    'type' => 'varchar',
+    'length' => 255,
+    'not null' => FALSE,
+    'description' => 'The filter format ID of the description.',
+  );
+  db_change_field('taxonomy_term_data', 'format', 'description__format', $format);
 }

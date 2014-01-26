@@ -7,19 +7,18 @@
 
 namespace Drupal\views_ui\Controller;
 
+use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\views\ViewExecutable;
 use Drupal\views\ViewStorageInterface;
 use Drupal\views_ui\ViewUI;
 use Drupal\views\ViewsData;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
-use Drupal\Core\Entity\EntityManager;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Ajax\ReplaceCommand;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Drupal\Core\Routing\UrlGeneratorInterface;
 use Drupal\Core\Utility\LinkGeneratorInterface;
 
@@ -31,7 +30,7 @@ class ViewsUIController implements ContainerInjectionInterface {
   /**
    * Stores the Entity manager.
    *
-   * @var \Drupal\Core\Entity\EntityManager
+   * @var \Drupal\Core\Entity\EntityManagerInterface
    */
   protected $entityManager;
 
@@ -59,14 +58,14 @@ class ViewsUIController implements ContainerInjectionInterface {
   /**
    * Constructs a new \Drupal\views_ui\Controller\ViewsUIController object.
    *
-   * @param \Drupal\Core\Entity\EntityManager $entity_manager
+   * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
    *   The Entity manager.
    * @param \Drupal\views\ViewsData views_data
    *   The Views data cache object.
    * @param \Drupal\Core\Routing\UrlGeneratorInterface
    *   The URL generator.
    */
-  public function __construct(EntityManager $entity_manager, ViewsData $views_data, UrlGeneratorInterface $url_generator, LinkGeneratorInterface $link_generator) {
+  public function __construct(EntityManagerInterface $entity_manager, ViewsData $views_data, UrlGeneratorInterface $url_generator, LinkGeneratorInterface $link_generator) {
     $this->entityManager = $entity_manager;
     $this->viewsData = $views_data;
     $this->urlGenerator = $url_generator;
@@ -181,14 +180,8 @@ class ViewsUIController implements ContainerInjectionInterface {
    *   Either returns a rebuilt listing page as an AJAX response, or redirects
    *   back to the listing page.
    *
-   * @throws \Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException
    */
   public function ajaxOperation(ViewStorageInterface $view, $op, Request $request) {
-    if (!drupal_valid_token($request->query->get('token'), $op)) {
-      // Throw an access denied exception if the token is invalid or missing.
-      throw new AccessDeniedHttpException();
-    }
-
     // Perform the operation.
     $view->$op()->save();
 
@@ -250,7 +243,7 @@ class ViewsUIController implements ContainerInjectionInterface {
     if (isset($data['table']['base']['title'])) {
       $name .= ' (' . $data['table']['base']['title'] . ')';
     }
-    drupal_set_title($name);
+    $build['#title'] = $name;
 
     $build['edit'] = $this->entityManager->getForm($view, 'edit', array('display_id' => $display_id));
     $build['preview'] = $this->entityManager->getForm($view, 'preview', array('display_id' => $display_id));

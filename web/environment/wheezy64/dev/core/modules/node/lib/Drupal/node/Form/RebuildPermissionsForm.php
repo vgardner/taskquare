@@ -14,7 +14,7 @@ class RebuildPermissionsForm extends ConfirmFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'node_configure_rebuild_confirm';
   }
 
@@ -28,8 +28,10 @@ class RebuildPermissionsForm extends ConfirmFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getCancelPath() {
-    return 'admin/reports/status';
+  public function getCancelRoute() {
+    return array(
+      'route_name' => 'system.status',
+    );
   }
 
   /**
@@ -51,7 +53,7 @@ class RebuildPermissionsForm extends ConfirmFormBase {
    */
   public function submitForm(array &$form, array &$form_state) {
     node_access_rebuild(TRUE);
-    $form_state['redirect'] = 'admin/reports/status';
+    $form_state['redirect_route']['route_name'] = 'system.status';
   }
 
 }

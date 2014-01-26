@@ -30,12 +30,9 @@ class Crypt {
     static $random_state, $bytes;
     // Initialize on the first call. The contents of $_SERVER includes a mix of
     // user-specific and system information that varies a little with each page.
+    // Further initialize with the somewhat random PHP process ID.
     if (!isset($random_state)) {
-      $random_state = print_r($_SERVER, TRUE);
-      if (function_exists('getmypid')) {
-        // Further initialize with the somewhat random PHP process ID.
-        $random_state .= getmypid();
-      }
+      $random_state = print_r($_SERVER, TRUE) . getmypid();
       $bytes = '';
     }
     if (strlen($bytes) < $count) {
@@ -84,7 +81,11 @@ class Crypt {
    *   any = padding characters removed.
    */
   public static function hmacBase64($data, $key) {
-    $hmac = base64_encode(hash_hmac('sha256', $data, $key, TRUE));
+    // Casting $data and $key to strings here is necessary to avoid empty string
+    // results of the hash function if they are not scalar values. As this
+    // function is used in security-critical contexts like token validation it is
+    // important that it never returns an empty string.
+    $hmac = base64_encode(hash_hmac('sha256', (string) $data, (string) $key, TRUE));
     // Modify the hmac so it's safe to use in URLs.
     return strtr($hmac, array('+' => '-', '/' => '_', '=' => ''));
   }

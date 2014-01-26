@@ -7,21 +7,13 @@
 
 namespace Drupal\user;
 
-use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Session\AccountInterface;
 
 /**
  * Provides an interface defining a user entity.
  */
-interface UserInterface extends EntityInterface, AccountInterface {
-
-  /**
-   * Returns a list of roles.
-   *
-   * @return array
-   *   List of role IDs.
-   */
-  public function getRoles();
+interface UserInterface extends ContentEntityInterface, AccountInterface {
 
   /**
    * Whether a user has a certain role.
@@ -49,17 +41,6 @@ interface UserInterface extends EntityInterface, AccountInterface {
    *   The role ID to remove.
    */
   public function removeRole($rid);
-
-  /**
-   * Checks whether a user has a certain permission.
-   *
-   * @param string $permission
-   *   The permission string to check.
-   *
-   * @return bool
-   *   TRUE if the user has the permission, FALSE otherwise.
-   */
-  public function hasPermission($permission);
 
   /**
    * Sets the username of this account.

@@ -17,7 +17,7 @@ class AjaxTestForm implements FormInterface {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'ajax_test_form';
   }
 
@@ -25,8 +25,6 @@ class AjaxTestForm implements FormInterface {
    * {@inheritdoc}
    */
   public function buildForm(array $form, array &$form_state) {
-
-    drupal_set_title(t('Ajax Form contents'));
 
     $form['#action'] = url('ajax-test/dialog');
     $form['#cache'] = TRUE;

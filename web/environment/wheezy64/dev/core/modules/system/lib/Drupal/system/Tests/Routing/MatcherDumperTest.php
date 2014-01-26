@@ -13,6 +13,7 @@ use Symfony\Component\Routing\RouteCollection;
 use Drupal\simpletest\UnitTestBase;
 use Drupal\Core\Database\Database;
 use Drupal\Core\Routing\MatcherDumper;
+use Drupal\Tests\Core\Routing\RoutingFixtures;
 
 /**
  * Basic tests for the UrlMatcherDumper.
@@ -45,7 +46,7 @@ class MatcherDumperTest extends UnitTestBase {
   }
 
   /**
-   * Confirms that the dumper can be instantiated successfuly.
+   * Confirms that the dumper can be instantiated successfully.
    */
   function testCreate() {
     $connection = Database::getConnection();
@@ -72,7 +73,7 @@ class MatcherDumperTest extends UnitTestBase {
     $collection_routes = $collection->all();
 
     foreach ($dumper_routes as $name => $route) {
-      $this->assertEqual($route->getPattern(), $collection_routes[$name]->getPattern(), 'Routes match');
+      $this->assertEqual($route->getPath(), $collection_routes[$name]->getPath(), 'Routes match');
     }
   }
 
@@ -128,14 +129,14 @@ class MatcherDumperTest extends UnitTestBase {
 
     $this->fixtures->createTables($connection);
 
-    $dumper->dump(array('route_set' => 'test'));
+    $dumper->dump(array('provider' => 'test'));
 
     $record = $connection->query("SELECT * FROM {test_routes} WHERE name= :name", array(':name' => 'test_route'))->fetchObject();
 
     $loaded_route = unserialize($record->route);
 
     $this->assertEqual($record->name, 'test_route', 'Dumped route has correct name.');
-    $this->assertEqual($record->pattern, '/test/{my}/path', 'Dumped route has correct pattern.');
+    $this->assertEqual($record->path, '/test/{my}/path', 'Dumped route has correct pattern.');
     $this->assertEqual($record->pattern_outline, '/test/%/path', 'Dumped route has correct pattern outline.');
     $this->assertEqual($record->fit, 5 /* 101 in binary */, 'Dumped route has correct fit.');
     $this->assertTrue($loaded_route instanceof Route, 'Route object retrieved successfully.');

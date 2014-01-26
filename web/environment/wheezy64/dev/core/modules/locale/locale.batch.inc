@@ -87,14 +87,14 @@ function locale_translation_batch_status_check($project, $langcode, $options = a
  * Batch finished callback: Set result message.
  *
  * @param boolean $success
- *   TRUE if batch succesfully completed.
+ *   TRUE if batch successfully completed.
  * @param array $results
  *   Batch results.
  */
 function locale_translation_batch_status_finished($success, $results) {
   if ($success) {
     if (isset($results['failed_files'])) {
-        if (Drupal::moduleHandler()->moduleExists('dblog')) {
+        if (\Drupal::moduleHandler()->moduleExists('dblog')) {
           $message = format_plural(count($results['failed_files']), 'One translation file could not be checked. <a href="@url">See the log</a> for details.', '@count translation files could not be checked. <a href="@url">See the log</a> for details.', array('@url' => url('admin/reports/dblog')));
         }
         else {
@@ -112,7 +112,7 @@ function locale_translation_batch_status_finished($success, $results) {
     if (!isset($results['failed_files']) && !isset($results['files'])) {
       drupal_set_message(t('Nothing to check.'));
     }
-    Drupal::state()->set('locale.translation_last_checked', REQUEST_TIME);
+    \Drupal::state()->set('locale.translation_last_checked', REQUEST_TIME);
   }
   else {
     drupal_set_message(t('An error occurred trying to check available interface translation updates.'), 'error');
@@ -185,7 +185,7 @@ function locale_translation_batch_fetch_import($project, $langcode, $options, &$
 
         // The import is finished.
         if (isset($context['finished']) && $context['finished'] == 1) {
-          // The import is successfull.
+          // The import is successful.
           if (isset($context['results']['files'][$file->uri])) {
             $context['message'] = t('Imported translation for %project.', array('%project' => $source->project));
 
@@ -203,14 +203,14 @@ function locale_translation_batch_fetch_import($project, $langcode, $options, &$
  * Batch finished callback: Set result message.
  *
  * @param boolean $success
- *   TRUE if batch succesfully completed.
+ *   TRUE if batch successfully completed.
  * @param array
  *   Batch results.
  */
 function locale_translation_batch_fetch_finished($success, $results) {
   module_load_include('bulk.inc', 'locale');
   if ($success) {
-    Drupal::state()->set('locale.translation_last_checked', REQUEST_TIME);
+    \Drupal::state()->set('locale.translation_last_checked', REQUEST_TIME);
   }
   return locale_translate_batch_finished($success, $results);
 }
@@ -231,7 +231,7 @@ function locale_translation_batch_fetch_finished($success, $results) {
 function locale_translation_http_check($uri) {
 
   try {
-    $response = Drupal::httpClient()
+    $response = \Drupal::httpClient()
       ->head($uri)
       ->send();
     $result = array();

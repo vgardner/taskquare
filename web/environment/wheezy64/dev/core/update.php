@@ -15,6 +15,7 @@
  */
 
 use Drupal\Core\DrupalKernel;
+use Drupal\Core\Update\Form\UpdateScriptSelectionForm;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\DependencyInjection\Reference;
@@ -53,115 +54,12 @@ function update_selection_page() {
   cache()->deleteAll();
 
   drupal_set_title('Drupal database update');
-  $elements = drupal_get_form('update_script_selection_form');
+  $elements = \Drupal::formBuilder()->getForm('Drupal\Core\Update\Form\UpdateScriptSelectionForm');
   $output = drupal_render($elements);
 
   update_task_list('select');
 
   return $output;
-}
-
-/**
- * Form constructor for the list of available database module updates.
- */
-function update_script_selection_form($form, &$form_state) {
-  $count = 0;
-  $incompatible_count = 0;
-  $form['start'] = array(
-    '#tree' => TRUE,
-    '#type' => 'details',
-    '#collapsed' => TRUE,
-  );
-
-  // Ensure system.module's updates appear first.
-  $form['start']['system'] = array();
-
-  $updates = update_get_update_list();
-  $starting_updates = array();
-  $incompatible_updates_exist = FALSE;
-  foreach ($updates as $module => $update) {
-    if (!isset($update['start'])) {
-      $form['start'][$module] = array(
-        '#type' => 'item',
-        '#title' => $module . ' module',
-        '#markup'  => $update['warning'],
-        '#prefix' => '<div class="messages messages--warning">',
-        '#suffix' => '</div>',
-      );
-      $incompatible_updates_exist = TRUE;
-      continue;
-    }
-    if (!empty($update['pending'])) {
-      $starting_updates[$module] = $update['start'];
-      $form['start'][$module] = array(
-        '#type' => 'hidden',
-        '#value' => $update['start'],
-      );
-      $form['start'][$module . '_updates'] = array(
-        '#theme' => 'item_list',
-        '#items' => $update['pending'],
-        '#title' => $module . ' module',
-      );
-    }
-    if (isset($update['pending'])) {
-      $count = $count + count($update['pending']);
-    }
-  }
-
-  // Find and label any incompatible updates.
-  foreach (update_resolve_dependencies($starting_updates) as $data) {
-    if (!$data['allowed']) {
-      $incompatible_updates_exist = TRUE;
-      $incompatible_count++;
-      $module_update_key = $data['module'] . '_updates';
-      if (isset($form['start'][$module_update_key]['#items'][$data['number']])) {
-        $text = $data['missing_dependencies'] ? 'This update will been skipped due to the following missing dependencies: <em>' . implode(', ', $data['missing_dependencies']) . '</em>' : "This update will be skipped due to an error in the module's code.";
-        $form['start'][$module_update_key]['#items'][$data['number']] .= '<div class="warning">' . $text . '</div>';
-      }
-      // Move the module containing this update to the top of the list.
-      $form['start'] = array($module_update_key => $form['start'][$module_update_key]) + $form['start'];
-    }
-  }
-
-  // Warn the user if any updates were incompatible.
-  if ($incompatible_updates_exist) {
-    drupal_set_message('Some of the pending updates cannot be applied because their dependencies were not met.', 'warning');
-  }
-
-  if (empty($count)) {
-    drupal_set_message(t('No pending updates.'));
-    unset($form);
-    $form['links'] = array(
-      '#theme' => 'links',
-      '#links' => update_helpful_links(),
-    );
-
-    // No updates to run, so caches won't get flushed later.  Clear them now.
-    update_flush_all_caches();
-  }
-  else {
-    $form['help'] = array(
-      '#markup' => '<p>The version of Drupal you are updating from has been automatically detected.</p>',
-      '#weight' => -5,
-    );
-    if ($incompatible_count) {
-      $form['start']['#title'] = format_plural(
-        $count,
-        '1 pending update (@number_applied to be applied, @number_incompatible skipped)',
-        '@count pending updates (@number_applied to be applied, @number_incompatible skipped)',
-        array('@number_applied' => $count - $incompatible_count, '@number_incompatible' => $incompatible_count)
-      );
-    }
-    else {
-      $form['start']['#title'] = format_plural($count, '1 pending update', '@count pending updates');
-    }
-    $form['actions'] = array('#type' => 'actions');
-    $form['actions']['submit'] = array(
-      '#type' => 'submit',
-      '#value' => 'Apply pending updates',
-    );
-  }
-  return $form;
 }
 
 /**
@@ -189,7 +87,7 @@ function update_helpful_links() {
  */
 function update_flush_all_caches() {
   unset($GLOBALS['conf']['container_service_providers']['UpdateServiceProvider']);
-  Drupal::service('kernel')->updateModules(Drupal::moduleHandler()->getModuleList());
+  \Drupal::service('kernel')->updateModules(\Drupal::moduleHandler()->getModuleList());
 
   // No updates to run, so caches won't get flushed later.  Clear them now.
   drupal_flush_all_caches();
@@ -203,7 +101,7 @@ function update_results_page() {
 
   update_task_list();
   // Report end result.
-  if (module_exists('dblog') && user_access('access site reports')) {
+  if (\Drupal::moduleHandler()->moduleExists('dblog') && user_access('access site reports')) {
     $log_message = ' All errors have been <a href="' . base_path() . '?q=admin/reports/dblog">logged</a>.';
   }
   else {
@@ -217,7 +115,7 @@ function update_results_page() {
     $last = reset($_SESSION['updates_remaining']);
     list($module, $version) = array_pop($last);
     $output = '<p class="error">The update process was aborted prematurely while running <strong>update #' . $version . ' in ' . $module . '.module</strong>.' . $log_message;
-    if (module_exists('dblog')) {
+    if (\Drupal::moduleHandler()->moduleExists('dblog')) {
       $output .= ' You may need to check the <code>watchdog</code> database table manually.';
     }
     $output .= '</p>';
@@ -310,7 +208,7 @@ function update_info_page() {
   $output .= "</ol>\n";
   $output .= "<p>When you have performed the steps above, you may proceed.</p>\n";
   $form_action = check_url(drupal_current_script_url(array('op' => 'selection', 'token' => $token)));
-  $output .= '<form method="post" action="' . $form_action . '"><p><input type="submit" value="Continue" class="form-submit" /></p></form>';
+  $output .= '<form method="post" action="' . $form_action . '"><p><input type="submit" value="Continue" class="form-submit button button-primary" /></p></form>';
   $output .= "\n";
   return $output;
 }
@@ -323,7 +221,7 @@ function update_info_page() {
  */
 function update_access_denied_page() {
   drupal_add_http_header('Status', '403 Forbidden');
-  header($_SERVER['SERVER_PROTOCOL'] . ' 403 Forbidden');
+  header(\Drupal::request()->server->get('SERVER_PROTOCOL') . ' 403 Forbidden');
   watchdog('access denied', 'update.php', NULL, WATCHDOG_WARNING);
   drupal_set_title('Access denied');
   return '<p>Access denied. You are not authorized to access this page. Log in using either an account with the <em>administer software updates</em> permission or the site maintenance account (the account you created during installation). If you cannot log in, you will have to edit <code>settings.php</code> to bypass this access check. To do this:</p>
@@ -342,7 +240,7 @@ function update_access_denied_page() {
  *   TRUE if the current user should be granted access, or FALSE otherwise.
  */
 function update_access_allowed() {
-  global $user;
+  $user = \Drupal::currentUser();
 
   // Allow the global variable in settings.php to override the access check.
   if (settings()->get('update_free_access')) {
@@ -351,7 +249,7 @@ function update_access_allowed() {
   // Calls to user_access() might fail during the Drupal 6 to 7 update process,
   // so we fall back on requiring that the user be logged in as user #1.
   try {
-    $module_handler = Drupal::moduleHandler();
+    $module_handler = \Drupal::moduleHandler();
     $module_filenames = $module_handler->getModuleList();
     $module_filenames['user'] = 'core/modules/user/user.module';
     $module_handler->setModuleList($module_filenames);
@@ -407,7 +305,7 @@ function update_extra_requirements($requirements = NULL) {
  */
 function update_check_requirements($skip_warnings = FALSE) {
   // Check requirements of all loaded modules.
-  $requirements = Drupal::moduleHandler()->invokeAll('requirements', array('update'));
+  $requirements = \Drupal::moduleHandler()->invokeAll('requirements', array('update'));
   $requirements += update_extra_requirements();
   $severity = drupal_requirements_severity($requirements);
 
@@ -432,6 +330,7 @@ function update_check_requirements($skip_warnings = FALSE) {
   }
 }
 
+
 // Some unavoidable errors happen because the database is not yet up-to-date.
 // Our custom error handler is not yet installed, so we just suppress them.
 ini_set('display_errors', FALSE);
@@ -448,19 +347,17 @@ update_prepare_d8_bootstrap();
 
 // Determine if the current user has access to run update.php.
 drupal_bootstrap(DRUPAL_BOOTSTRAP_VARIABLES);
+
+// A request object from the HTTPFoundation to tell us about the request.
+$request = Request::createFromGlobals();
+\Drupal::getContainer()->set('request', $request);
+
 require_once DRUPAL_ROOT . '/' . settings()->get('session_inc', 'core/includes/session.inc');
 drupal_session_initialize();
 
-// A request object from the HTTPFoundation to tell us about the request.
-// @todo These two lines were copied from index.php which has its own todo about
-// a change required here. Revisit this when that change has been made.
-$request = Request::createFromGlobals();
-drupal_container()
-  ->set('request', $request);
-
 // Ensure that URLs generated for the home and admin pages don't have 'update.php'
 // in them.
-$generator = Drupal::urlGenerator();
+$generator = \Drupal::urlGenerator();
 $generator->setBasePath(str_replace('/core', '', $request->getBasePath()) . '/');
 $generator->setScriptPath('');
 
@@ -555,7 +452,7 @@ if (update_access_allowed()) {
     // Regular batch ops : defer to batch processing API.
     default:
       update_task_list('run');
-      $output = _batch_page();
+      $output = _batch_page($request);
       break;
   }
 }

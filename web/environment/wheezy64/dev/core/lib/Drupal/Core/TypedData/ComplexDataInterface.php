@@ -7,8 +7,6 @@
 
 namespace Drupal\Core\TypedData;
 
-use Traversable;
-
 /**
  * Interface for complex data; i.e. data containing named and typed properties.
  *
@@ -21,7 +19,7 @@ use Traversable;
  * When implementing this interface which extends Traversable, make sure to list
  * IteratorAggregate or Iterator before this interface in the implements clause.
  */
-interface ComplexDataInterface extends Traversable, TypedDataInterface  {
+interface ComplexDataInterface extends \Traversable, TypedDataInterface  {
 
   /**
    * Gets a property object.
@@ -107,11 +105,7 @@ interface ComplexDataInterface extends Traversable, TypedDataInterface  {
   /**
    * Gets an array of property definitions of contained properties.
    *
-   * @param array $definition
-   *   The definition of the container's property, e.g. the definition of an
-   *   entity reference property.
-   *
-   * @return array
+   * @return \Drupal\Core\TypedData\DataDefinitionInterface[]
    *   An array of property definitions of contained properties, keyed by
    *   property name.
    */

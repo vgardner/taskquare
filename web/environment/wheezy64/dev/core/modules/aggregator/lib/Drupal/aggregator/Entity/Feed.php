@@ -7,7 +7,8 @@
 
 namespace Drupal\aggregator\Entity;
 
-use Drupal\Core\Entity\EntityNG;
+use Drupal\Core\Entity\ContentEntityBase;
+use Drupal\Core\Field\FieldDefinition;
 use Symfony\Component\DependencyInjection\Container;
 use Drupal\Core\Entity\EntityStorageControllerInterface;
 use Drupal\Core\Entity\Annotation\EntityType;
@@ -20,10 +21,9 @@ use Drupal\aggregator\FeedInterface;
  * @EntityType(
  *   id = "aggregator_feed",
  *   label = @Translation("Aggregator feed"),
- *   module = "aggregator",
  *   controllers = {
  *     "storage" = "Drupal\aggregator\FeedStorageController",
- *     "render" = "Drupal\aggregator\FeedRenderController",
+ *     "view_builder" = "Drupal\aggregator\FeedViewBuilder",
  *     "form" = {
  *       "default" = "Drupal\aggregator\FeedFormController",
  *       "delete" = "Drupal\aggregator\Form\FeedDeleteForm",
@@ -38,63 +38,63 @@ use Drupal\aggregator\FeedInterface;
  *   }
  * )
  */
-class Feed extends EntityNG implements FeedInterface {
+class Feed extends ContentEntityBase implements FeedInterface {
 
   /**
    * The feed ID.
    *
    * @todo rename to id.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $fid;
 
   /**
    * Title of the feed.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $title;
 
   /**
    * The feed language code.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $langcode;
 
   /**
    * URL to the feed.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $url;
 
   /**
    * How often to check for new feed items, in seconds.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $refresh;
 
   /**
    * Last time feed was checked for new items, as Unix timestamp.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $checked;
 
   /**
    * Time when this feed was queued for refresh, 0 if not queued.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $queued;
 
   /**
    * The parent website of the feed; comes from the <link> element in the feed.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $link ;
 
@@ -102,47 +102,40 @@ class Feed extends EntityNG implements FeedInterface {
    * The parent website's description;
    * comes from the <description> element in the feed.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $description;
 
   /**
    * An image representing the feed.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $image;
 
   /**
    * Calculated hash of the feed data, used for validating cache.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $hash;
 
   /**
    * Entity tag HTTP response header, used for validating cache.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $etag;
 
   /**
    * When the feed was last modified, as a Unix timestamp.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $modified;
 
   /**
-   * Number of items to display in the feed’s block.
-   *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
-   */
-  public $block;
-
-  /**
-   * Overrides Drupal\Core\Entity\EntityNG::init().
+   * {@inheritdoc}
    */
   public function init() {
     parent::init();
@@ -160,7 +153,6 @@ class Feed extends EntityNG implements FeedInterface {
     unset($this->hash);
     unset($this->etag);
     unset($this->modified);
-    unset($this->block);
   }
 
   /**
@@ -208,11 +200,6 @@ class Feed extends EntityNG implements FeedInterface {
    * {@inheritdoc}
    */
   public static function preDelete(EntityStorageControllerInterface $storage_controller, array $entities) {
-    // Invalidate the block cache to update aggregator feed-based derivatives.
-    if (\Drupal::moduleHandler()->moduleExists('block')) {
-      \Drupal::service('plugin.manager.block')->clearCachedDefinitions();
-    }
-    $storage_controller->deleteCategories($entities);
     foreach ($entities as $entity) {
       // Notify processors to remove stored items.
       $manager = \Drupal::service('plugin.manager.aggregator.processor');
@@ -226,14 +213,15 @@ class Feed extends EntityNG implements FeedInterface {
    * {@inheritdoc}
    */
   public static function postDelete(EntityStorageControllerInterface $storage_controller, array $entities) {
-    foreach ($entities as $entity) {
-      // Make sure there is no active block for this feed.
-      $block_configs = config_get_storage_names_with_prefix('plugin.core.block');
-      foreach ($block_configs as $config_id) {
-        $config = \Drupal::config($config_id);
-        if ($config->get('id') == 'aggregator_feed_block:' . $entity->id()) {
-          $config->delete();
-        }
+    if (\Drupal::moduleHandler()->moduleExists('block')) {
+      // Make sure there are no active blocks for these feeds.
+      $ids = \Drupal::entityQuery('block')
+        ->condition('plugin', 'aggregator_feed_block')
+        ->condition('settings.feed', array_keys($entities))
+        ->execute();
+      if ($ids) {
+        $block_storage = \Drupal::entityManager()->getStorageController('block');
+        $block_storage->delete($block_storage->loadMultiple($ids));
       }
     }
   }
@@ -241,104 +229,66 @@ class Feed extends EntityNG implements FeedInterface {
   /**
    * {@inheritdoc}
    */
-  public function preSave(EntityStorageControllerInterface $storage_controller) {
-    $this->clearBlockCacheDefinitions();
-    $storage_controller->deleteCategories(array($this->id() => $this));
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function postSave(EntityStorageControllerInterface $storage_controller, $update = FALSE) {
-    if (!empty($this->categories)) {
-      $storage_controller->saveCategories($this, $this->categories);
-    }
-  }
-
-  /**
-   * Invalidate the block cache to update aggregator feed-based derivatives.
-   */
-  protected function clearBlockCacheDefinitions() {
-    if ($block_manager = \Drupal::getContainer()->get('plugin.manager.block', Container::NULL_ON_INVALID_REFERENCE)) {
-      $block_manager->clearCachedDefinitions();
-    }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public static function baseFieldDefinitions($entity_type) {
-    $fields['fid'] = array(
-      'label' => t('ID'),
-      'description' => t('The ID of the aggregor feed.'),
-      'type' => 'integer_field',
-      'read-only' => TRUE,
-    );
-    $fields['title'] = array(
-      'label' => t('Title'),
-      'description' => t('The title of the feed.'),
-      'type' => 'string_field',
-    );
-    $fields['langcode'] = array(
-      'label' => t('Language code'),
-      'description' => t('The feed language code.'),
-      'type' => 'language_field',
-    );
-    $fields['url'] = array(
-      'label' => t('URL'),
-      'description' => t('The URL to the feed.'),
-      'type' => 'uri_field',
-    );
-    $fields['refresh'] = array(
-      'label' => t('Refresh'),
-      'description' => t('How often to check for new feed items, in seconds.'),
-      'type' => 'integer_field',
-    );
-    $fields['checked'] = array(
-      'label' => t('Checked'),
-      'description' => t('Last time feed was checked for new items, as Unix timestamp.'),
-      'type' => 'integer_field',
-    );
-    $fields['queued'] = array(
-      'label' => t('Queued'),
-      'description' => t('Time when this feed was queued for refresh, 0 if not queued.'),
-      'type' => 'integer_field',
-    );
-    $fields['link'] = array(
-      'label' => t('Link'),
-      'description' => t('The link of the feed.'),
-      'type' => 'uri_field',
-    );
-    $fields['description'] = array(
-      'label' => t('Description'),
-      'description' => t("The parent website's description that comes from the !description element in the feed.", array('!description' => '<description>')),
-      'type' => 'string_field',
-    );
-    $fields['image'] = array(
-      'label' => t('image'),
-      'description' => t('An image representing the feed.'),
-      'type' => 'uri_field',
-    );
-    $fields['hash'] = array(
-      'label' => t('Hash'),
-      'description' => t('Calculated hash of the feed data, used for validating cache.'),
-      'type' => 'string_field',
-    );
-    $fields['etag'] = array(
-      'label' => t('Etag'),
-      'description' => t('Entity tag HTTP response header, used for validating cache.'),
-      'type' => 'string_field',
-    );
-    $fields['modified'] = array(
-      'label' => t('Modified'),
-      'description' => t('When the feed was last modified, as a Unix timestamp.'),
-      'type' => 'integer_field',
-    );
-    $fields['block'] = array(
-      'label' => t('Block'),
-      'description' => t('Number of items to display in the feed’s block.'),
-      'type' => 'integer_field',
-    );
+    $fields['fid'] = FieldDefinition::create('integer')
+      ->setLabel(t('Feed ID'))
+      ->setDescription(t('The ID of the aggregator feed.'))
+      ->setReadOnly(TRUE);
+
+    // @todo Add a UUID field for this entity type in
+    // https://drupal.org/node/2149841.
+
+    $fields['title'] = FieldDefinition::create('string')
+      ->setLabel(t('Title'))
+      ->setDescription(t('The title of the feed.'));
+
+    $fields['langcode'] = FieldDefinition::create('language')
+      ->setLabel(t('Language code'))
+      ->setDescription(t('The feed language code.'));
+
+    $fields['url'] = FieldDefinition::create('uri')
+      ->setLabel(t('URL'))
+      ->setDescription(t('The URL to the feed.'));
+
+    $fields['refresh'] = FieldDefinition::create('integer')
+      ->setLabel(t('Refresh'))
+      ->setDescription(t('How often to check for new feed items, in seconds.'));
+
+    // @todo Convert to a "timestamp" field in https://drupal.org/node/2145103.
+    $fields['checked'] = FieldDefinition::create('integer')
+      ->setLabel(t('Checked'))
+      ->setDescription(t('Last time feed was checked for new items, as Unix timestamp.'));
+
+    // @todo Convert to a "timestamp" field in https://drupal.org/node/2145103.
+    $fields['queued'] = FieldDefinition::create('integer')
+      ->setLabel(t('Queued'))
+      ->setDescription(t('Time when this feed was queued for refresh, 0 if not queued.'));
+
+    $fields['link'] = FieldDefinition::create('uri')
+      ->setLabel(t('Link'))
+      ->setDescription(t('The link of the feed.'));
+
+    $fields['description'] = FieldDefinition::create('string')
+      ->setLabel(t('Description'))
+      ->setDescription(t("The parent website's description that comes from the !description element in the feed.", array('!description' => '<description>')));
+
+    $fields['image'] = FieldDefinition::create('uri')
+      ->setLabel(t('Image'))
+      ->setDescription(t('An image representing the feed.'));
+
+    $fields['hash'] = FieldDefinition::create('string')
+      ->setLabel(t('Hash'))
+      ->setDescription(t('Calculated hash of the feed data, used for validating cache.'));
+
+    $fields['etag'] = FieldDefinition::create('string')
+      ->setLabel(t('Etag'))
+      ->setDescription(t('Entity tag HTTP response header, used for validating cache.'));
+
+    // @todo Convert to a "changed" field in https://drupal.org/node/2145103.
+    $fields['modified'] = FieldDefinition::create('integer')
+      ->setLabel(t('Modified'))
+      ->setDescription(t('When the feed was last modified, as a Unix timestamp.'));
+
     return $fields;
   }
 

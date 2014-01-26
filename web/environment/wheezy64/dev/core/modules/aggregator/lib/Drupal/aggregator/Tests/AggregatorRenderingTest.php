@@ -31,17 +31,12 @@ class AggregatorRenderingTest extends AggregatorTestBase {
 
   /**
    * Adds a feed block to the page and checks its links.
-   *
-   * @todo Test the category block as well.
    */
   public function testBlockLinks() {
     // Create feed.
     $this->createSampleNodes();
     $feed = $this->createFeed();
     $this->updateFeedItems($feed, $this->getDefaultFeedItemCount());
-
-    // Clear the block cache to load the new block definitions.
-    $this->container->get('plugin.manager.block')->clearCachedDefinitions();
 
     // Need admin user to be able to access block admin.
     $admin_user = $this->drupalCreateUser(array(
@@ -52,7 +47,12 @@ class AggregatorRenderingTest extends AggregatorTestBase {
     ));
     $this->drupalLogin($admin_user);
 
-    $block = $this->drupalPlaceBlock("aggregator_feed_block:{$feed->id()}", array('label' => 'feed-' . $feed->label(), 'block_count' => 2));
+    $block = $this->drupalPlaceBlock("aggregator_feed_block", array('label' => 'feed-' . $feed->label()));
+
+    // Configure the feed that should be displayed.
+    $block->getPlugin()->setConfigurationValue('feed', $feed->id());
+    $block->getPlugin()->setConfigurationValue('block_count', 2);
+    $block->save();
 
     // Confirm that the block is now being displayed on pages.
     $this->drupalGet('test-page');
@@ -70,8 +70,8 @@ class AggregatorRenderingTest extends AggregatorTestBase {
 
     // Set the number of news items to 0 to test that the block does not show
     // up.
-    $feed->block = 0;
-    $feed->save();
+    $block->getPlugin()->setConfigurationValue('block_count', 0);
+    $block->save();
     // Check that the block is no longer displayed.
     $this->drupalGet('test-page');
     $this->assertNoText($block->label(), 'Feed block is not displayed on the page when number of items is set to 0.');

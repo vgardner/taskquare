@@ -6,6 +6,7 @@
  */
 
 use Drupal\Component\Utility\NestedArray;
+use Drupal\Core\Field\FieldDefinitionInterface;
 
 /**
  * Returns HTML for an individual form element.
@@ -24,7 +25,7 @@ function theme_field_multiple_value_form($variables) {
   $element = $variables['element'];
   $output = '';
 
-  if ($element['#cardinality'] > 1 || $element['#cardinality'] == FIELD_CARDINALITY_UNLIMITED) {
+  if ($element['#cardinality_multiple']) {
     $form_required_marker = array('#theme' => 'form_required_marker');
     $required = !empty($element['#required']) ? drupal_render($form_required_marker) : '';
     $table_id = drupal_html_id($element['#field_name'] . '_values');
@@ -54,7 +55,7 @@ function theme_field_multiple_value_form($variables) {
     usort($items, '_field_sort_items_value_helper');
 
     // Add the items as table rows.
-    foreach ($items as $key => $item) {
+    foreach ($items as $item) {
       $item['_weight']['#attributes']['class'] = array($order_class);
       $delta_element = drupal_render($item['_weight']);
       $cells = array(
@@ -125,11 +126,10 @@ function _field_sort_items_value_helper($a, $b) {
 function field_form_element_after_build($element, &$form_state) {
   $parents = $element['#field_parents'];
   $field_name = $element['#field_name'];
-  $langcode = $element['#language'];
 
-  $field_state = field_form_get_state($parents, $field_name, $langcode, $form_state);
+  $field_state = field_form_get_state($parents, $field_name, $form_state);
   $field_state['array_parents'] = $element['#array_parents'];
-  field_form_set_state($parents, $field_name, $langcode, $form_state, $field_state);
+  field_form_set_state($parents, $field_name, $form_state, $field_state);
 
   return $element;
 }
@@ -149,13 +149,12 @@ function field_add_more_submit($form, &$form_state) {
   // Go one level up in the form, to the widgets container.
   $element = NestedArray::getValue($form, array_slice($button['#array_parents'], 0, -1));
   $field_name = $element['#field_name'];
-  $langcode = $element['#language'];
   $parents = $element['#field_parents'];
 
   // Increment the items count.
-  $field_state = field_form_get_state($parents, $field_name, $langcode, $form_state);
+  $field_state = field_form_get_state($parents, $field_name, $form_state);
   $field_state['items_count']++;
-  field_form_set_state($parents, $field_name, $langcode, $form_state, $field_state);
+  field_form_set_state($parents, $field_name, $form_state, $field_state);
 
   $form_state['rebuild'] = TRUE;
 }
@@ -175,7 +174,7 @@ function field_add_more_js($form, $form_state) {
   $element = NestedArray::getValue($form, array_slice($button['#array_parents'], 0, -1));
 
   // Ensure the widget allows adding additional items.
-  if ($element['#cardinality'] != FIELD_CARDINALITY_UNLIMITED) {
+  if ($element['#cardinality'] != FieldDefinitionInterface::CARDINALITY_UNLIMITED) {
     return;
   }
 
@@ -190,13 +189,11 @@ function field_add_more_js($form, $form_state) {
 /**
  * Retrieves processing information about a field from $form_state.
  *
- * @param $parents
+ * @param array $parents
  *   The array of #parents where the field lives in the form.
  * @param $field_name
  *   The field name.
- * @param $langcode
- *   The language in which the field values are entered.
- * @param $form_state
+ * @param array $form_state
  *   The form state.
  *
  * @return
@@ -209,64 +206,46 @@ function field_add_more_js($form, $form_state) {
  *
  * @see field_form_set_state()
  */
-function field_form_get_state($parents, $field_name, $langcode, &$form_state) {
-  $form_state_parents = _field_form_state_parents($parents, $field_name, $langcode);
+function field_form_get_state(array $parents, $field_name, array &$form_state) {
+  $form_state_parents = _field_form_state_parents($parents, $field_name);
   return NestedArray::getValue($form_state, $form_state_parents);
 }
 
 /**
  * Stores processing information about a field in $form_state.
  *
- * @param $parents
+ * @param array $parents
  *   The array of #parents where the field lives in the form.
  * @param $field_name
  *   The field name.
- * @param $langcode
- *   The language in which the field values are entered.
- * @param $form_state
+ * @param array $form_state
  *   The form state.
- * @param $field_state
+ * @param array $field_state
  *   The array of data to store. See field_form_get_state() for the structure
  *   and content of the array.
  *
  * @see field_form_get_state()
  */
-function field_form_set_state($parents, $field_name, $langcode, &$form_state, $field_state) {
-  $form_state_parents = _field_form_state_parents($parents, $field_name, $langcode);
+function field_form_set_state(array $parents, $field_name, array &$form_state, array $field_state) {
+  $form_state_parents = _field_form_state_parents($parents, $field_name);
   NestedArray::setValue($form_state, $form_state_parents, $field_state);
 }
 
 /**
  * Returns the location of processing information within $form_state.
  *
- * @param $parents
+ * @param array $parents
  *   The array of #parents where the field lives in the form.
  * @param $field_name
  *   The field name.
- * @param $langcode
- *   The language in which the field values are entered.
  *
  * @return
  *   The location of processing information within $form_state.
  */
-function _field_form_state_parents($parents, $field_name, $langcode) {
-  // To ensure backwards compatibility on regular entity forms for widgets that
-  // still access $form_state['field'][$field_name] directly,
-  // - top-level fields (empty $parents) are placed directly under
-  //   $form_state['fields'][$field_name].
-  // - Other fields are placed under
-  //   $form_state['field']['#parents'][...$parents...]['#fields'][$field_name]
-  //   to avoid clashes between field names and $parents parts.
-  // @todo Remove backwards compatibility in Drupal 8, and use a unique
-  // $form_state['field'][...$parents...]['#fields'][$field_name] structure.
-  if (!empty($parents)) {
-    $form_state_parents = array_merge(array('#parents'), $parents, array('#fields'));
-  }
-  else {
-    $form_state_parents = array();
-  }
-  $form_state_parents = array_merge(array('field'), $form_state_parents, array($field_name, $langcode));
-
-  return $form_state_parents;
+function _field_form_state_parents(array $parents, $field_name) {
+  // Field processing data is placed at
+  // $form_state['field']['#parents'][...$parents...]['#fields'][$field_name],
+  // to avoid clashes between field names and $parents parts.
+  return array_merge(array('field', '#parents'), $parents, array('#fields', $field_name));
 }
 

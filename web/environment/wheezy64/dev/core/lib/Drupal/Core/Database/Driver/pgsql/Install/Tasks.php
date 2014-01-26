@@ -13,11 +13,18 @@ use Drupal\Core\Database\Driver\pgsql\Connection;
 use Drupal\Core\Database\DatabaseNotFoundException;
 
 /**
- * PostgreSQL specific install functions
+ * Specifies installation tasks for PostgreSQL databases.
  */
 class Tasks extends InstallTasks {
+
+  /**
+   * {@inheritdoc}
+   */
   protected $pdoDriver = 'pgsql';
 
+  /**
+   * Constructs a \Drupal\Core\Database\Driver\pgsql\Install\Tasks object.
+   */
   public function __construct() {
     $this->tasks[] = array(
       'function' => 'checkEncoding',
@@ -33,17 +40,22 @@ class Tasks extends InstallTasks {
     );
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function name() {
     return t('PostgreSQL');
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function minimumVersion() {
     return '8.3';
   }
 
   /**
-   * Check database connection and attempt to create database if the database is
-   * missing.
+   * {@inheritdoc}
    */
   protected function connect() {
     try {
@@ -234,5 +246,15 @@ class Tasks extends InstallTasks {
     catch (\Exception $e) {
       $this->fail(t('Drupal could not be correctly setup with the existing database. Revise any errors.'));
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getFormOptions(array $database) {
+    $form = parent::getFormOptions($database);
+    $form['advanced_options']['port']['#default_value'] = '5432';
+
+    return $form;
   }
 }

@@ -69,17 +69,13 @@ abstract class ImageStyleFormBase extends EntityFormController {
    * {@inheritdoc}
    */
   public function save(array $form, array &$form_state) {
-    $form_state['redirect'] = 'admin/config/media/image-styles/manage/' . $this->entity->id();
+    $form_state['redirect_route'] = array(
+      'route_name' => 'image.style_edit',
+      'route_parameters' => array(
+        'image_style' => $this->entity->id(),
+      ),
+    );
     return $this->entity->save();
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function actions(array $form, array &$form_state) {
-    $actions = parent::actions($form, $form_state);
-    unset($actions['delete']);
-    return $actions;
   }
 
 }

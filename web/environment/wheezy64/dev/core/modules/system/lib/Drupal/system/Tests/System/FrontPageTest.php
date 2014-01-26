@@ -19,7 +19,7 @@ class FrontPageTest extends WebTestBase {
    *
    * @var array
    */
-  public static $modules = array('node', 'system_test');
+  public static $modules = array('node', 'system_test', 'views');
 
   public static function getInfo() {
     return array(
@@ -46,8 +46,16 @@ class FrontPageTest extends WebTestBase {
   /**
    * Test front page functionality.
    */
-  function testDrupalIsFrontPage() {
+  public function testDrupalFrontPage() {
+    // Create a promoted node to test the <title> tag on the front page view.
+    $settings = array(
+      'title' => $this->randomName(8),
+      'promote' => 1,
+    );
+    $node = $this->drupalCreateNode($settings);
     $this->drupalGet('');
+    $this->assertTitle('Home | Drupal');
+
     $this->assertText(t('On front page.'), 'Path is the front page.');
     $this->drupalGet('node');
     $this->assertText(t('On front page.'), 'Path is the front page.');
@@ -56,12 +64,12 @@ class FrontPageTest extends WebTestBase {
 
     // Change the front page to an invalid path.
     $edit = array('site_frontpage' => 'kittens');
-    $this->drupalPost('admin/config/system/site-information', $edit, t('Save configuration'));
+    $this->drupalPostForm('admin/config/system/site-information', $edit, t('Save configuration'));
     $this->assertText(t("The path '@path' is either invalid or you do not have access to it.", array('@path' => $edit['site_frontpage'])));
 
     // Change the front page to a valid path.
     $edit['site_frontpage'] = $this->node_path;
-    $this->drupalPost('admin/config/system/site-information', $edit, t('Save configuration'));
+    $this->drupalPostForm('admin/config/system/site-information', $edit, t('Save configuration'));
     $this->assertText(t('The configuration options have been saved.'), 'The front page path has been saved.');
 
     $this->drupalGet('');

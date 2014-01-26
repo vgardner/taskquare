@@ -8,6 +8,8 @@
 namespace Drupal\field_ui\Access;
 
 use Drupal\Core\Access\StaticAccessCheckInterface;
+use Drupal\Core\Entity\EntityManagerInterface;
+use Drupal\Core\Session\AccountInterface;
 use Symfony\Component\Routing\Route;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -15,6 +17,23 @@ use Symfony\Component\HttpFoundation\Request;
  * Allows access to routes to be controlled by an '_access' boolean parameter.
  */
 class ViewModeAccessCheck implements StaticAccessCheckInterface {
+
+  /**
+   * The entity manager.
+   *
+   * @var \Drupal\Core\Entity\EntityManagerInterface
+   */
+  protected $entityManager;
+
+  /**
+   * Creates a new ViewModeAccessCheck.
+   *
+   * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
+   *   The entity manager.
+   */
+  public function __construct(EntityManagerInterface $entity_manager) {
+    $this->entityManager = $entity_manager;
+  }
 
   /**
    * {@inheritdoc}
@@ -26,18 +45,30 @@ class ViewModeAccessCheck implements StaticAccessCheckInterface {
   /**
    * {@inheritdoc}
    */
-  public function access(Route $route, Request $request) {
-    if ($entity_type = $request->attributes->get('entity_type')) {
-      $bundle = $request->attributes->get('bundle');
-      $view_mode = $request->attributes->get('mode');
+  public function access(Route $route, Request $request, AccountInterface $account) {
+    if ($entity_type = $route->getDefault('entity_type')) {
+      $view_mode = $request->attributes->get('view_mode_name');
 
-      $view_mode_settings = field_view_mode_settings($entity_type, $bundle);
-      $visibility = ($view_mode == 'default') || !empty($view_mode_settings[$view_mode]['status']);
+      if (!($bundle = $request->attributes->get('bundle'))) {
+        $entity_info = $this->entityManager->getDefinition($entity_type);
+        $bundle = $request->attributes->get('_raw_variables')->get($entity_info['bundle_entity_type']);
+      }
+
+      $visibility = FALSE;
+      if (!$view_mode || $view_mode == 'default') {
+        $visibility = TRUE;
+      }
+      elseif ($entity_display = $this->entityManager->getStorageController('entity_display')->load($entity_type . '.' . $bundle . '.' . $view_mode)) {
+        $visibility = $entity_display->status();
+      }
+
       if ($visibility) {
         $permission = $route->getRequirement('_field_ui_view_mode_access');
-        return user_access($permission) ? static::ALLOW : static::DENY;
+        return $account->hasPermission($permission) ? static::ALLOW : static::DENY;
       }
     }
+
+    return static::DENY;
   }
 
 }

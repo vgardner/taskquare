@@ -26,7 +26,7 @@ abstract class FieldUiTestBase extends WebTestBase {
     parent::setUp();
 
     // Create test user.
-    $admin_user = $this->drupalCreateUser(array('access content', 'administer content types', 'administer node fields', 'administer node form display', 'administer node display', 'administer taxonomy', 'administer taxonomy_term fields', 'administer taxonomy_term display', 'administer users', 'administer user display', 'bypass node access'));
+    $admin_user = $this->drupalCreateUser(array('access content', 'administer content types', 'administer node fields', 'administer node form display', 'administer node display', 'administer taxonomy', 'administer taxonomy_term fields', 'administer taxonomy_term display', 'administer users', 'administer account settings', 'administer user display', 'bypass node access'));
     $this->drupalLogin($admin_user);
 
     // Create content type, with underscores.
@@ -54,13 +54,13 @@ abstract class FieldUiTestBase extends WebTestBase {
    * @param $bundle_path
    *   Admin path of the bundle that the new field is to be attached to.
    * @param $initial_edit
-   *   $edit parameter for drupalPost() on the first step ('Manage fields'
+   *   $edit parameter for drupalPostForm() on the first step ('Manage fields'
    *   screen).
    * @param $field_edit
-   *   $edit parameter for drupalPost() on the second step ('Field settings'
+   *   $edit parameter for drupalPostForm() on the second step ('Field settings'
    *   form).
    * @param $instance_edit
-   *   $edit parameter for drupalPost() on the third step ('Instance settings'
+   *   $edit parameter for drupalPostForm() on the third step ('Instance settings'
    *   form).
    */
   function fieldUIAddNewField($bundle_path, $initial_edit, $field_edit = array(), $instance_edit = array()) {
@@ -71,19 +71,21 @@ abstract class FieldUiTestBase extends WebTestBase {
     $label = $initial_edit['fields[_add_new_field][label]'];
 
     // First step : 'Add new field' on the 'Manage fields' page.
-    $this->drupalPost("$bundle_path/fields",  $initial_edit, t('Save'));
+    $this->drupalPostForm("$bundle_path/fields",  $initial_edit, t('Save'));
     $this->assertRaw(t('These settings apply to the %label field everywhere it is used.', array('%label' => $label)), 'Field settings page was displayed.');
+    // Test Breadcrumbs.
+    $this->assertLink($label, 0, 'Field label is correct in the breadcrumb of the field settings page.');
 
     // Second step : 'Field settings' form.
-    $this->drupalPost(NULL, $field_edit, t('Save field settings'));
+    $this->drupalPostForm(NULL, $field_edit, t('Save field settings'));
     $this->assertRaw(t('Updated field %label field settings.', array('%label' => $label)), 'Redirected to instance and widget settings page.');
 
     // Third step : 'Instance settings' form.
-    $this->drupalPost(NULL, $instance_edit, t('Save settings'));
+    $this->drupalPostForm(NULL, $instance_edit, t('Save settings'));
     $this->assertRaw(t('Saved %label configuration.', array('%label' => $label)), 'Redirected to "Manage fields" page.');
 
     // Check that the field appears in the overview form.
-    $this->assertFieldByXPath('//table[@id="field-overview"]//td[1]', $label, 'Field was created and appears in the overview page.');
+    $this->assertFieldByXPath('//table[@id="field-overview"]//tr/td[1]', $label, 'Field was created and appears in the overview page.');
   }
 
   /**
@@ -92,24 +94,24 @@ abstract class FieldUiTestBase extends WebTestBase {
    * @param $bundle_path
    *   Admin path of the bundle that the field is to be attached to.
    * @param $initial_edit
-   *   $edit parameter for drupalPost() on the first step ('Manage fields'
+   *   $edit parameter for drupalPostForm() on the first step ('Manage fields'
    *   screen).
    * @param $instance_edit
-   *   $edit parameter for drupalPost() on the second step ('Instance settings'
+   *   $edit parameter for drupalPostForm() on the second step ('Instance settings'
    *   form).
    */
   function fieldUIAddExistingField($bundle_path, $initial_edit, $instance_edit = array()) {
     $label = $initial_edit['fields[_add_existing_field][label]'];
 
     // First step : 'Re-use existing field' on the 'Manage fields' page.
-    $this->drupalPost("$bundle_path/fields", $initial_edit, t('Save'));
+    $this->drupalPostForm("$bundle_path/fields", $initial_edit, t('Save'));
 
     // Second step : 'Instance settings' form.
-    $this->drupalPost(NULL, $instance_edit, t('Save settings'));
+    $this->drupalPostForm(NULL, $instance_edit, t('Save settings'));
     $this->assertRaw(t('Saved %label configuration.', array('%label' => $label)), 'Redirected to "Manage fields" page.');
 
     // Check that the field appears in the overview form.
-    $this->assertFieldByXPath('//table[@id="field-overview"]//td[1]', $label, 'Field was created and appears in the overview page.');
+    $this->assertFieldByXPath('//table[@id="field-overview"]//tr/td[1]', $label, 'Field was created and appears in the overview page.');
   }
 
   /**
@@ -129,8 +131,11 @@ abstract class FieldUiTestBase extends WebTestBase {
     $this->drupalGet("$bundle_path/fields/$field_name/delete");
     $this->assertRaw(t('Are you sure you want to delete the field %label', array('%label' => $label)), 'Delete confirmation was found.');
 
+    // Test Breadcrumbs.
+    $this->assertLink($label, 0, 'Field label is correct in the breadcrumb of the field delete page.');
+
     // Submit confirmation form.
-    $this->drupalPost(NULL, array(), t('Delete'));
+    $this->drupalPostForm(NULL, array(), t('Delete'));
     $this->assertRaw(t('The field %label has been deleted from the %type content type.', array('%label' => $label, '%type' => $bundle_label)), 'Delete message was found.');
 
     // Check that the field does not appear in the overview form.

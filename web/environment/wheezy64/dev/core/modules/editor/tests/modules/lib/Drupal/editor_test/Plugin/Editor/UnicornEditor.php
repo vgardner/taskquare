@@ -24,22 +24,26 @@ use Drupal\editor\Entity\Editor as EditorEntity;
 class UnicornEditor extends EditorBase {
 
   /**
-   * Implements \Drupal\editor\Plugin\EditPluginInterface::getDefaultSettings().
+   * {@inheritdoc}
    */
   function getDefaultSettings() {
     return array('ponies too' => TRUE);
   }
 
   /**
-   * Implements \Drupal\editor\Plugin\EditPluginInterface::settingsForm().
+   * {@inheritdoc}
    */
   function settingsForm(array $form, array &$form_state, EditorEntity $editor) {
-    $form['foo'] = array('#type' => 'textfield', '#default_value' => 'bar');
+    $form['foo'] = array(
+      '#title' => t('Foo'),
+      '#type' => 'textfield',
+      '#default_value' => 'bar',
+    );
     return $form;
   }
 
   /**
-   * Implements \Drupal\editor\Plugin\EditPluginInterface::getJSSettings().
+   * {@inheritdoc}
    */
   function getJSSettings(EditorEntity $editor) {
     $settings = array();
@@ -50,7 +54,7 @@ class UnicornEditor extends EditorBase {
   }
 
   /**
-   * Implements \Drupal\editor\Plugin\EditPluginInterface::getLibraries().
+   * {@inheritdoc}
    */
   public function getLibraries(EditorEntity $editor) {
     return array(

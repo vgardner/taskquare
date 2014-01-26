@@ -8,12 +8,12 @@
 namespace Drupal\field;
 
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
-use Drupal\Core\Entity\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\FieldDefinitionInterface;
 
 /**
  * Provides an interface defining a field entity.
  */
-interface FieldInterface extends ConfigEntityInterface, FieldDefinitionInterface, \ArrayAccess {
+interface FieldInterface extends ConfigEntityInterface, FieldDefinitionInterface {
 
   /**
    * Returns the field schema.
@@ -48,8 +48,7 @@ interface FieldInterface extends ConfigEntityInterface, FieldDefinitionInterface
    * Returns the list of bundles where the field has instances.
    *
    * @return array
-   *   An array keyed by entity type names, whose values are arrays of bundle
-   *   names.
+   *   An array of bundle names.
    */
   public function getBundles();
 

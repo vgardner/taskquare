@@ -65,7 +65,7 @@ class HandlerFilterUserNameTest extends ViewTestBase {
   protected function setUp() {
     parent::setUp();
 
-    ViewTestData::importTestViews(get_class($this), array('user_test_views'));
+    ViewTestData::createTestViews(get_class($this), array('user_test_views'));
 
     $this->enableViewsTestModule();
 
@@ -84,14 +84,11 @@ class HandlerFilterUserNameTest extends ViewTestBase {
   public function testUserNameApi() {
     $view = views_get_view('test_user_name');
 
-    // Test all of the accounts with a single entry.
     $view->initHandlers();
-    foreach ($this->accounts as $account) {
-      $view->filter['uid']->value = array($account->id());
-    }
+    $view->filter['uid']->value = array($this->accounts[0]->id());
 
     $this->executeView($view);
-    $this->assertIdenticalResultset($view, array(array('uid' => $account->id())), $this->columnMap);
+    $this->assertIdenticalResultset($view, array(array('uid' => $this->accounts[0]->id())), $this->columnMap);
   }
 
   /**
@@ -110,7 +107,7 @@ class HandlerFilterUserNameTest extends ViewTestBase {
     $edit = array(
       'options[value]' => implode(', ', $users)
     );
-    $this->drupalPost($path, $edit, t('Apply'));
+    $this->drupalPostForm($path, $edit, t('Apply'));
     $message = format_plural(count($users), 'Unable to find user: @users', 'Unable to find users: @users', array('@users' => implode(', ', $users)));
     $this->assertText($message);
 
@@ -122,7 +119,7 @@ class HandlerFilterUserNameTest extends ViewTestBase {
       'options[value]' => implode(', ', $users)
     );
     $users = array($users[0]);
-    $this->drupalPost($path, $edit, t('Apply'));
+    $this->drupalPostForm($path, $edit, t('Apply'));
     $message = format_plural(count($users), 'Unable to find user: @users', 'Unable to find users: @users', array('@users' => implode(', ', $users)));
     $this->assertRaw($message);
 
@@ -132,7 +129,7 @@ class HandlerFilterUserNameTest extends ViewTestBase {
     $edit = array(
       'options[value]' => implode(', ', $users)
     );
-    $this->drupalPost($path, $edit, t('Apply'));
+    $this->drupalPostForm($path, $edit, t('Apply'));
     $message = format_plural(count($users), 'Unable to find user: @users', 'Unable to find users: @users', array('@users' => implode(', ', $users)));
     $this->assertNoRaw($message);
   }
@@ -166,7 +163,6 @@ class HandlerFilterUserNameTest extends ViewTestBase {
     // Pass in just valid usernames.
     $users = $this->names;
     $options['query']['uid'] = implode(', ', $users);
-    $users = array_map('strtolower', $users);
 
     $this->drupalGet($path, $options);
     $this->assertNoRaw('Unable to find user');

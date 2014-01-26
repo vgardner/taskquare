@@ -11,14 +11,14 @@ use Drupal\Component\Plugin\PluginBase;
 use Drupal\edit\Annotation\InPlaceEditor;
 use Drupal\Core\Annotation\Translation;
 use Drupal\edit\EditPluginInterface;
-use Drupal\Core\Entity\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\FieldDefinitionInterface;
 
 /**
- * Defines the formatted text editor.
+ * Defines the formatted text in-place editor.
  *
  * @InPlaceEditor(
  *   id = "editor",
- *   alternativeTo = {"direct"}
+ *   alternativeTo = {"plain_text"}
  * )
  */
 class Editor extends PluginBase implements EditPluginInterface {
@@ -28,13 +28,13 @@ class Editor extends PluginBase implements EditPluginInterface {
    */
   function isCompatible(FieldDefinitionInterface $field_definition, array $items) {
     // This editor is incompatible with multivalued fields.
-    if ($field_definition->getFieldCardinality() != 1) {
+    if ($field_definition->getCardinality() != 1) {
       return FALSE;
     }
     // This editor is compatible with processed ("rich") text fields; but only
     // if there is a currently active text format, that text format has an
     // associated editor and that editor supports inline editing.
-    elseif ($field_definition->getFieldSetting('text_processing')) {
+    elseif ($field_definition->getSetting('text_processing')) {
       $format_id = $items[0]['format'];
       if (isset($format_id) && $editor = editor_load($format_id)) {
         $definition = \Drupal::service('plugin.manager.editor')->getDefinition($editor->editor);
@@ -65,10 +65,10 @@ class Editor extends PluginBase implements EditPluginInterface {
   }
 
   /**
-   * Implements \Drupal\edit\EditPluginInterface::getAttachments().
+   * {@inheritdoc}
    */
   public function getAttachments() {
-    global $user;
+    $user = \Drupal::currentUser();
 
     $user_format_ids = array_keys(filter_formats($user));
     $manager = \Drupal::service('plugin.manager.editor');
@@ -87,7 +87,7 @@ class Editor extends PluginBase implements EditPluginInterface {
     $attachments = $manager->getAttachments($formats);
 
     // Also include editor.module's formatted text editor.
-    $attachments['library'][] = array('editor', 'edit.formattedTextEditor.editor');
+    $attachments['library'][] = array('editor', 'edit.inPlaceEditor.formattedText');
 
     return $attachments;
   }

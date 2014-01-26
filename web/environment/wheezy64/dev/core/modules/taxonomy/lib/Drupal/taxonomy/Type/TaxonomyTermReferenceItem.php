@@ -7,7 +7,7 @@
 
 namespace Drupal\taxonomy\Type;
 
-use Drupal\field\Plugin\Type\FieldType\ConfigEntityReferenceItemBase;
+use Drupal\Core\Field\ConfigEntityReferenceItemBase;
 
 /**
  * Defines the 'taxonomy_term_reference' entity field item.
@@ -27,7 +27,7 @@ class TaxonomyTermReferenceItem extends ConfigEntityReferenceItemBase {
    * {@inheritdoc}
    */
   public function getPropertyDefinitions() {
-    $this->definition['settings']['target_type'] = 'taxonomy_term';
+    $this->definition->setSetting('target_type', 'taxonomy_term');
     return parent::getPropertyDefinitions();
   }
 

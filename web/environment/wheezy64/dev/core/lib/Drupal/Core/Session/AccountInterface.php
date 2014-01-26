@@ -45,7 +45,7 @@ interface AccountInterface {
   /**
    * Returns the session ID.
    *
-   * @return string|NULL
+   * @return string|null
    *   The session ID or NULL if this user does not have an active session.
    */
   public function getSessionId();
@@ -53,7 +53,7 @@ interface AccountInterface {
   /**
    * Returns the secure session ID.
    *
-   * @return string|NULL
+   * @return string|null
    *   The session ID or NULL if this user does not have an active secure session.
    */
   public function getSecureSessionId();
@@ -120,7 +120,8 @@ interface AccountInterface {
    *
    * @return
    *   An unsanitized string with the username to display. The code receiving
-   *   this result must ensure that check_plain() is called on it before it is
+   *   this result must ensure that \Drupal\Component\Utility\String::checkPlain()
+   *   is called on it before it is
    *   printed to the page.
    */
   public function getUsername();

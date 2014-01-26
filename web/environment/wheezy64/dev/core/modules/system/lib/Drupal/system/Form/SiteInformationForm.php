@@ -10,13 +10,13 @@ namespace Drupal\system\Form;
 use Drupal\Core\Config\ConfigFactory;
 use Drupal\Core\Config\Context\ContextInterface;
 use Drupal\Core\Path\AliasManagerInterface;
-use Drupal\system\SystemConfigFormBase;
+use Drupal\Core\Form\ConfigFormBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Configure site information settings for this site.
  */
-class SiteInformationForm extends SystemConfigFormBase {
+class SiteInformationForm extends ConfigFormBase {
 
   /**
    * The path alias manager.
@@ -55,7 +55,7 @@ class SiteInformationForm extends SystemConfigFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'system_site_information_settings';
   }
 
@@ -144,7 +144,7 @@ class SiteInformationForm extends SystemConfigFormBase {
     }
     // Validate front page path.
     if (!drupal_valid_path($form_state['values']['site_frontpage'])) {
-      form_set_error('site_frontpage', t("The path '%path' is either invalid or you do not have access to it.", array('%path' => $form_state['values']['site_frontpage'])));
+      $this->setFormError('site_frontpage', $form_state, $this->t("The path '%path' is either invalid or you do not have access to it.", array('%path' => $form_state['values']['site_frontpage'])));
     }
     // Get the normal paths of both error pages.
     if (!empty($form_state['values']['site_403'])) {
@@ -155,11 +155,11 @@ class SiteInformationForm extends SystemConfigFormBase {
     }
     // Validate 403 error path.
     if (!empty($form_state['values']['site_403']) && !drupal_valid_path($form_state['values']['site_403'])) {
-      form_set_error('site_403', t("The path '%path' is either invalid or you do not have access to it.", array('%path' => $form_state['values']['site_403'])));
+      $this->setFormError('site_403', $form_state, $this->t("The path '%path' is either invalid or you do not have access to it.", array('%path' => $form_state['values']['site_403'])));
     }
     // Validate 404 error path.
     if (!empty($form_state['values']['site_404']) && !drupal_valid_path($form_state['values']['site_404'])) {
-      form_set_error('site_404', t("The path '%path' is either invalid or you do not have access to it.", array('%path' => $form_state['values']['site_404'])));
+      $this->setFormError('site_404', $form_state, $this->t("The path '%path' is either invalid or you do not have access to it.", array('%path' => $form_state['values']['site_404'])));
     }
 
     parent::validateForm($form, $form_state);

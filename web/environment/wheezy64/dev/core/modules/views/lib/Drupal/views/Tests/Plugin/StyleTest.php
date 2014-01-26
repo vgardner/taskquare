@@ -16,7 +16,7 @@ use Drupal\views_test_data\Plugin\views\style\StyleTest as StyleTestPlugin;
 /**
  * Tests some general style plugin related functionality.
  *
- * @see Drupal\views_test_data\Plugin\views\style\StyleTest.
+ * @see \Drupal\views_test_data\Plugin\views\style\StyleTest.
  */
 class StyleTest extends ViewTestBase {
 
@@ -197,7 +197,7 @@ class StyleTest extends ViewTestBase {
     // The newer api passes the value of the grouping as well.
     $sets_new_rendered = $view->style_plugin->renderGrouping($view->result, $view->style_plugin->options['grouping'], TRUE);
 
-    $this->assertEqual($sets_new_rendered, $expected, 'The style plugins should proper group the results with grouping by the rendered output.');
+    $this->assertEqual($sets_new_rendered, $expected, 'The style plugins should properly group the results with grouping by the rendered output.');
 
     // Don't test stripped case, because the actual value is not stripped.
     if (!$stripped) {
@@ -239,11 +239,11 @@ class StyleTest extends ViewTestBase {
     foreach ($rows as $row) {
       $attributes = $row->attributes();
       $class = (string) $attributes['class'][0];
-      $this->assertTrue(strpos($class, $random_name) !== FALSE, 'Take sure that a custom css class is added to the output.');
+      $this->assertTrue(strpos($class, $random_name) !== FALSE, 'Make sure that a custom css class is added to the output.');
 
       // Check token replacement.
       $name = $view->field['name']->getValue($view->result[$count]);
-      $this->assertTrue(strpos($class, "test-token-$name") !== FALSE, 'Take sure that a token in custom css class is replaced.');
+      $this->assertTrue(strpos($class, "test-token-$name") !== FALSE, 'Make sure that a token in custom css class is replaced.');
 
       $count++;
     }

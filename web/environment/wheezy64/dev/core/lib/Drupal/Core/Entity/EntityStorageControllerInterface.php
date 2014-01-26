@@ -11,14 +11,24 @@ namespace Drupal\Core\Entity;
  * Defines a common interface for entity controller classes.
  *
  * All entity controller classes specified via the "controllers['storage']" key
- * returned by \Drupal\Core\Entity\EntityManager or hook_entity_info_alter()
- * have to implement this interface.
+ * returned by \Drupal\Core\Entity\EntityManagerInterface or
+ * hook_entity_info_alter() have to implement this interface.
  *
  * Most simple, SQL-based entity controllers will do better by extending
  * Drupal\Core\Entity\DatabaseStorageController instead of implementing this
  * interface directly.
  */
 interface EntityStorageControllerInterface {
+
+  /**
+   * Load the most recent version of an entity's field data.
+   */
+  const FIELD_LOAD_CURRENT = 'FIELD_LOAD_CURRENT';
+
+  /**
+   * Load the version of an entity's field data specified in the entity.
+   */
+  const FIELD_LOAD_REVISION = 'FIELD_LOAD_REVISION';
 
   /**
    * Resets the internal, static entity cache.
@@ -140,25 +150,24 @@ interface EntityStorageControllerInterface {
    * Gets the name of the service for the query for this entity storage.
    *
    * @return string
+   *   The name of the service for the query for this entity storage.
    */
   public function getQueryServicename();
 
   /**
-   * Invokes a method on the Field objects within an entity.
+   * Returns the entity type.
    *
-   * @param string $method
-   *   The method name.
-   * @param \Drupal\Core\Entity\EntityInterface $entity
-   *   The entity object.
+   * @return string
+   *   The entity type.
    */
-  public function invokeFieldMethod($method, EntityInterface $entity);
+  public function entityType();
 
   /**
-   * Invokes the prepareCache() method on all the relevant FieldItem objects.
+   * Returns the entity info.
    *
-   * @param \Drupal\Core\Entity\EntityInterface $entity
-   *   The entity object.
+   * @return string
+   *   The entity info.
    */
-  public function invokeFieldItemPrepareCache(EntityInterface $entity);
+  public function entityInfo();
 
 }

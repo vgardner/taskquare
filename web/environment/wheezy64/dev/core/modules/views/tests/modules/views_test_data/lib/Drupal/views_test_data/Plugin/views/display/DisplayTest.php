@@ -82,6 +82,7 @@ class DisplayTest extends DisplayPluginBase {
       case 'test_option':
         $form['#title'] .= t('Test option');
         $form['test_option'] = array(
+          '#title' => t('Test option'),
           '#type' => 'textfield',
           '#description' => t('This is a textfield for test_option.'),
           '#default_value' => $this->getOption('test_option'),
@@ -99,7 +100,7 @@ class DisplayTest extends DisplayPluginBase {
     switch ($form_state['section']) {
       case 'test_option':
         if (!trim($form_state['values']['test_option'])) {
-          form_error($form['test_option'], t('You cannot have an empty option.'));
+          form_error($form['test_option'], $form_state, t('You cannot have an empty option.'));
         }
         break;
     }

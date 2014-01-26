@@ -40,9 +40,6 @@ system.maintenance:
   type: mapping
   label: 'Maintenance mode'
   mapping:
-    enabled:
-      type: boolean
-      label: 'Put site into maintenance mode'
     message:
       type: text
       label: 'Message to display when in maintenance mode'
@@ -133,18 +130,12 @@ system.date_format.*:
     locked:
       type: boolean
       label: 'Locked'
-    locales:
-      type: sequence
-      label: 'Languages'
-      sequence:
-        - type: string
-          label: 'Language'
     pattern:
       type: mapping
       label: 'Format string'
       mapping:
         php:
-          type: string
+          type: date_format
           label: 'PHP date format'
         intl:
           type: string
@@ -265,9 +256,6 @@ system.performance:
     stale_file_threshold:
       type: integer
       label: 'Stale file threshold'
-    theme_link:
-      type: boolean
-      label: 'Force inline link rendering'
 
 system.rss:
   type: mapping
@@ -308,7 +296,7 @@ system.theme:
         - type: string
           label: 'Theme'
 
-menu.menu.*:
+system.menu.*:
   type: mapping
   label: 'Menu'
   mapping:

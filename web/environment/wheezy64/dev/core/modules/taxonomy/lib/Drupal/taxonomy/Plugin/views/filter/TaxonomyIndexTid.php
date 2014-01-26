@@ -127,7 +127,8 @@ class TaxonomyIndexTid extends ManyToOne {
       );
 
       if ($this->options['limit']) {
-        $form['value']['#autocomplete_path'] = 'admin/views/ajax/autocomplete/taxonomy/' . $vocabulary->id();
+        $form['value']['#autocomplete_route_name'] = 'taxonomy.autocomplete_vid';
+        $form['value']['#autocomplete_route_parameters'] = array('taxonomy_vocabulary' => $vocabulary->id());
       }
     }
     else {
@@ -322,7 +323,7 @@ class TaxonomyIndexTid extends ManyToOne {
     }
 
     if ($missing && !empty($this->options['error_message'])) {
-      form_error($form, format_plural(count($missing), 'Unable to find term: @terms', 'Unable to find terms: @terms', array('@terms' => implode(', ', array_keys($missing)))));
+      form_error($form, $form_state, format_plural(count($missing), 'Unable to find term: @terms', 'Unable to find terms: @terms', array('@terms' => implode(', ', array_keys($missing)))));
     }
     elseif ($missing && empty($this->options['error_message'])) {
       $tids = array(0);

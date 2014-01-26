@@ -7,7 +7,6 @@
 
 namespace Drupal\rdf\Tests;
 
-use Drupal\Core\Language\Language;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\simpletest\WebTestBase;
 
@@ -87,6 +86,9 @@ class TrackerAttributesTest extends WebTestBase {
       'skip comment approval' => TRUE,
     ));
 
+    // Create comment field on article.
+    $this->container->get('comment.manager')->addDefaultField('node', 'article');
+
     // Sets base URI of the site used by the RDFa parser.
     $this->base_uri = url('<front>', array('absolute' => TRUE));
   }
@@ -120,8 +122,6 @@ class TrackerAttributesTest extends WebTestBase {
   function _testBasicTrackerRdfaMarkup(EntityInterface $node) {
     $node_uri = url('node/' . $node->id(), array('absolute' => TRUE));
     $user_uri = url('user/' . $node->getAuthorId(), array('absolute' => TRUE));
-
-    $user = ($node->getAuthorId() == 0) ? 'Anonymous user' : 'Registered user';
 
     // Parses tracker page where the nodes are displayed in a table.
     $parser = new \EasyRdf_Parser_Rdfa();
@@ -168,9 +168,9 @@ class TrackerAttributesTest extends WebTestBase {
     // Adds new comment to ensure the tracker is updated accordingly.
     $comment = array(
       'subject' => $this->randomName(),
-      'comment_body[' . Language::LANGCODE_NOT_SPECIFIED . '][0][value]' => $this->randomName(),
+      'comment_body[0][value]' => $this->randomName(),
     );
-    $this->drupalPost('comment/reply/' . $node->id(), $comment, t('Save'));
+    $this->drupalPostForm('comment/reply/node/' . $node->id() .'/comment', $comment, t('Save'));
 
     // Parses tracker page where the nodes are displayed in a table.
     $parser = new \EasyRdf_Parser_Rdfa();

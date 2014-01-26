@@ -13,6 +13,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\HttpKernel\Exception\FlattenException;
+use Drupal\Component\Utility\String;
 
 use Drupal\Core\ContentNegotiation;
 
@@ -24,14 +25,14 @@ class ExceptionController extends ContainerAware {
   /**
    * The content negotiation library.
    *
-   * @var Drupal\Core\ContentNegotiation
+   * @var \Drupal\Core\ContentNegotiation
    */
   protected $negotiation;
 
   /**
    * Constructor.
    *
-   * @param Drupal\Core\ContentNegotiation $negotiation
+   * @param \Drupal\Core\ContentNegotiation $negotiation
    *   The content negotiation library to use to determine the correct response
    *   format.
    */
@@ -91,7 +92,7 @@ class ExceptionController extends ContainerAware {
         $request->query->set('destination', $system_path);
       }
 
-      $subrequest = Request::create('/' . $path, 'get', array('destination' => $system_path), $request->cookies->all(), array(), $request->server->all());
+      $subrequest = Request::create($request->getBaseUrl() . '/' . $path, 'get', array('destination' => $system_path), $request->cookies->all(), array(), $request->server->all());
 
       // The active trail is being statically cached from the parent request to
       // the subrequest, like any other static.  Unfortunately that means the
@@ -136,7 +137,7 @@ class ExceptionController extends ContainerAware {
    *   The request object that triggered this exception.
    */
   public function on404Html(FlattenException $exception, Request $request) {
-    watchdog('page not found', check_plain($request->attributes->get('_system_path')), NULL, WATCHDOG_WARNING);
+    watchdog('page not found', String::checkPlain($request->attributes->get('_system_path')), NULL, WATCHDOG_WARNING);
 
     // Check for and return a fast 404 page if configured.
     $config = \Drupal::config('system.performance');
@@ -146,7 +147,7 @@ class ExceptionController extends ContainerAware {
       $fast_paths = $config->get('fast_404.paths');
       if ($fast_paths && preg_match($fast_paths, $request->getPathInfo())) {
         $fast_404_html = $config->get('fast_404.html');
-        $fast_404_html = strtr($fast_404_html, array('@path' => check_plain($request->getUri())));
+        $fast_404_html = strtr($fast_404_html, array('@path' => String::checkPlain($request->getUri())));
         return new Response($fast_404_html, 404);
       }
     }
@@ -164,7 +165,7 @@ class ExceptionController extends ContainerAware {
       //   that and sub-call the kernel rather than using meah().
       // @todo The create() method expects a slash-prefixed path, but we store a
       //   normal system path in the site_404 variable.
-      $subrequest = Request::create('/' . $path, 'get', array(), $request->cookies->all(), array(), $request->server->all());
+      $subrequest = Request::create($request->getBaseUrl() . '/' . $path, 'get', array('destination' => $system_path), $request->cookies->all(), array(), $request->server->all());
 
       // The active trail is being statically cached from the parent request to
       // the subrequest, like any other static.  Unfortunately that means the
@@ -268,7 +269,7 @@ class ExceptionController extends ContainerAware {
   }
 
   /**
-   * Processes an AccessDenied exception that occured on a JSON request.
+   * Processes an AccessDenied exception that occurred on a JSON request.
    *
    * @param Symfony\Component\HttpKernel\Exception\FlattenException $exception
    *   The flattened exception.
@@ -282,7 +283,7 @@ class ExceptionController extends ContainerAware {
   }
 
   /**
-   * Processes a NotFound exception that occured on a JSON request.
+   * Processes a NotFound exception that occurred on a JSON request.
    *
    * @param Symfony\Component\HttpKernel\Exception\FlattenException $exception
    *   The flattened exception.
@@ -296,7 +297,7 @@ class ExceptionController extends ContainerAware {
   }
 
   /**
-   * Processes a MethodNotAllowed exception that occured on a JSON request.
+   * Processes a MethodNotAllowed exception that occurred on a JSON request.
    *
    * @param Symfony\Component\HttpKernel\Exception\FlattenException $exception
    *   The flattened exception.
@@ -353,7 +354,7 @@ class ExceptionController extends ContainerAware {
       '%type' => $exception->getClass(),
       // The standard PHP exception handler considers that the exception message
       // is plain-text. We mimick this behavior here.
-      '!message' => check_plain($message),
+      '!message' => String::checkPlain($message),
       '%function' => $caller['function'],
       '%file' => $caller['file'],
       '%line' => $caller['line'],

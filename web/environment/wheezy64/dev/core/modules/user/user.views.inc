@@ -2,9 +2,7 @@
 
 /**
  * @file
- * Provide views data and handlers for user.module.
- *
- * @ingroup views_module_handlers
+ * Provide views data for user.module.
  */
 
 use Drupal\views\ViewExecutable;
@@ -36,6 +34,7 @@ function user_views_data() {
     'argument' => array(
       'id' => 'user_uid',
       'name field' => 'name',
+      'empty field name' => \Drupal::config('user.settings')->get('anonymous'),
     ),
     'filter' => array(
       'title' => t('Name'),
@@ -281,7 +280,7 @@ function user_views_data() {
     ),
   );
 
-  if (Drupal::moduleHandler()->moduleExists('content_translation')) {
+  if (\Drupal::moduleHandler()->moduleExists('content_translation')) {
     $data['users']['translation_link'] = array(
       'title' => t('Translation link'),
       'help' => t('Provide a link to the translations overview for users.'),
@@ -384,5 +383,5 @@ function user_views_data() {
  */
 function user_views_plugins_row_alter(array &$plugins) {
   $plugins['entity:user']['class'] = 'Drupal\user\Plugin\views\row\UserRow';
-  $plugins['entity:user']['module'] = 'user';
+  $plugins['entity:user']['provider'] = 'user';
 }

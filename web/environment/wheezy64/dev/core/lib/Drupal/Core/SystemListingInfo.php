@@ -56,12 +56,12 @@ class SystemListingInfo extends SystemListing {
       // new resource on the list for merging.
       if (file_exists($info_file = dirname($file->uri) . '/' . $file->name . '.info.yml')) {
         // Get the .info.yml file for the module or theme this file belongs to.
-        $info = drupal_parse_info_file($info_file);
+        $info = \Drupal::service('info_parser')->parse($info_file);
 
         // If the module or theme is incompatible with Drupal core, remove it
         // from the array for the current search directory, so it is not
         // overwritten when merged with the $files array.
-        if (isset($info['core']) && $info['core'] != DRUPAL_CORE_COMPATIBILITY) {
+        if (isset($info['core']) && $info['core'] != \Drupal::CORE_COMPATIBILITY) {
           unset($files_to_add[$file_key]);
         }
       }

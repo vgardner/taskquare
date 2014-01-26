@@ -43,7 +43,7 @@ class ConfigItem extends ViewsFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'views_ui_config_item_form';
   }
 
@@ -51,7 +51,7 @@ class ConfigItem extends ViewsFormBase {
    * {@inheritdoc}
    */
   public function buildForm(array $form, array &$form_state) {
-    $view = &$form_state['view'];
+    $view = $form_state['view'];
     $display_id = $form_state['display_id'];
     $type = $form_state['type'];
     $id = $form_state['id'];
@@ -60,7 +60,7 @@ class ConfigItem extends ViewsFormBase {
       'options' => array(
         '#tree' => TRUE,
         '#theme_wrappers' => array('container'),
-        '#attributes' => array('class' => array('scroll')),
+        '#attributes' => array('class' => array('scroll'), 'data-drupal-views-scroll' => TRUE),
       ),
     );
     $executable = $view->getExecutable();
@@ -102,11 +102,12 @@ class ConfigItem extends ViewsFormBase {
 
           // If this relationship is valid for this type, add it to the list.
           $data = Views::viewsData()->get($relationship['table']);
-          $base = $data[$relationship['field']]['relationship']['base'];
-          $base_fields = Views::viewsDataHelper()->fetchFields($base, $form_state['type'], $executable->display_handler->useGroupBy());
-          if (isset($base_fields[$item['table'] . '.' . $item['field']])) {
-            $relationship_handler->init($executable, $executable->display_handler, $relationship);
-            $relationship_options[$relationship['id']] = $relationship_handler->adminLabel();
+          if (isset($data[$relationship['field']]['relationship']['base']) && $base = $data[$relationship['field']]['relationship']['base']) {
+            $base_fields = Views::viewsDataHelper()->fetchFields($base, $form_state['type'], $executable->display_handler->useGroupBy());
+            if (isset($base_fields[$item['table'] . '.' . $item['field']])) {
+              $relationship_handler->init($executable, $executable->display_handler, $relationship);
+              $relationship_options[$relationship['id']] = $relationship_handler->adminLabel();
+            }
           }
         }
 
@@ -157,7 +158,7 @@ class ConfigItem extends ViewsFormBase {
 
         // Get form from the handler.
         $handler->buildOptionsForm($form['options'], $form_state);
-        $form_state['handler'] = &$handler;
+        $form_state['handler'] = $handler;
       }
 
       $name = NULL;
@@ -167,11 +168,14 @@ class ConfigItem extends ViewsFormBase {
 
       $view->getStandardButtons($form, $form_state, 'views_ui_config_item_form', $name);
       // Add a 'remove' button.
-      $form['buttons']['remove'] = array(
+      $form['actions']['remove'] = array(
         '#type' => 'submit',
         '#value' => $this->t('Remove'),
         '#submit' => array(array($this, 'remove')),
         '#limit_validation_errors' => array(array('override')),
+        '#ajax' => array(
+          'path' => current_path(),
+        ),
       );
     }
 
@@ -188,7 +192,7 @@ class ConfigItem extends ViewsFormBase {
   public function validateForm(array &$form, array &$form_state) {
     $form_state['handler']->validateOptionsForm($form['options'], $form_state);
 
-    if (form_get_errors()) {
+    if (form_get_errors($form_state)) {
       $form_state['rerender'] = TRUE;
     }
   }

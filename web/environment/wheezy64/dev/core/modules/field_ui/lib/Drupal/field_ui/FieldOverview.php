@@ -7,8 +7,8 @@
 
 namespace Drupal\field_ui;
 
-use Drupal\Core\Entity\EntityManager;
-use Drupal\Core\Entity\Field\FieldTypePluginManager;
+use Drupal\Core\Entity\EntityManagerInterface;
+use Drupal\Core\Field\FieldTypePluginManager;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\field_ui\OverviewBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -22,7 +22,7 @@ class FieldOverview extends OverviewBase {
   /**
    *  The field type manager.
    *
-   * @var \Drupal\Core\Entity\Field\FieldTypePluginManager
+   * @var \Drupal\Core\Field\FieldTypePluginManager
    */
   protected $fieldTypeManager;
 
@@ -36,14 +36,14 @@ class FieldOverview extends OverviewBase {
   /**
    * Constructs a new FieldOverview.
    *
-   * @param \Drupal\Core\Entity\EntityManager $entity_manager
+   * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
    *   The entity manager.
-   * @param \Drupal\Core\Entity\Field\FieldTypePluginManager $field_type_manager
+   * @param \Drupal\Core\Field\FieldTypePluginManager $field_type_manager
    *   The field type manager
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
    *   The module handler to invoke hooks on.
    */
-  public function __construct(EntityManager $entity_manager, FieldTypePluginManager $field_type_manager, ModuleHandlerInterface $module_handler) {
+  public function __construct(EntityManagerInterface $entity_manager, FieldTypePluginManager $field_type_manager, ModuleHandlerInterface $module_handler) {
     parent::__construct($entity_manager);
     $this->fieldTypeManager = $field_type_manager;
     $this->moduleHandler = $module_handler;
@@ -55,7 +55,7 @@ class FieldOverview extends OverviewBase {
   public static function create(ContainerInterface $container) {
     return new static(
       $container->get('entity.manager'),
-      $container->get('plugin.manager.entity.field.field_type'),
+      $container->get('plugin.manager.field.field_type'),
       $container->get('module_handler')
     );
   }
@@ -77,7 +77,7 @@ class FieldOverview extends OverviewBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'field_ui_field_overview_form';
   }
 
@@ -89,7 +89,7 @@ class FieldOverview extends OverviewBase {
 
     // Gather bundle information.
     $instances = field_info_instances($this->entity_type, $this->bundle);
-    $field_types = $this->fieldTypeManager->getDefinitions();
+    $field_types = $this->fieldTypeManager->getConfigurableDefinitions();
 
     // Field prefix.
     $field_prefix = \Drupal::config('field_ui.settings')->get('field_prefix');
@@ -105,7 +105,10 @@ class FieldOverview extends OverviewBase {
       '#tree' => TRUE,
       '#header' => array(
         $this->t('Label'),
-        $this->t('Machine name'),
+        array(
+          'data' => $this->t('Machine name'),
+          'class' => array(RESPONSIVE_PRIORITY_MEDIUM),
+        ),
         $this->t('Field type'),
         $this->t('Operations'),
       ),
@@ -125,14 +128,14 @@ class FieldOverview extends OverviewBase {
           'id' => drupal_html_class($name),
         ),
         'label' => array(
-          '#markup' => check_plain($instance['label']),
+          '#markup' => check_plain($instance->getLabel()),
         ),
         'field_name' => array(
-          '#markup' => $instance['field_name'],
+          '#markup' => $instance->getName(),
         ),
         'type' => array(
           '#type' => 'link',
-          '#title' => $field_types[$field['type']]['label'],
+          '#title' => $field_types[$field->getType()]['label'],
           '#href' => $admin_field_path . '/field',
           '#options' => array('attributes' => array('title' => $this->t('Edit field settings.'))),
         ),
@@ -161,7 +164,7 @@ class FieldOverview extends OverviewBase {
         '#links' => $links,
       );
 
-      if (!empty($field['locked'])) {
+      if (!empty($field->locked)) {
         $table[$name]['operations'] = array('#markup' => $this->t('Locked'));
         $table[$name]['#attributes']['class'][] = 'menu-disabled';
       }
@@ -306,7 +309,7 @@ class FieldOverview extends OverviewBase {
    * @param array $form_state
    *   A reference to a keyed array containing the current state of the form.
    *
-   * @see Drupal\field_ui\FieldOverview::validateForm()
+   * @see \Drupal\field_ui\FieldOverview::validateForm()
    */
   protected function validateAddNew(array $form, array &$form_state) {
     $field = $form_state['values']['fields']['_add_new_field'];
@@ -315,12 +318,12 @@ class FieldOverview extends OverviewBase {
     if (array_filter(array($field['label'], $field['field_name'], $field['type']))) {
       // Missing label.
       if (!$field['label']) {
-        form_set_error('fields][_add_new_field][label', $this->t('Add new field: you need to provide a label.'));
+        $this->setFormError('fields][_add_new_field][label', $form_state, $this->t('Add new field: you need to provide a label.'));
       }
 
       // Missing field name.
       if (!$field['field_name']) {
-        form_set_error('fields][_add_new_field][field_name', $this->t('Add new field: you need to provide a field name.'));
+        $this->setFormError('fields][_add_new_field][field_name', $form_state, $this->t('Add new field: you need to provide a field name.'));
       }
       // Field name validation.
       else {
@@ -333,7 +336,7 @@ class FieldOverview extends OverviewBase {
 
       // Missing field type.
       if (!$field['type']) {
-        form_set_error('fields][_add_new_field][type', $this->t('Add new field: you need to select a field type.'));
+        $this->setFormError('fields][_add_new_field][type', $form_state, $this->t('Add new field: you need to select a field type.'));
       }
     }
   }
@@ -346,7 +349,7 @@ class FieldOverview extends OverviewBase {
    * @param array $form_state
    *   A reference to a keyed array containing the current state of the form.
    *
-   * @see Drupal\field_ui\FieldOverview::validate()
+   * @see \Drupal\field_ui\FieldOverview::validate()
    */
   protected function validateAddExisting(array $form, array &$form_state) {
     // The form element might be absent if no existing fields can be added to
@@ -359,12 +362,12 @@ class FieldOverview extends OverviewBase {
       if (array_filter(array($field['label'], $field['field_name']))) {
         // Missing label.
         if (!$field['label']) {
-          form_set_error('fields][_add_existing_field][label', $this->t('Re-use existing field: you need to provide a label.'));
+          $this->setFormError('fields][_add_existing_field][label', $form_state, $this->t('Re-use existing field: you need to provide a label.'));
         }
 
         // Missing existing field name.
         if (!$field['field_name']) {
-          form_set_error('fields][_add_existing_field][field_name', $this->t('Re-use existing field: you need to select a field.'));
+          $this->setFormError('fields][_add_existing_field][field_name', $form_state, $this->t('Re-use existing field: you need to select a field.'));
         }
       }
     }
@@ -423,20 +426,21 @@ class FieldOverview extends OverviewBase {
         $form_state['fields_added']['_add_new_field'] = $values['field_name'];
       }
       catch (\Exception $e) {
-        drupal_set_message($this->t('There was a problem creating field %label: !message', array('%label' => $instance['label'], '!message' => $e->getMessage())), 'error');
+        drupal_set_message($this->t('There was a problem creating field %label: !message', array('%label' => $instance->getLabel(), '!message' => $e->getMessage())), 'error');
       }
     }
 
     // Re-use existing field.
     if (!empty($form_values['_add_existing_field']['field_name'])) {
       $values = $form_values['_add_existing_field'];
-      $field = field_info_field($this->entity_type, $values['field_name']);
-      if (!empty($field['locked'])) {
+      $field_name = $values['field_name'];
+      $field = field_info_field($this->entity_type, $field_name);
+      if (!empty($field->locked)) {
         drupal_set_message($this->t('The field %label cannot be added because it is locked.', array('%label' => $values['label'])), 'error');
       }
       else {
         $instance = array(
-          'field_name' => $field['field_name'],
+          'field_name' => $field_name,
           'entity_type' => $this->entity_type,
           'bundle' => $this->bundle,
           'label' => $values['label'],
@@ -450,14 +454,14 @@ class FieldOverview extends OverviewBase {
           // default widget and settings). It stays hidden for other form modes
           // until it is explicitly configured.
           entity_get_form_display($this->entity_type, $this->bundle, 'default')
-            ->setComponent($field['field_name'])
+            ->setComponent($field_name)
             ->save();
 
           // Make sure the field is displayed in the 'default' view mode (using
           // default formatter and settings). It stays hidden for other view
           // modes until it is explicitly configured.
           entity_get_display($this->entity_type, $this->bundle, 'default')
-            ->setComponent($field['field_name'])
+            ->setComponent($field_name)
             ->save();
 
           $destinations[] = $this->adminPath . '/fields/' . $new_instance->id();
@@ -465,7 +469,7 @@ class FieldOverview extends OverviewBase {
           $form_state['fields_added']['_add_existing_field'] = $instance['field_name'];
         }
         catch (\Exception $e) {
-          drupal_set_message($this->t('There was a problem creating field instance %label: @message.', array('%label' => $instance['label'], '@message' => $e->getMessage())), 'error');
+          drupal_set_message($this->t('There was a problem creating field instance %label: @message.', array('%label' => $instance->getLabel(), '@message' => $e->getMessage())), 'error');
         }
       }
     }
@@ -473,7 +477,7 @@ class FieldOverview extends OverviewBase {
     if ($destinations) {
       $destination = drupal_get_destination();
       $destinations[] = $destination['destination'];
-      unset($_GET['destination']);
+      $this->getRequest()->query->remove('destination');
       $path = array_shift($destinations);
       $options = drupal_parse_url($path);
       $options['query']['destinations'] = $destinations;
@@ -511,16 +515,17 @@ class FieldOverview extends OverviewBase {
       $field_types = $this->fieldTypeManager->getDefinitions();
       $instances = $this->entityManager->getStorageController('field_instance')->loadMultiple($instance_ids);
       foreach ($instances as $instance) {
-        $field = $instance->getField();
         // Do not show:
         // - locked fields,
         // - fields that should not be added via user interface.
-        if (empty($field['locked']) && empty($field_types[$field['type']]['no_ui'])) {
-          $options[$field->name] = array(
-            'type' => $field->type,
-            'type_label' => $field_types[$field->type]['label'],
-            'field' => $field->name,
-            'label' => $instance->label,
+        $field_type = $instance->getType();
+        $field = $instance->getField();
+        if (empty($field->locked) && empty($field_types[$field_type]['no_ui'])) {
+          $options[$instance->getName()] = array(
+            'type' => $field_type,
+            'type_label' => $field_types[$field_type]['label'],
+            'field' => $instance->getName(),
+            'label' => $instance->getLabel(),
           );
         }
       }
@@ -542,9 +547,7 @@ class FieldOverview extends OverviewBase {
     // Prefix with 'field_'.
     $field_name = 'field_' . $value;
 
-    // We need to check inactive fields as well, so we can't use
-    // field_info_fields().
-    return (bool) field_read_fields(array('entity_type' => $this->entity_type, 'name' => $field_name), array('include_inactive' => TRUE));
+    return (bool) field_info_field($this->entity_type, $field_name);
   }
 
 }

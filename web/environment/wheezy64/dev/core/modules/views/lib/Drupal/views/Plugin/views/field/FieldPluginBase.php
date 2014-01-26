@@ -20,23 +20,6 @@ use Drupal\views\ViewExecutable;
  */
 
 /**
- * Indicator of the renderText() method for rendering a single item.
- * (If no render_item() is present).
- */
-define('VIEWS_HANDLER_RENDER_TEXT_PHASE_SINGLE_ITEM', 0);
-
-/**
- * Indicator of the renderText() method for rendering the whole element.
- * (if no render_item() method is available).
- */
-define('VIEWS_HANDLER_RENDER_TEXT_PHASE_COMPLETELY', 1);
-
-/**
- * Indicator of the renderText() method for rendering the empty text.
- */
-define('VIEWS_HANDLER_RENDER_TEXT_PHASE_EMPTY', 2);
-
-/**
  * Base field handler that has no options and renders an unformatted field.
  *
  * Definition terms:
@@ -50,6 +33,23 @@ define('VIEWS_HANDLER_RENDER_TEXT_PHASE_EMPTY', 2);
  * @ingroup views_field_handlers
  */
 abstract class FieldPluginBase extends HandlerBase {
+
+  /**
+   * Indicator of the renderText() method for rendering a single item.
+   * (If no render_item() is present).
+   */
+  const RENDER_TEXT_PHASE_SINGLE_ITEM = 0;
+
+  /**
+   * Indicator of the renderText() method for rendering the whole element.
+   * (if no render_item() method is available).
+   */
+  const RENDER_TEXT_PHASE_COMPLETELY = 1;
+
+  /**
+   * Indicator of the renderText() method for rendering the empty text.
+   */
+  const RENDER_TEXT_PHASE_EMPTY = 2;
 
   var $field_alias = 'unknown';
   var $aliases = array();
@@ -269,7 +269,7 @@ abstract class FieldPluginBase extends HandlerBase {
    *
    * This function can be overridden by fields that want more or fewer
    * elements available, though this seems like it would be an incredibly
-   * rare occurence.
+   * rare occurrence.
    */
   public function getElements() {
     static $elements = NULL;
@@ -384,12 +384,12 @@ abstract class FieldPluginBase extends HandlerBase {
    * This api exists so that other modules can easy set the values of the field
    * without having the need to change the render method as well.
    *
-   * @param $values
+   * @param \Drupal\views\ResultRow $values
    *   An object containing all retrieved values.
-   * @param $field
+   * @param string $field
    *   Optional name of the field where the value is stored.
    */
-  public function getValue($values, $field = NULL) {
+  public function getValue(ResultRow $values, $field = NULL) {
     $alias = isset($field) ? $this->aliases[$field] : $this->field_alias;
     if (isset($values->{$alias})) {
       return $values->{$alias};
@@ -850,6 +850,8 @@ abstract class FieldPluginBase extends HandlerBase {
       foreach ($previous as $id => $label) {
         $options[t('Fields')]["[$id]"] = $label;
       }
+      // Add the field to the list of options.
+      $options[t('Fields')]["[{$this->options['id']}]"] = $this->label();
 
       $count = 0; // This lets us prepare the key as we want it printed.
       foreach ($this->view->display_handler->getHandlers('argument') as $arg => $handler) {
@@ -1096,7 +1098,7 @@ abstract class FieldPluginBase extends HandlerBase {
    * Renders the field.
    *
    * @param \Drupal\views\ResultRow $values
-   *   The values retrieved from the database.
+   *   The values retrieved from a single row of a view's query result.
    */
   public function render(ResultRow $values) {
     $value = $this->getValue($values);
@@ -1110,7 +1112,7 @@ abstract class FieldPluginBase extends HandlerBase {
    * text-replacement rendering is necessary.
    *
    * @param \Drupal\views\ResultRow $values
-   *   The values retrieved from the database.
+   *   The values retrieved from a single row of a view's query result.
    */
   public function advancedRender(ResultRow $values) {
     if ($this->allowAdvancedRender() && method_exists($this, 'render_item')) {
@@ -1142,14 +1144,14 @@ abstract class FieldPluginBase extends HandlerBase {
           $this->original_value = $this->last_render;
 
           $alter = $item + $this->options['alter'];
-          $alter['phase'] = VIEWS_HANDLER_RENDER_TEXT_PHASE_SINGLE_ITEM;
+          $alter['phase'] = static::RENDER_TEXT_PHASE_SINGLE_ITEM;
           $items[] = $this->renderText($alter);
         }
 
         $value = $this->renderItems($items);
       }
       else {
-        $alter = array('phase' => VIEWS_HANDLER_RENDER_TEXT_PHASE_COMPLETELY) + $this->options['alter'];
+        $alter = array('phase' => static::RENDER_TEXT_PHASE_COMPLETELY) + $this->options['alter'];
         $value = $this->renderText($alter);
       }
 
@@ -1166,7 +1168,7 @@ abstract class FieldPluginBase extends HandlerBase {
         $alter = $this->options['alter'];
         $alter['alter_text'] = 1;
         $alter['text'] = $this->options['empty'];
-        $alter['phase'] = VIEWS_HANDLER_RENDER_TEXT_PHASE_EMPTY;
+        $alter['phase'] = static::RENDER_TEXT_PHASE_EMPTY;
         $this->last_render = $this->renderText($alter);
       }
     }
@@ -1226,12 +1228,12 @@ abstract class FieldPluginBase extends HandlerBase {
     // First check whether the field should be hidden if the value(hide_alter_empty = TRUE) /the rewrite is empty (hide_alter_empty = FALSE).
     // For numeric values you can specify whether "0"/0 should be empty.
     if ((($this->options['hide_empty'] && empty($value))
-        || ($alter['phase'] != VIEWS_HANDLER_RENDER_TEXT_PHASE_EMPTY && $no_rewrite_for_empty))
+        || ($alter['phase'] != static::RENDER_TEXT_PHASE_EMPTY && $no_rewrite_for_empty))
       && $this->isValueEmpty($value, $this->options['empty_zero'], FALSE)) {
       return '';
     }
     // Only in empty phase.
-    if ($alter['phase'] == VIEWS_HANDLER_RENDER_TEXT_PHASE_EMPTY && $no_rewrite_for_empty) {
+    if ($alter['phase'] == static::RENDER_TEXT_PHASE_EMPTY && $no_rewrite_for_empty) {
       // If we got here then $alter contains the value of "No results text"
       // and so there is nothing left to do.
       return $value;
@@ -1252,7 +1254,7 @@ abstract class FieldPluginBase extends HandlerBase {
         $more_link_path = $this->options['alter']['more_link_path'];
         $more_link_path = strip_tags(decode_entities(strtr($more_link_path, $tokens)));
 
-        // Take sure that paths which was runned through url() does work as well.
+        // Make sure that paths which were run through url() work as well.
         $base_path = base_path();
         // Checks whether the path starts with the base_path.
         if (strpos($more_link_path, $base_path) === 0) {
@@ -1482,7 +1484,7 @@ abstract class FieldPluginBase extends HandlerBase {
       $tokens['!' . $count] = isset($this->view->args[$count - 1]) ? strip_tags(decode_entities($this->view->args[$count - 1])) : '';
     }
 
-    // Get flattened set of tokens for any array depth in $_GET parameters.
+    // Get flattened set of tokens for any array depth in query parameters.
     $tokens += $this->getTokenValuesRecursive(\Drupal::request()->query->all());
 
     // Now add replacements for our fields.
@@ -1591,8 +1593,14 @@ abstract class FieldPluginBase extends HandlerBase {
   /**
    * Call out to the theme() function, which probably just calls render() but
    * allows sites to override output fairly easily.
+   *
+   * @param \Drupal\views\ResultRow $values
+   *   Holds single row of a view's result set.
+   *
+   * @return string|false
+   *   Returns rendered output of the given theme implementation.
    */
-  function theme($values) {
+  function theme(ResultRow $values) {
     return theme($this->themeFunctions(),
       array(
         'view' => $this->view,
@@ -1636,10 +1644,10 @@ abstract class FieldPluginBase extends HandlerBase {
    *
    * @param array $alter
    *   The alter array of options to use.
-   *     - max_length: Maximum lenght of the string, the rest gets truncated.
+   *     - max_length: Maximum length of the string, the rest gets truncated.
    *     - word_boundary: Trim only on a word boundary.
    *     - ellipsis: Show an ellipsis (...) at the end of the trimmed string.
-   *     - html: Take sure that the html is correct.
+   *     - html: Make sure that the html is correct.
    *
    * @param string $value
    *   The string which should be trimmed.

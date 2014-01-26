@@ -9,7 +9,7 @@ namespace Drupal\views\Plugin\Block;
 
 use Drupal\block\Annotation\Block;
 use Drupal\Core\Annotation\Translation;
-use Drupal\Core\Entity\EntityStorageControllerInterface;
+use Drupal\Core\Config\Entity\Query\Query;
 use Drupal\Component\Utility\Xss;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -32,7 +32,13 @@ class ViewsBlock extends ViewsBlockBase {
 
     if ($output = $this->view->executeDisplay($this->displayID)) {
       // Set the label to the title configured in the view.
-      $this->configuration['label'] = Xss::filterAdmin($this->view->getTitle());
+      if (empty($this->configuration['views_label'])) {
+        $this->configuration['label'] = Xss::filterAdmin($this->view->getTitle());
+      }
+      else {
+        $this->configuration['label'] = $this->configuration['views_label'];
+      }
+      $this->configuration['label_display'] = TRUE;
       // Before returning the block output, convert it to a renderable array
       // with contextual links.
       $this->addContextualLinks($output);
@@ -45,11 +51,11 @@ class ViewsBlock extends ViewsBlockBase {
   /**
    * {@inheritdoc}
    */
-  public function settings() {
-    $settings = array();
+  public function defaultConfiguration() {
+    $settings = parent::defaultConfiguration();
 
     if ($this->displaySet) {
-      return $this->view->display_handler->blockSettings($settings);
+      $settings += $this->view->display_handler->blockSettings($settings);
     }
 
     return $settings;
@@ -79,40 +85,11 @@ class ViewsBlock extends ViewsBlockBase {
    * {@inheritdoc}
    */
   public function blockSubmit($form, &$form_state) {
+    parent::blockSubmit($form, $form_state);
     if ($this->displaySet) {
       $this->view->display_handler->blockSubmit($this, $form, $form_state);
     }
   }
-
-  /**
-   * Generates a views block instance ID.
-   *
-   * @param \Drupal\Core\Entity\EntityStorageControllerInterface $manager
-   *   The block storage controller.
-   *
-   * @return string
-   *   The new block instance ID.
-   */
-   public function generateBlockInstanceID(EntityStorageControllerInterface $manager) {
-     $original_id = 'views_block__' . $this->view->storage->id() . '_' . $this->view->current_display;
-
-     // Get an array of block IDs without the theme prefix.
-     $block_ids = array_map(function ($block_id) {
-       $parts = explode('.', $block_id);
-       return end($parts);
-     }, array_keys($manager->loadMultiple()));
-
-     // Iterate through potential IDs until we get a new one. E.g.
-     // 'views_block__MYVIEW_PAGE_1_2'
-     $count = 1;
-     $id = $original_id;
-     while (in_array($id, $block_ids)) {
-       $id = $original_id . '_' . ++$count;
-     }
-
-     return $id;
-   }
-
 
   /**
    * {@inheritdoc}

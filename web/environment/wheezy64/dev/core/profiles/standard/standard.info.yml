@@ -18,6 +18,7 @@ dependencies:
   - custom_block
   - edit
   - editor
+  - entity_reference
   - help
   - image
   - menu
@@ -29,7 +30,6 @@ dependencies:
   - search
   - shortcut
   - toolbar
-  - overlay
   - field_ui
   - file
   - rdf

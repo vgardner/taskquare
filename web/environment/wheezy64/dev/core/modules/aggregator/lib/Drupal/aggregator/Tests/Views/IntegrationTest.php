@@ -20,7 +20,7 @@ class IntegrationTest extends ViewUnitTestBase {
    *
    * @var array
    */
-  public static $modules = array('aggregator', 'aggregator_test_views', 'system', 'field');
+  public static $modules = array('aggregator', 'aggregator_test_views', 'system', 'entity', 'field');
 
   /**
    * Views used by this test.
@@ -54,9 +54,9 @@ class IntegrationTest extends ViewUnitTestBase {
   protected function setUp() {
     parent::setUp();
 
-    $this->installSchema('aggregator', array('aggregator_item', 'aggregator_feed', 'aggregator_category_feed', 'aggregator_category', 'aggregator_category_item'));
+    $this->installSchema('aggregator', array('aggregator_item', 'aggregator_feed'));
 
-    ViewTestData::importTestViews(get_class($this), array('aggregator_test_views'));
+    ViewTestData::createTestViews(get_class($this), array('aggregator_test_views'));
 
     $this->itemStorageController = $this->container->get('entity.manager')->getStorageController('aggregator_item');
     $this->feedStorageController = $this->container->get('entity.manager')->getStorageController('aggregator_feed');
@@ -76,6 +76,7 @@ class IntegrationTest extends ViewUnitTestBase {
       // Add a image to ensure that the sanitizing can be tested below.
       $values['author'] = $this->randomName() . '<img src="http://example.com/example.png" \>"';
       $values['link'] = 'http://drupal.org/node/' . mt_rand(1000, 10000);
+      $values['guid'] = $this->randomString();
 
       $aggregator_item = $this->itemStorageController->create($values);
       $aggregator_item->save();
@@ -100,13 +101,13 @@ class IntegrationTest extends ViewUnitTestBase {
     // Ensure that the rendering of the linked title works as expected.
     foreach ($view->result as $row) {
       $iid = $view->field['iid']->getValue($row);
-      $expected_link = l($items[$iid]->title->value, $items[$iid]->link->value, array('absolute' => TRUE));
+      $expected_link = l($items[$iid]->getTitle(), $items[$iid]->getLink(), array('absolute' => TRUE));
       $this->assertEqual($view->field['title']->advancedRender($row), $expected_link, 'Ensure the right link is generated');
 
-      $expected_author = aggregator_filter_xss($items[$iid]->author->value);
+      $expected_author = aggregator_filter_xss($items[$iid]->getAuthor());
       $this->assertEqual($view->field['author']->advancedRender($row), $expected_author, 'Ensure the author got filtered');
 
-      $expected_description = aggregator_filter_xss($items[$iid]->description->value);
+      $expected_description = aggregator_filter_xss($items[$iid]->getDescription());
       $this->assertEqual($view->field['description']->advancedRender($row), $expected_description, 'Ensure the author got filtered');
     }
   }

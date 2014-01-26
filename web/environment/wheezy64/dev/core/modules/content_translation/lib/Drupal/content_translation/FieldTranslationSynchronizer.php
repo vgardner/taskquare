@@ -7,9 +7,9 @@
 
 namespace Drupal\content_translation;
 
+use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Entity\EntityManager;
-use Drupal\Core\Entity\EntityNG;
+use Drupal\Core\Entity\EntityManagerInterface;
 
 /**
  * Provides field translation synchronization capabilities.
@@ -19,30 +19,24 @@ class FieldTranslationSynchronizer implements FieldTranslationSynchronizerInterf
   /**
    * The entity manager to use to load unchanged entities.
    *
-   * @var \Drupal\Core\Entity\EntityManager
+   * @var \Drupal\Core\Entity\EntityManagerInterface
    */
   protected $entityManager;
 
   /**
    * Constructs a FieldTranslationSynchronizer object.
    *
-   * @param \Drupal\Core\Entity\EntityManager $entityManager
+   * @param \Drupal\Core\Entity\EntityManagerInterface $entityManager
    *   The entity manager.
    */
-  public function __construct(EntityManager $entityManager) {
+  public function __construct(EntityManagerInterface $entityManager) {
     $this->entityManager = $entityManager;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function synchronizeFields(EntityInterface $entity, $sync_langcode, $original_langcode = NULL) {
-    // Field synchronization is only supported for NG entities.
-    $entity = $entity->getNGEntity();
-    if (!($entity instanceof EntityNG)) {
-      return;
-    }
-
+  public function synchronizeFields(ContentEntityInterface $entity, $sync_langcode, $original_langcode = NULL) {
     $translations = $entity->getTranslationLanguages();
 
     // If we have no information about what to sync to, if we are creating a new
@@ -66,14 +60,16 @@ class FieldTranslationSynchronizer implements FieldTranslationSynchronizerInterf
 
       // Sync when the field is not empty, when the synchronization translations
       // setting is set, and the field is translatable.
-      if (!$entity->get($field_name)->isEmpty() && !empty($instance['settings']['translation_sync']) && field_is_translatable($entity_type, $field)) {
+      $translation_sync = $instance->getSetting('translation_sync');
+      if (!$entity->get($field_name)->isEmpty() && !empty($translation_sync) && field_is_translatable($entity_type, $field)) {
         // Retrieve all the untranslatable column groups and merge them into
         // single list.
-        $groups = array_keys(array_diff($instance['settings']['translation_sync'], array_filter($instance['settings']['translation_sync'])));
+        $groups = array_keys(array_diff($translation_sync, array_filter($translation_sync)));
         if (!empty($groups)) {
           $columns = array();
           foreach ($groups as $group) {
-            $info = $field['settings']['column_groups'][$group];
+            $column_groups = $field->getSetting('column_groups');
+            $info = $column_groups[$group];
             // A missing 'columns' key indicates we have a single-column group.
             $columns = array_merge($columns, isset($info['columns']) ? $info['columns'] : array($group));
           }

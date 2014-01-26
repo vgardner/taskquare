@@ -7,9 +7,8 @@
 
 namespace Drupal\Core\Entity\Plugin\DataType;
 
+use Drupal\Core\TypedData\DataDefinition;
 use Drupal\Core\TypedData\DataReferenceBase;
-use Drupal\Core\TypedData\Annotation\DataType;
-use Drupal\Core\Annotation\Translation;
 
 /**
  * Defines the 'language_reference' data type.
@@ -32,8 +31,14 @@ class LanguageReference extends DataReferenceBase {
    * {@inheritdoc}
    */
   public function getTargetDefinition() {
-    return array(
-      'type' => 'language',
-    );
+    return DataDefinition::create('language');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getTargetIdentifier() {
+    $language = $this->getTarget();
+    return isset($language) ? $language->id() : NULL;
   }
 }

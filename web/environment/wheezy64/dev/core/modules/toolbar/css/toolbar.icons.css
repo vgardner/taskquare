@@ -65,20 +65,6 @@
 /**
  * Top level icons.
  */
-.toolbar-bar .toolbar-icon-home:before {
-  background-image: url("../../../misc/icons/bebebe/house.svg");
-}
-.no-svg .toolbar-bar .toolbar-icon-home:before {
-  background-image: url("../../../misc/icons/bebebe/house.png");
-}
-.toolbar-bar .toolbar-icon-home:active:before,
-.toolbar-bar .toolbar-icon-home.active:before {
-  background-image: url("../../../misc/icons/ffffff/house.svg");
-}
-.no-svg .toolbar-bar .toolbar-icon-home:active:before,
-.no-svg .toolbar-bar .toolbar-icon-home.active:before {
-  background-image: url("../../../misc/icons/ffffff/house.png");
-}
 .toolbar-bar .toolbar-icon-menu:before {
   background-image: url("../../../misc/icons/bebebe/hamburger.svg");
 }
@@ -305,7 +291,7 @@
 }
 .toolbar .menu .menu .toolbar-icon.toolbar-handle:before {
   background-image: url("../../../misc/icons/5181c6/twistie-down.svg");
-  background-size: 75% 75%;
+  background-size: 75%;
 }
 .no-svg .toolbar .menu .menu .toolbar-icon.toolbar-handle:before {
   background-image: url("../../../misc/icons/5181c6/twistie-down.png");
@@ -313,13 +299,24 @@
 }
 .toolbar .menu .menu .toolbar-icon.toolbar-handle.open:before {
   background-image: url("../../../misc/icons/787878/twistie-up.svg");
-  background-size: 75% 75%;
+  background-size: 75%;
 }
 .no-svg .toolbar .menu .menu .toolbar-icon.toolbar-handle.open:before {
   background-image: url("../../../misc/icons/787878/twistie-up.png");
   background-size: auto auto;
 }
-
+.toolbar .toolbar-icon-escape-admin:before {
+  background-image: url("../../../misc/icons/bebebe/chevron-disc-left.svg");
+}
+.no-svg .toolbar .toolbar-icon-escape-admin:before {
+  background-image: url("../../../misc/icons/bebebe/chevron-disc-left.png");
+}
+[dir="rtl"] .toolbar .toolbar-icon-escape-admin:before {
+  background-image: url("../../../misc/icons/bebebe/chevron-disc-right.svg");
+}
+[dir="rtl"] .no-svg .toolbar .toolbar-icon-escape-admin:before {
+  background-image: url("../../../misc/icons/bebebe/chevron-disc-right.png");
+}
 /**
  * Orientation toggle.
  */

@@ -6,17 +6,17 @@
 
 namespace Drupal\locale\Form;
 
-use Drupal\system\SystemConfigFormBase;
+use Drupal\Core\Form\ConfigFormBase;
 
 /**
  * Configure locale settings for this site.
  */
-class LocaleSettingsForm extends SystemConfigFormBase {
+class LocaleSettingsForm extends ConfigFormBase {
 
   /**
-   * Implements \Drupal\Core\Form\FormInterface::getFormID().
+   * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'locale_translate_settings';
   }
 
@@ -38,13 +38,7 @@ class LocaleSettingsForm extends SystemConfigFormBase {
       '#description' => t('Select how frequently you want to check for new interface translations for your currently installed modules and themes. <a href="@url">Check updates now</a>.', array('@url' => url('admin/reports/translations/check'))),
     );
 
-    $form['check_disabled_modules'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Check for updates of disabled modules and themes'),
-      '#default_value' => $config->get('translation.check_disabled_modules'),
-    );
-
-    if ($directory =\Drupal::config('locale.settings')->get('translation.path')) {
+    if ($directory = $config->get('translation.path')) {
       $description = t('Translation files are stored locally in the  %path directory. You can change this directory on the <a href="@url">File system</a> configuration page.', array('%path' => $directory, '@url' => url('admin/config/media/file-system')));
     }
     else {
@@ -93,7 +87,7 @@ class LocaleSettingsForm extends SystemConfigFormBase {
     parent::validateForm($form, $form_state);
 
     if (empty($form['#translation_directory']) && $form_state['values']['use_source'] == LOCALE_TRANSLATION_USE_SOURCE_LOCAL) {
-      form_set_error('use_source', t('You have selected local translation source, but no <a href="@url">Interface translation directory</a> was configured.', array('@url' => url('admin/config/media/file-system'))));
+      $this->setFormError('use_source', $form_state, $this->t('You have selected local translation source, but no <a href="@url">Interface translation directory</a> was configured.', array('@url' => url('admin/config/media/file-system'))));
     }
   }
 
@@ -111,28 +105,26 @@ class LocaleSettingsForm extends SystemConfigFormBase {
       case LOCALE_TRANSLATION_OVERWRITE_ALL:
         $config
           ->set('translation.overwrite_customized', TRUE)
-          ->set('translation.overwrite_not_customized', TRUE);
+          ->set('translation.overwrite_not_customized', TRUE)
+          ->save();
         break;
       case LOCALE_TRANSLATION_OVERWRITE_NON_CUSTOMIZED:
         $config
           ->set('translation.overwrite_customized', FALSE)
-          ->set('translation.overwrite_not_customized', TRUE);
+          ->set('translation.overwrite_not_customized', TRUE)
+          ->save();
         break;
       case LOCALE_TRANSLATION_OVERWRITE_NONE:
         $config
           ->set('translation.overwrite_customized', FALSE)
-          ->set('translation.overwrite_not_customized', FALSE);
+          ->set('translation.overwrite_not_customized', FALSE)
+          ->save();
         break;
     }
 
-    $config
-      ->set('translation.check_disabled_modules', $values['check_disabled_modules'])
-      ->save();
-
     // Invalidate the cached translation status when the configuration setting of
-    // 'use_source' and 'check_disabled_modules' change.
-    if ($form['use_source']['#default_value'] != $form_state['values']['use_source'] ||
-        $form['check_disabled_modules']['#default_value'] != $form_state['values']['check_disabled_modules']) {
+    // 'use_source' changes.
+    if ($form['use_source']['#default_value'] != $form_state['values']['use_source']) {
       locale_translation_clear_status();
     }
 

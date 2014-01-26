@@ -8,6 +8,7 @@
 namespace Drupal\contextual\Tests;
 
 use Drupal\simpletest\WebTestBase;
+use Drupal\Core\Template\Attribute;
 
 /**
  * Tests accessible links after inaccessible links on dynamic context.
@@ -60,10 +61,10 @@ class ContextualDynamicContextTest extends WebTestBase {
     // Now, on the front page, all article nodes should have contextual links
     // placeholders, as should the view that contains them.
     $ids = array(
-      'node:node:' . $node1->id() . ':',
-      'node:node:' . $node2->id() . ':',
-      'node:node:' . $node3->id() . ':',
-      'views_ui:admin/structure/views/view:frontpage:location=page&name=frontpage&display_id=page_1',
+      'node:node=' . $node1->id() . ':',
+      'node:node=' . $node2->id() . ':',
+      'node:node=' . $node3->id() . ':',
+      'views_ui_edit:view=frontpage:location=page&name=frontpage&display_id=page_1',
     );
 
     // Editor user: can access contextual links and can edit articles.
@@ -77,9 +78,9 @@ class ContextualDynamicContextTest extends WebTestBase {
     $response = $this->renderContextualLinks($ids, 'node');
     $this->assertResponse(200);
     $json = drupal_json_decode($response);
-    $this->assertIdentical($json[$ids[0]], '<ul class="contextual-links"><li class="node-edit odd first last"><a href="' . base_path() . 'node/1/edit?destination=node">Edit</a></li></ul>');
+    $this->assertIdentical($json[$ids[0]], '<ul class="contextual-links"><li class="nodepage-edit odd first last"><a href="' . base_path() . 'node/1/edit?destination=node">Edit</a></li></ul>');
     $this->assertIdentical($json[$ids[1]], '');
-    $this->assertIdentical($json[$ids[2]], '<ul class="contextual-links"><li class="node-edit odd first last"><a href="' . base_path() . 'node/3/edit?destination=node">Edit</a></li></ul>');
+    $this->assertIdentical($json[$ids[2]], '<ul class="contextual-links"><li class="nodepage-edit odd first last"><a href="' . base_path() . 'node/3/edit?destination=node">Edit</a></li></ul>');
     $this->assertIdentical($json[$ids[3]], '');
 
     // Authenticated user: can access contextual links, cannot edit articles.
@@ -120,7 +121,7 @@ class ContextualDynamicContextTest extends WebTestBase {
    * @return bool
    */
   protected function assertContextualLinkPlaceHolder($id) {
-    $this->assertRaw('<div data-contextual-id="'. $id . '"></div>', format_string('Contextual link placeholder with id @id exists.', array('@id' => $id)));
+    $this->assertRaw('<div' . new Attribute(array('data-contextual-id' => $id)) . '></div>', format_string('Contextual link placeholder with id @id exists.', array('@id' => $id)));
   }
 
   /**
@@ -132,7 +133,7 @@ class ContextualDynamicContextTest extends WebTestBase {
    * @return bool
    */
   protected function assertNoContextualLinkPlaceHolder($id) {
-    $this->assertNoRaw('<div data-contextual-id="'. $id . '"></div>', format_string('Contextual link placeholder with id @id does not exist.', array('@id' => $id)));
+    $this->assertNoRaw('<div' . new Attribute(array('data-contextual-id' => $id)) . '></div>', format_string('Contextual link placeholder with id @id does not exist.', array('@id' => $id)));
   }
 
   /**
@@ -147,30 +148,10 @@ class ContextualDynamicContextTest extends WebTestBase {
    *   The response body.
    */
   protected function renderContextualLinks($ids, $current_path) {
-    // Build POST values.
     $post = array();
     for ($i = 0; $i < count($ids); $i++) {
       $post['ids[' . $i . ']'] = $ids[$i];
     }
-
-    // Serialize POST values.
-    foreach ($post as $key => $value) {
-      // Encode according to application/x-www-form-urlencoded
-      // Both names and values needs to be urlencoded, according to
-      // http://www.w3.org/TR/html4/interact/forms.html#h-17.13.4.1
-      $post[$key] = urlencode($key) . '=' . urlencode($value);
-    }
-    $post = implode('&', $post);
-
-    // Perform HTTP request.
-    return $this->curlExec(array(
-      CURLOPT_URL => url('contextual/render', array('absolute' => TRUE, 'query' => array('destination' => $current_path))),
-      CURLOPT_POST => TRUE,
-      CURLOPT_POSTFIELDS => $post,
-      CURLOPT_HTTPHEADER => array(
-        'Accept: application/json',
-        'Content-Type: application/x-www-form-urlencoded',
-      ),
-    ));
+    return $this->drupalPost('contextual/render', 'application/json', $post, array('query' => array('destination' => $current_path)));
   }
 }

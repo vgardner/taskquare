@@ -7,12 +7,6 @@
 
 "use strict";
 
-// Do not process the window of the overlay.
-if (parent.Drupal.overlay && parent.Drupal.overlay.iframeWindow === window) {
-  return;
-}
-
-
 /**
  * Provides an API for managing page tabbing order modifications.
  */
@@ -133,7 +127,7 @@ $.extend(TabbingManager.prototype, {
     if ($hasFocus.length === 0) {
       $hasFocus = $set.eq(0);
     }
-    $hasFocus.focus();
+    $hasFocus.trigger('focus');
   },
 
   /**

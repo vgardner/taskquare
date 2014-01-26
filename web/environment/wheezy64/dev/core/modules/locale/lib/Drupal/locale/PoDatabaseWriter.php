@@ -45,7 +45,7 @@ class PoDatabaseWriter implements PoWriterInterface {
   /**
    * Header of the po file written to the database.
    *
-   * @var Drupal\Component\Gettext\PoHeader
+   * @var \Drupal\Component\Gettext\PoHeader
    */
   private $_header;
 
@@ -148,14 +148,13 @@ class PoDatabaseWriter implements PoWriterInterface {
    *
    * A langcode is required to set the current header's PluralForm.
    *
-   * @param Drupal\Component\Gettext\PoHeader $header
+   * @param \Drupal\Component\Gettext\PoHeader $header
    *   Header metadata.
    *
    * @throws Exception
    */
   function setHeader(PoHeader $header) {
     $this->_header = $header;
-    $config = \Drupal::config('locale.settings');
     $locale_plurals = \Drupal::state()->get('locale.translation.plurals') ?: array();
 
     // Check for options.
@@ -209,7 +208,7 @@ class PoDatabaseWriter implements PoWriterInterface {
   /**
    * Imports one string into the database.
    *
-   * @param Drupal\Component\Gettext\PoItem $item
+   * @param \Drupal\Component\Gettext\PoItem $item
    *   The item being imported.
    *
    * @return int
@@ -267,7 +266,7 @@ class PoDatabaseWriter implements PoWriterInterface {
         // No such source string in the database yet.
         $string = \Drupal::service('locale.storage')->createString(array('source' => $source, 'context' => $context))
           ->save();
-        $target = \Drupal::service('locale.storage')->createTranslation(array(
+        \Drupal::service('locale.storage')->createTranslation(array(
           'lid' => $string->getId(),
           'language' => $this->_langcode,
           'translation' => $translation,

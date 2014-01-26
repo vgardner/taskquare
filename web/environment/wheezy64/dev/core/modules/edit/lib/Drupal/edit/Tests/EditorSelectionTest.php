@@ -37,7 +37,7 @@ class EditorSelectionTest extends EditTestBase {
     );
   }
 
-  function setUp() {
+  protected function setUp() {
     parent::setUp();
 
     $this->editorManager = $this->container->get('plugin.manager.edit.editor');
@@ -58,7 +58,7 @@ class EditorSelectionTest extends EditTestBase {
    * Tests a textual field, without/with text processing, with cardinality 1 and
    * >1, always without a WYSIWYG editor present.
    */
-  function testText() {
+  public function testText() {
     $field_name = 'field_text';
     $this->createFieldWithInstance(
       $field_name, 'text', 1, 'Simple text field',
@@ -76,7 +76,7 @@ class EditorSelectionTest extends EditTestBase {
     $items = array(array('value' => 'Hello, world!', 'format' => 'full_html'));
 
     // Editor selection without text processing, with cardinality 1.
-    $this->assertEqual('direct', $this->getSelectedEditor($items, $field_name), "Without text processing, cardinality 1, the 'direct' editor is selected.");
+    $this->assertEqual('plain_text', $this->getSelectedEditor($items, $field_name), "Without text processing, cardinality 1, the 'plain_text' editor is selected.");
 
     // Editor selection with text processing, cardinality 1.
     $this->field_text_instance->settings['text_processing'] = 1;
@@ -86,7 +86,7 @@ class EditorSelectionTest extends EditTestBase {
     // Editor selection without text processing, cardinality 1 (again).
     $this->field_text_instance->settings['text_processing'] = 0;
     $this->field_text_instance->save();
-    $this->assertEqual('direct', $this->getSelectedEditor($items, $field_name), "Without text processing again, cardinality 1, the 'direct' editor is selected.");
+    $this->assertEqual('plain_text', $this->getSelectedEditor($items, $field_name), "Without text processing again, cardinality 1, the 'plain_text' editor is selected.");
 
     // Editor selection without text processing, cardinality >1
     $this->field_text_field->cardinality = 2;
@@ -105,7 +105,7 @@ class EditorSelectionTest extends EditTestBase {
    * always with an Editor plugin present that supports textual fields with text
    * processing, but with varying text format compatibility.
    */
-  function testTextWysiwyg() {
+  public function testTextWysiwyg() {
     // Enable edit_test module so that the 'wysiwyg' editor becomes available.
     $this->enableModules(array('edit_test'));
 
@@ -142,7 +142,7 @@ class EditorSelectionTest extends EditTestBase {
   /**
    * Tests a number field, with cardinality 1 and >1.
    */
-  function testNumber() {
+  public function testNumber() {
     $field_name = 'field_nr';
     $this->createFieldWithInstance(
       $field_name, 'number_integer', 1, 'Simple number field',

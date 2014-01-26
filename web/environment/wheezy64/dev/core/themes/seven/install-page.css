@@ -27,33 +27,25 @@ body.install-page {
   background: none;
 }
 @media all and (min-width: 48em) { /* 768px */
-  html, body {
-    height: 100%;
-    text-align: center;
-    white-space: nowrap;
-    margin: 0;
+  html {
+    display: table;
   }
-  body:before {
-    content: '';
-    display: inline-block;
-    height: 100%;
-    width: 0;
+  body {
+    display: table-cell;
+    padding: 1em 0;
     vertical-align: middle;
-    margin-right: -0.35em;
+  }
+  html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
   }
   body.install-page #page {
-    display: inline-block;
-    vertical-align: middle;
-    text-align: left;
-    white-space: normal;
-    border-radius: 5px;
-    width: 75%;
+    margin: 0 auto;
     max-width: 770px;
+    width: 75%;
+    border-radius: 5px;
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-    padding: 1em 2em 1em 0; /* LTR */
-  }
-  [dir="rtl"] body.install-page #page {
-    padding: 1em 0 1em 2em;
   }
   body.install-page #content {
     -webkit-box-sizing: border-box;
@@ -61,13 +53,12 @@ body.install-page {
     box-sizing: border-box;
     clear: none;
     float: left;
-    padding-left: 50px; /* LTR */
+    padding-left: 50px;
+    padding-right: 50px;
     width: 65%;
   }
   [dir="rtl"] body.install-page #content {
     float: right;
-    padding-left: 0;
-    padding-right: 50px;
   }
   ul{
     padding: 15px;
@@ -94,9 +85,18 @@ body.install-page #page-title {
   background: transparent;
   padding-top: 0;
 }
+body.install-page .site-slogan {
+  margin: 0.75em 0 0.75em 50px; /* LTR */
+}
+[dir="rtl"] body.install-page .site-slogan {
+  margin: 0.75em 50px 0.75em 0;
+}
 @media all and  (max-width: 48em) { /* 768px */
   body.install-page #site-name {
     margin-left: 0;
+  }
+  body.install-page .site-slogan {
+    margin: 0.75em 0 1.5em;
   }
   body.install-page {
     padding: 0;
@@ -183,11 +183,15 @@ body.install-page #page-title {
   float: none;
   width: auto;
 }
-@media all and (max-width: 975px) and (min-width: 48em) {
+@media all and (max-width: 1010px) and (min-width: 48em) {
   .install-page .password-strength,
   .install-page .confirm-parent,
   .install-page div.password-confirm {
     float: none;
     width: auto;
+  }
+  input.password-confirm,
+  input.password-field {
+    float: none;
   }
 }

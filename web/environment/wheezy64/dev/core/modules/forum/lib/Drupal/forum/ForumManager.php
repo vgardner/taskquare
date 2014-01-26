@@ -9,8 +9,9 @@ namespace Drupal\forum;
 
 use Drupal\Core\Config\ConfigFactory;
 use Drupal\Core\Database\Connection;
-use Drupal\Core\Entity\EntityManager;
+use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\StringTranslation\TranslationInterface;
+use Drupal\comment\CommentInterface;
 use Drupal\field\FieldInfo;
 use Drupal\node\NodeInterface;
 
@@ -49,7 +50,7 @@ class ForumManager implements ForumManagerInterface {
   /**
    * Entity manager service
    *
-   * @var \Drupal\Core\Entity\EntityManager
+   * @var \Drupal\Core\Entity\EntityManagerInterface
    */
   protected $entityManager;
 
@@ -91,7 +92,7 @@ class ForumManager implements ForumManagerInterface {
   /**
    * Cached forum index.
    *
-   * @var \Drupal\taxonomy\Plugin\Core\Entity\Term;
+   * @var \Drupal\taxonomy\TermInterface
    */
   protected $index;
 
@@ -114,7 +115,7 @@ class ForumManager implements ForumManagerInterface {
    *
    * @param \Drupal\Core\Config\ConfigFactory $config_factory
    *   The config factory service.
-   * @param \Drupal\Core\Entity\EntityManager $entity_manager
+   * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
    *   The entity manager service.
    * @param \Drupal\Core\Database\Connection $connection
    *   The current database connection.
@@ -123,7 +124,7 @@ class ForumManager implements ForumManagerInterface {
    * @param \Drupal\Core\StringTranslation\TranslationInterface $translation_manager
    *   The translation manager service.
    */
-  public function __construct(ConfigFactory $config_factory, EntityManager $entity_manager, Connection $connection, FieldInfo $field_info, TranslationInterface $translation_manager) {
+  public function __construct(ConfigFactory $config_factory, EntityManagerInterface $entity_manager, Connection $connection, FieldInfo $field_info, TranslationInterface $translation_manager) {
     $this->configFactory = $config_factory;
     $this->entityManager = $entity_manager;
     $this->connection = $connection;
@@ -139,7 +140,8 @@ class ForumManager implements ForumManagerInterface {
     $forum_per_page = $config->get('topics.page_limit');
     $sortby = $config->get('topics.order');
 
-    global $user, $forum_topic_list_header;
+    global $forum_topic_list_header;
+    $user = \Drupal::currentUser();
 
     $forum_topic_list_header = array(
       array('data' => $this->t('Topic'), 'field' => 'f.title'),
@@ -185,23 +187,23 @@ class ForumManager implements ForumManagerInterface {
         ->extend('Drupal\Core\Database\Query\TableSortExtender');
       $query->fields('n', array('nid'));
 
-      $query->join('node_comment_statistics', 'ncs', 'n.nid = ncs.nid');
-      $query->fields('ncs', array(
+      $query->join('comment_entity_statistics', 'ces', "n.nid = ces.entity_id AND ces.field_id = 'node__comment_forum' AND ces.entity_type = 'node'");
+      $query->fields('ces', array(
         'cid',
         'last_comment_uid',
         'last_comment_timestamp',
         'comment_count'
       ));
 
-      $query->join('forum_index', 'f', 'f.nid = ncs.nid');
+      $query->join('forum_index', 'f', 'f.nid = n.nid');
       $query->addField('f', 'tid', 'forum_tid');
 
       $query->join('users', 'u', 'n.uid = u.uid');
       $query->addField('u', 'name');
 
-      $query->join('users', 'u2', 'ncs.last_comment_uid = u2.uid');
+      $query->join('users', 'u2', 'ces.last_comment_uid = u2.uid');
 
-      $query->addExpression('CASE ncs.last_comment_uid WHEN 0 THEN ncs.last_comment_name ELSE u2.name END', 'last_comment_name');
+      $query->addExpression('CASE ces.last_comment_uid WHEN 0 THEN ces.last_comment_name ELSE u2.name END', 'last_comment_name');
 
       $query
         ->orderBy('f.sticky', 'DESC')
@@ -214,7 +216,7 @@ class ForumManager implements ForumManagerInterface {
       $result = array();
       foreach ($query->execute() as $row) {
         $topic = $nodes[$row->nid];
-        $topic->comment_mode = $topic->comment;
+        $topic->comment_mode = $topic->comment_forum->status;
 
         foreach ($row as $key => $value) {
           $topic->{$key} = $value;
@@ -326,7 +328,7 @@ class ForumManager implements ForumManagerInterface {
    *   previously viewed the node; otherwise HISTORY_READ_LIMIT.
    */
   protected function lastVisit($nid) {
-    global $user;
+    $user = \Drupal::currentUser();
 
     if (empty($this->history[$nid])) {
       $result = $this->connection->select('history', 'h')
@@ -356,12 +358,12 @@ class ForumManager implements ForumManagerInterface {
     // Query "Last Post" information for this forum.
     $query = $this->connection->select('node_field_data', 'n');
     $query->join('forum', 'f', 'n.vid = f.vid AND f.tid = :tid', array(':tid' => $tid));
-    $query->join('node_comment_statistics', 'ncs', 'n.nid = ncs.nid');
-    $query->join('users', 'u', 'ncs.last_comment_uid = u.uid');
-    $query->addExpression('CASE ncs.last_comment_uid WHEN 0 THEN ncs.last_comment_name ELSE u.name END', 'last_comment_name');
+    $query->join('comment_entity_statistics', 'ces', "n.nid = ces.entity_id AND ces.field_id = 'node__comment_forum' AND ces.entity_type = 'node'");
+    $query->join('users', 'u', 'ces.last_comment_uid = u.uid');
+    $query->addExpression('CASE ces.last_comment_uid WHEN 0 THEN ces.last_comment_name ELSE u.name END', 'last_comment_name');
 
     $topic = $query
-      ->fields('ncs', array('last_comment_timestamp', 'last_comment_uid'))
+      ->fields('ces', array('last_comment_timestamp', 'last_comment_uid'))
       ->condition('n.status', 1)
       ->orderBy('last_comment_timestamp', 'DESC')
       ->range(0, 1)
@@ -394,10 +396,10 @@ class ForumManager implements ForumManagerInterface {
     if (empty($this->forumStatistics)) {
       // Prime the statistics.
       $query = $this->connection->select('node_field_data', 'n');
-      $query->join('node_comment_statistics', 'ncs', 'n.nid = ncs.nid');
+      $query->join('comment_entity_statistics', 'ces', "n.nid = ces.entity_id AND ces.field_id = 'node__comment_forum' AND ces.entity_type = 'node'");
       $query->join('forum', 'f', 'n.vid = f.vid');
       $query->addExpression('COUNT(n.nid)', 'topic_count');
-      $query->addExpression('SUM(ncs.comment_count)', 'comment_count');
+      $query->addExpression('SUM(ces.comment_count)', 'comment_count');
       $this->forumStatistics = $query
         ->fields('f', array('tid'))
         ->condition('n.status', 1)
@@ -515,16 +517,16 @@ class ForumManager implements ForumManagerInterface {
    * {@inheritdoc}
    */
   public function updateIndex($nid) {
-    $count = $this->connection->query('SELECT COUNT(cid) FROM {comment} c INNER JOIN {forum_index} i ON c.nid = i.nid WHERE c.nid = :nid AND c.status = :status', array(
+    $count = $this->connection->query("SELECT COUNT(cid) FROM {comment} c INNER JOIN {forum_index} i ON c.entity_id = i.nid WHERE c.entity_id = :nid AND c.field_id = 'node__comment_forum' AND c.entity_type = 'node' AND c.status = :status", array(
       ':nid' => $nid,
-      ':status' => COMMENT_PUBLISHED,
+      ':status' => CommentInterface::PUBLISHED,
     ))->fetchField();
 
     if ($count > 0) {
       // Comments exist.
-      $last_reply = $this->connection->queryRange('SELECT cid, name, created, uid FROM {comment} WHERE nid = :nid AND status = :status ORDER BY cid DESC', 0, 1, array(
+      $last_reply = $this->connection->queryRange("SELECT cid, name, created, uid FROM {comment} WHERE entity_id = :nid AND field_id = 'node__comment_forum' AND entity_type = 'node' AND status = :status ORDER BY cid DESC", 0, 1, array(
         ':nid' => $nid,
-        ':status' => COMMENT_PUBLISHED,
+        ':status' => CommentInterface::PUBLISHED,
       ))->fetchObject();
       $this->connection->update('forum_index')
         ->fields( array(

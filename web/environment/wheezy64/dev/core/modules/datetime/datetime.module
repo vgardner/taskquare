@@ -50,6 +50,7 @@ function datetime_element_info() {
     '#theme' => 'datetime_form',
     '#theme_wrappers' => array('datetime_wrapper'),
     '#date_date_format' => $date_format,
+    '#date_format_string_type' => $format_type,
     '#date_date_element' => 'date',
     '#date_date_callbacks' => array(),
     '#date_time_format' => $time_format,
@@ -103,7 +104,7 @@ function datetime_theme() {
  *   The current state of the form.
  */
 function datetime_datetime_widget_validate(&$element, &$form_state) {
-  if (!form_get_errors()) {
+  if (!form_get_errors($form_state)) {
     $input_exists = FALSE;
     $input = NestedArray::getValue($form_state['values'], $element['#parents'], $input_exists);
     if ($input_exists) {
@@ -141,7 +142,7 @@ function datetime_datetime_widget_validate(&$element, &$form_state) {
  *   The current state of the form.
  */
 function datetime_datelist_widget_validate(&$element, &$form_state) {
-  if (!form_get_errors()) {
+  if (!form_get_errors($form_state)) {
     $input_exists = FALSE;
     $input = NestedArray::getValue($form_state['values'], $element['#parents'], $input_exists);
     if ($input_exists) {
@@ -170,7 +171,7 @@ function datetime_datelist_widget_validate(&$element, &$form_state) {
  * Sets a default value for an empty date field.
  *
  * Callback for $instance['default_value_function'], as implemented by
- * Drupal\datetime\Plugin\field\widget\DateTimeDatepicker.
+ * Drupal\datetime\Plugin\Field\FieldWidget\DateTimeDatepicker.
  *
  * @param $entity_type
  *
@@ -190,11 +191,11 @@ function datetime_default_value($entity, $field, $instance, $langcode) {
 
   $value = '';
   $date = '';
-  if ($instance['settings']['default_value'] == 'now') {
+  if ($instance->getSetting('default_value') == 'now') {
     // A default value should be in the format and timezone used for date
     // storage.
     $date = new DrupalDateTime('now', DATETIME_STORAGE_TIMEZONE);
-    $storage_format = $field['settings']['datetime_type'] == 'date' ? DATETIME_DATE_STORAGE_FORMAT: DATETIME_DATETIME_STORAGE_FORMAT;
+    $storage_format = $field->getSetting('datetime_type') == 'date' ? DATETIME_DATE_STORAGE_FORMAT: DATETIME_DATETIME_STORAGE_FORMAT;
     $value = $date->format($storage_format);
   }
 
@@ -383,7 +384,7 @@ function template_preprocess_datetime_wrapper(&$variables) {
  *   The form element whose value has been processed.
  */
 function datetime_datetime_form_process($element, &$form_state) {
-
+  $format_settings = array('format_string_type' => $element['#date_format_string_type']);
   // The value callback has populated the #value array.
   $date = !empty($element['#value']['object']) ? $element['#value']['object'] : NULL;
 
@@ -403,7 +404,7 @@ function datetime_datetime_form_process($element, &$form_state) {
   if ($element['#date_date_element'] != 'none') {
 
     $date_format = $element['#date_date_element'] != 'none' ? datetime_html5_format('date', $element) : '';
-    $date_value = !empty($date) ? $date->format($date_format) : $element['#value']['date'];
+    $date_value = !empty($date) ? $date->format($date_format, $format_settings) : $element['#value']['date'];
 
     // Creating format examples on every individual date item is messy, and
     // placeholders are invalid for HTML5 date and datetime, so an example
@@ -422,8 +423,8 @@ function datetime_datetime_form_process($element, &$form_state) {
       $html5_max->setDate($range[1], 12, 31)->setTime(23, 59, 59);
 
       $extra_attributes += array(
-        'min' => $html5_min->format($date_format),
-        'max' => $html5_max->format($date_format),
+        'min' => $html5_min->format($date_format, $format_settings),
+        'max' => $html5_max->format($date_format, $format_settings),
       );
     }
 
@@ -450,7 +451,7 @@ function datetime_datetime_form_process($element, &$form_state) {
   if ($element['#date_time_element'] != 'none') {
 
     $time_format = $element['#date_time_element'] != 'none' ? datetime_html5_format('time', $element) : '';
-    $time_value = !empty($date) ? $date->format($time_format) : $element['#value']['time'];
+    $time_value = !empty($date) ? $date->format($time_format, $format_settings) : $element['#value']['time'];
 
     // Adds the HTML5 attributes.
     $extra_attributes = array(
@@ -508,7 +509,10 @@ function form_type_datetime_value($element, $input = FALSE) {
     }
 
     try {
-      $date = DrupalDateTime::createFromFormat(trim($date_format . ' ' . $time_format), trim($date_input . ' ' . $time_input), $timezone);
+      $date_time_format = trim($date_format . ' ' . $time_format);
+      $date_time_input = trim($date_input . ' ' . $time_input);
+      $date_time_settings = array('format_string_type' => $element['#date_format_string_type']);
+      $date = DrupalDateTime::createFromFormat($date_time_format, $date_time_input, $timezone, $date_time_settings);
     }
     catch (\Exception $e) {
       $date = NULL;
@@ -523,8 +527,8 @@ function form_type_datetime_value($element, $input = FALSE) {
     $date = $element['#default_value'];
     if ($date instanceOf DrupalDateTime && !$date->hasErrors()) {
       $input = array(
-        'date'   => $date->format($element['#date_date_format']),
-        'time'   => $date->format($element['#date_time_format']),
+        'date'   => $date->format($element['#date_date_format'], array('format_string_type' => $element['#date_format_string_type'])),
+        'time'   => $date->format($element['#date_time_format'], array('format_string_type' => $element['#date_format_string_type'])),
         'object' => $date,
       );
     }
@@ -570,7 +574,7 @@ function datetime_datetime_validate($element, &$form_state) {
     // If there's empty input and the field is required, set an error. A
     // reminder of the required format in the message provides a good UX.
     elseif (empty($input['date']) && empty($input['time']) && $element['#required']) {
-      form_error($element, t('The %field date is required. Please enter a date in the format %format.', array('%field' => $title, '%format' => datetime_format_example($format))));
+      form_error($element, $form_state, t('The %field date is required. Please enter a date in the format %format.', array('%field' => $title, '%format' => datetime_format_example($format))));
     }
     else {
       // If the date is valid, set it.
@@ -581,7 +585,7 @@ function datetime_datetime_validate($element, &$form_state) {
       // If the date is invalid, set an error. A reminder of the required
       // format in the message provides a good UX.
       else {
-        form_error($element, t('The %field date is invalid. Please enter a date in the format %format.', array('%field' => $title, '%format' => datetime_format_example($format))));
+        form_error($element, $form_state, t('The %field date is invalid. Please enter a date in the format %format.', array('%field' => $title, '%format' => datetime_format_example($format))));
       }
     }
   }
@@ -643,11 +647,12 @@ function datetime_html5_format($part, $element) {
  *
  */
 function datetime_format_example($format) {
+  $format_type = datetime_default_format_type();
   $date = &drupal_static(__FUNCTION__);
   if (empty($date)) {
     $date = new DrupalDateTime();
   }
-  return $date->format($format);
+  return $date->format($format, array('format_string_type' => $format_type));
 }
 
 /**
@@ -726,8 +731,6 @@ function datetime_datelist_form_process($element, &$form_state) {
   $order = !empty($element['#date_part_order']) ? $element['#date_part_order'] : array('year', 'month', 'day');
   $text_parts = !empty($element['#date_text_parts']) ? $element['#date_text_parts'] : array();
 
-  $has_time = FALSE;
-
   // Output multi-selector for date.
   foreach ($order as $part) {
     switch ($part) {
@@ -753,28 +756,24 @@ function datetime_datelist_form_process($element, &$form_state) {
       case 'hour':
         $format = in_array('ampm', $element['#date_part_order']) ? 'g': 'G';
         $options = $date_helper->hours($format, $element['#required']);
-        $has_time = TRUE;
         $title = t('Hour');
         break;
 
       case 'minute':
         $format = 'i';
         $options = $date_helper->minutes($format, $element['#required'], $element['#date_increment']);
-        $has_time = TRUE;
         $title = t('Minute');
         break;
 
       case 'second':
         $format = 's';
         $options = $date_helper->seconds($format, $element['#required'], $element['#date_increment']);
-        $has_time = TRUE;
         $title = t('Second');
         break;
 
       case 'ampm':
         $format = 'a';
         $options = $date_helper->ampm($element['#required']);
-        $has_time = TRUE;
         $title = t('AM/PM');
     }
 
@@ -908,15 +907,13 @@ function datetime_datelist_validate($element, &$form_state) {
   $input = NestedArray::getValue($form_state['values'], $element['#parents'], $input_exists);
   if ($input_exists) {
 
-    $title = !empty($element['#title']) ? $element['#title'] : '';
-
     // If there's empty input and the field is not required, set it to empty.
     if (empty($input['year']) && empty($input['month']) && empty($input['day']) && !$element['#required']) {
       form_set_value($element, NULL, $form_state);
     }
     // If there's empty input and the field is required, set an error.
     elseif (empty($input['year']) && empty($input['month']) && empty($input['day']) && $element['#required']) {
-      form_error($element, t('The %field date is required.'));
+      form_error($element, $form_state, t('The %field date is required.'));
     }
     else {
       // If the input is valid, set it.
@@ -926,7 +923,7 @@ function datetime_datelist_validate($element, &$form_state) {
       }
       // If the input is invalid, set an error.
       else {
-        form_error($element, t('The %field date is invalid.'));
+        form_error($element, $form_state, t('The %field date is invalid.'));
       }
     }
   }
@@ -962,7 +959,6 @@ function date_increment_round(&$date, $increment) {
     date_time_set($date, $hour, $minute, $second);
     if ($hour == 24) {
       $day += 1;
-      $hour = 0;
       $year = date_format($date, 'Y');
       $month = date_format($date, 'n');
       date_date_set($date, $year, $month, $day);

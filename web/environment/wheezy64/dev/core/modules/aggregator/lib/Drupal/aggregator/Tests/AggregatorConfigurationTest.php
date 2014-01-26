@@ -34,13 +34,12 @@ class AggregatorConfigurationTest extends AggregatorTestBase {
       'aggregator_allowed_html_tags' => '<a>',
       'aggregator_summary_items' => 10,
       'aggregator_clear' => 3600,
-      'aggregator_category_selector' => 'select',
       'aggregator_teaser_length' => 200,
       'aggregator_fetcher' => 'aggregator_test_fetcher',
       'aggregator_parser' => 'aggregator_test_parser',
       'aggregator_processors[aggregator_test_processor]' => 'aggregator_test_processor',
     );
-    $this->drupalPost('admin/config/services/aggregator/settings', $edit, t('Save configuration'));
+    $this->drupalPostForm('admin/config/services/aggregator/settings', $edit, t('Save configuration'));
     $this->assertText(t('The configuration options have been saved.'));
 
     foreach ($edit as $name => $value) {
@@ -53,13 +52,13 @@ class AggregatorConfigurationTest extends AggregatorTestBase {
     $edit = array(
       'dummy_length' => 100,
     );
-    $this->drupalPost('admin/config/services/aggregator/settings', $edit, t('Save configuration'));
+    $this->drupalPostForm('admin/config/services/aggregator/settings', $edit, t('Save configuration'));
     $this->assertText(t('The configuration options have been saved.'));
     $this->assertFieldByName('dummy_length', 100, '"dummy_length" has correct default value.');
 
     // Make sure settings form is still accessible even after disabling a module
     // that provides the selected plugins.
-    module_disable(array('aggregator_test'));
+    module_uninstall(array('aggregator_test'));
     $this->resetAll();
     $this->drupalGet('admin/config/services/aggregator/settings');
     $this->assertResponse(200);

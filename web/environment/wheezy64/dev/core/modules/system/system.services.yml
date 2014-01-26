@@ -5,16 +5,18 @@ services:
       - { name: access_check }
   system.manager:
     class: Drupal\system\SystemManager
-    arguments: ['@module_handler', '@database']
-  system.breadcrumb.legacy:
-    class: Drupal\system\LegacyBreadcrumbBuilder
+    arguments: ['@module_handler', '@database', '@entity.manager']
+  system.breadcrumb.default:
+    class: Drupal\system\PathBasedBreadcrumbBuilder
+    arguments: ['@request', '@entity.manager', '@access_manager', '@router', '@path_processor_manager', '@config.factory',  '@title_resolver']
     tags:
-      - {name: breadcrumb_builder, priority: 500}
+      - { name: breadcrumb_builder, priority: 0 }
   path_processor.files:
     class: Drupal\system\PathProcessor\PathProcessorFiles
     tags:
       - { name: path_processor_inbound, priority: 200 }
-  system.route_subscriber:
-    class: Drupal\system\Routing\RouteSubscriber
+  theme.negotiator.system.batch:
+    class: Drupal\system\Theme\BatchNegotiator
+    arguments: ['@batch.storage']
     tags:
-      - { name: event_subscriber }
+      - { name: theme_negotiator, priority: 1000 }

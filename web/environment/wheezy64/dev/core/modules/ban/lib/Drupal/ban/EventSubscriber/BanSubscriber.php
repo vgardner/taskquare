@@ -22,14 +22,14 @@ class BanSubscriber implements EventSubscriberInterface {
   /**
    * The manager used to check the IP against.
    *
-   * @var Drupal\ban\BanIpManager
+   * @var \Drupal\ban\BanIpManager
    */
   protected $manager;
 
   /**
    * Construct the BanSubscriber.
    *
-   * @param Drupal\ban\BanIpManager $manager
+   * @param \Drupal\ban\BanIpManager $manager
    *   The manager used to check the IP against.
    */
   public function __construct(BanIpManager $manager) {
@@ -37,7 +37,7 @@ class BanSubscriber implements EventSubscriberInterface {
   }
 
   /**
-   * Response with 403 if the visitor's IP adress is banned.
+   * Response with 403 if the visitor's IP address is banned.
    *
    * @param Symfony\Component\HttpKernel\Event\GetResponseEvent $event
    *   The Event to process.

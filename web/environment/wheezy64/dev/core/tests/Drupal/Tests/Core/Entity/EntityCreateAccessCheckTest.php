@@ -10,6 +10,7 @@ namespace Drupal\Tests\Core\Entity;
 use Drupal\Core\Access\AccessCheckInterface;
 use Drupal\Core\Entity\EntityCreateAccessCheck;
 use Drupal\Tests\UnitTestCase;
+use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -47,9 +48,7 @@ class EntityCreateAccessCheckTest extends UnitTestCase {
    * Tests the appliesTo method for the access checker.
    */
   public function testAppliesTo() {
-    $entity_manager = $this->getMockBuilder('Drupal\Core\Entity\EntityManager')
-      ->disableOriginalConstructor()
-      ->getMock();
+    $entity_manager = $this->getMock('Drupal\Core\Entity\EntityManagerInterface');
 
     $entity_access = new EntityCreateAccessCheck($entity_manager);
     $this->assertEquals($entity_access->appliesTo(), array('_entity_create_access'), 'Access checker returned the expected appliesTo() array.');
@@ -65,6 +64,12 @@ class EntityCreateAccessCheckTest extends UnitTestCase {
       array('', 'entity_test',TRUE, AccessCheckInterface::ALLOW),
       array('test_entity', 'entity_test:test_entity', TRUE, AccessCheckInterface::ALLOW),
       array('test_entity', 'entity_test:test_entity', FALSE, AccessCheckInterface::DENY),
+      array('test_entity', 'entity_test:{bundle_argument}', TRUE, AccessCheckInterface::ALLOW),
+      array('test_entity', 'entity_test:{bundle_argument}', FALSE, AccessCheckInterface::DENY),
+      array('', 'entity_test:{bundle_argument}', FALSE, AccessCheckInterface::DENY),
+      // When the bundle is not provided, access should be denied even if the
+      // access controller would allow access.
+      array('', 'entity_test:{bundle_argument}', TRUE, AccessCheckInterface::DENY),
     );
   }
 
@@ -74,23 +79,21 @@ class EntityCreateAccessCheckTest extends UnitTestCase {
    * @dataProvider providerTestAccess
    */
   public function testAccess($entity_bundle, $requirement, $access, $expected) {
-    $entity = $this->getMockBuilder('Drupal\Core\Entity\Entity')
-      ->disableOriginalConstructor()
-      ->getMock();
+    $entity_manager = $this->getMock('Drupal\Core\Entity\EntityManagerInterface');
 
-    $entity_manager = $this->getMockBuilder('Drupal\Core\Entity\EntityManager')
-      ->disableOriginalConstructor()
-      ->getMock();
+    // Don't expect a call to the access controller when we have a bundle
+    // argument requirement but no bundle is provided.
+    if ($entity_bundle || strpos($requirement, '{') === FALSE) {
+      $access_controller = $this->getMock('Drupal\Core\Entity\EntityAccessControllerInterface');
+      $access_controller->expects($this->once())
+        ->method('createAccess')
+        ->with($entity_bundle)
+        ->will($this->returnValue($access));
 
-    $access_controller = $this->getMock('Drupal\Core\Entity\EntityAccessControllerInterface');
-    $access_controller->expects($this->once())
-      ->method('createAccess')
-      ->with($entity_bundle)
-      ->will($this->returnValue($access));
-
-    $entity_manager->expects($this->any())
-      ->method('getAccessController')
-      ->will($this->returnValue($access_controller));
+      $entity_manager->expects($this->any())
+        ->method('getAccessController')
+        ->will($this->returnValue($access_controller));
+    }
 
     $applies_check = new EntityCreateAccessCheck($entity_manager);
 
@@ -103,8 +106,16 @@ class EntityCreateAccessCheckTest extends UnitTestCase {
       ->will($this->returnValue($requirement));
 
     $request = new Request();
+    $raw_variables = new ParameterBag();
+    if ($entity_bundle) {
+      // Add the bundle as a raw variable and an upcasted attribute.
+      $request->attributes->set('bundle_argument', new \stdClass());
+      $raw_variables->set('bundle_argument', $entity_bundle);
+    }
+    $request->attributes->set('_raw_variables', $raw_variables);
 
-    $this->assertEquals($expected, $applies_check->access($route, $request));
+    $account = $this->getMock('Drupal\Core\Session\AccountInterface');
+    $this->assertEquals($expected, $applies_check->access($route, $request, $account));
   }
 
 }

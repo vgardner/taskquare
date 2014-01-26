@@ -19,7 +19,7 @@ class EntityReferenceItemNormalizer extends FieldItemNormalizer implements UuidR
    *
    * @var string
    */
-  protected $supportedInterfaceOrClass = 'Drupal\Core\Entity\Plugin\DataType\EntityReferenceItem';
+  protected $supportedInterfaceOrClass = 'Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem';
 
   /**
    * Implements \Symfony\Component\Serializer\Normalizer\NormalizerInterface::normalize()
@@ -47,7 +47,7 @@ class EntityReferenceItemNormalizer extends FieldItemNormalizer implements UuidR
     // entity so that the items are properly added to the _links and _embedded
     // objects.
     $field_name = $field_item->getParent()->getName();
-    $entity = $field_item->getRoot();
+    $entity = $field_item->getEntity();
     $field_uri = $this->linkManager->getRelationUri($entity->entityType(), $entity->bundle(), $field_name);
     return array(
       '_links' => array(
@@ -64,8 +64,8 @@ class EntityReferenceItemNormalizer extends FieldItemNormalizer implements UuidR
    */
   protected function constructValue($data, $context) {
     $field_item = $context['target_instance'];
-    $field_definition = $field_item->getDefinition();
-    $target_type = $field_definition['settings']['target_type'];
+    $field_definition = $field_item->getFieldDefinition();
+    $target_type = $field_definition->getSetting('target_type');
     if ($id = $this->entityResolver->resolve($this, $data, $target_type)) {
       return array('target_id' => $id);
     }

@@ -9,7 +9,7 @@ namespace Drupal\aggregator\Form;
 
 use Drupal\aggregator\CategoryStorageControllerInterface;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
-use Drupal\Core\Entity\EntityManager;
+use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Form\ConfirmFormBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -37,7 +37,7 @@ class CategoryDeleteForm extends ConfirmFormBase implements ContainerInjectionIn
   /**
    * The entity manager.
    *
-   * @var \Drupal\Core\Entity\EntityManager
+   * @var \Drupal\Core\Entity\EntityManagerInterface
    */
   protected $entityManager;
 
@@ -53,12 +53,12 @@ class CategoryDeleteForm extends ConfirmFormBase implements ContainerInjectionIn
    *
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
    *   The module handler.
-   * @param \Drupal\Core\Entity\EntityManager $entity_manager
+   * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
    *   The entity manager.
    * @param CategoryStorageControllerInterface $category_storage_controller
    *   The category storage controller.
    */
-  public function __construct(ModuleHandlerInterface $module_handler, EntityManager $entity_manager, CategoryStorageControllerInterface $category_storage_controller) {
+  public function __construct(ModuleHandlerInterface $module_handler, EntityManagerInterface $entity_manager, CategoryStorageControllerInterface $category_storage_controller) {
     $this->moduleHandler = $module_handler;
     $this->entityManager = $entity_manager;
     $this->categoryStorageController = $category_storage_controller;
@@ -85,14 +85,16 @@ class CategoryDeleteForm extends ConfirmFormBase implements ContainerInjectionIn
   /**
    * {@inheritdoc}
    */
-  public function getCancelPath() {
-    return 'admin/config/services/aggregator';
+  public function getCancelRoute() {
+    return array(
+      'route_name' => 'aggregator.admin_overview',
+    );
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'aggregator_category_delete';
   }
 
@@ -147,10 +149,10 @@ class CategoryDeleteForm extends ConfirmFormBase implements ContainerInjectionIn
     watchdog('aggregator', 'Category %category deleted.', array('%category' => $title));
     drupal_set_message($this->t('The category %category has been deleted.', array('%category' => $title)));
     if (preg_match('/^\/admin/', $this->getRequest()->getPathInfo())) {
-      $form_state['redirect'] = 'admin/config/services/aggregator/';
+      $form_state['redirect_route']['route_name'] = 'aggregator.admin_overview';
     }
     else {
-      $form_state['redirect'] = 'aggregator';
+      $form_state['redirect_route']['route_name'] = 'aggregator.page_last';
     }
     $this->updateMenuLink('delete', 'aggregator/categories/' . $cid, $title);
   }

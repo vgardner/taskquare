@@ -1,8 +1,9 @@
 /**
  * @file
- * A Backbone View that a dynamic contextual link.
+ * A Backbone View that provides a dynamic contextual link.
  */
-(function ($, _, Backbone, Drupal) {
+
+(function ($, Backbone, Drupal) {
 
 "use strict";
 
@@ -45,6 +46,8 @@ Drupal.edit.ContextualLinkView = Backbone.View.extend({
    * {@inheritdoc}
    */
   render: function (entityModel, isActive) {
+    this.$el.find('a').attr('aria-pressed', isActive);
+
     // Hides the contextual links if an in-place editor is active.
     this.$el.closest('.contextual').toggle(!isActive);
 
@@ -53,4 +56,4 @@ Drupal.edit.ContextualLinkView = Backbone.View.extend({
 
 });
 
-})(jQuery, _, Backbone, Drupal);
+})(jQuery, Backbone, Drupal);

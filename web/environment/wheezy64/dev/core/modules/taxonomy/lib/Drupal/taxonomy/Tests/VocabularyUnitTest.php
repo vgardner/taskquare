@@ -45,7 +45,7 @@ class VocabularyUnitTest extends TaxonomyTestBase {
     }
 
     // Assert that there are no terms left.
-    $this->assertEqual(0, db_query('SELECT COUNT(*) FROM {taxonomy_term_data}')->fetchField());
+    $this->assertEqual(0, db_query('SELECT COUNT(*) FROM {taxonomy_term_data}')->fetchField(), 'There are no terms remaining.');
 
     // Create a new vocabulary and add a few terms to it.
     $vocabulary = $this->createVocabulary();
@@ -61,12 +61,12 @@ class VocabularyUnitTest extends TaxonomyTestBase {
     $terms[4]->save();
 
     // Assert that there are now 5 terms.
-    $this->assertEqual(5, db_query('SELECT COUNT(*) FROM {taxonomy_term_data}')->fetchField());
+    $this->assertEqual(5, db_query('SELECT COUNT(*) FROM {taxonomy_term_data}')->fetchField(), 'There are 5 terms found.');
 
     $vocabulary->delete();
 
     // Assert that there are no terms left.
-    $this->assertEqual(0, db_query('SELECT COUNT(*) FROM {taxonomy_term_data}')->fetchField());
+    $this->assertEqual(0, db_query('SELECT COUNT(*) FROM {taxonomy_term_data}')->fetchField(), 'All terms are deleted.');
   }
 
   /**
@@ -85,8 +85,7 @@ class VocabularyUnitTest extends TaxonomyTestBase {
 
     // Load the vocabulary.
     $new_vocabulary = entity_load('taxonomy_vocabulary', $original_vocabulary->id());
-    $this->assertEqual($new_vocabulary->name, $vocabulary->name);
-    $this->assertEqual($new_vocabulary->name, $vocabulary->name);
+    $this->assertEqual($new_vocabulary->name, $vocabulary->name, 'The vocabulary was loaded.');
 
     // Delete the vocabulary.
     $this->vocabulary->delete();
@@ -202,10 +201,9 @@ class VocabularyUnitTest extends TaxonomyTestBase {
     );
     entity_create('field_instance', $this->instance_definition)->save();
 
-    module_disable(array('taxonomy'));
     require_once DRUPAL_ROOT . '/core/includes/install.inc';
     module_uninstall(array('taxonomy'));
-    module_enable(array('taxonomy'));
+    \Drupal::moduleHandler()->install(array('taxonomy'));
 
     // Now create a vocabulary with the same name. All field instances
     // connected to this vocabulary name should have been removed when the

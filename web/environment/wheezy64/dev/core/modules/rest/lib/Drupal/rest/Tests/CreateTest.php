@@ -7,8 +7,6 @@
 
 namespace Drupal\rest\Tests;
 
-use Drupal\rest\Tests\RESTTestBase;
-
 /**
  * Tests resource creation on user, node and test entities.
  */
@@ -80,8 +78,16 @@ class CreateTest extends RESTTestBase {
         $this->assertResponse(403);
         $this->assertFalse(entity_load_multiple($entity_type, NULL, TRUE), 'No entity has been created in the database.');
 
-        // Restore the valid test value.
+        // Try to create a field with a text format this user has no access to.
         $entity->field_test_text->value = $entity_values['field_test_text'][0]['value'];
+        $entity->field_test_text->format = 'full_html';
+        $serialized = $serializer->serialize($entity, $this->defaultFormat);
+        $this->httpRequest('entity/' . $entity_type, 'POST', $serialized, $this->defaultMimeType);
+        $this->assertResponse(422);
+        $this->assertFalse(entity_load_multiple($entity_type, NULL, TRUE), 'No entity has been created in the database.');
+
+        // Restore the valid test value.
+        $entity->field_test_text->format = 'plain_text';
         $serialized = $serializer->serialize($entity, $this->defaultFormat);
       }
 
@@ -92,19 +98,6 @@ class CreateTest extends RESTTestBase {
       // Try to send no data at all, which does not make sense on POST requests.
       $this->httpRequest('entity/' . $entity_type, 'POST', NULL, $this->defaultMimeType);
       $this->assertResponse(400);
-
-      // Try to create an entity without the CSRF token.
-      $this->curlExec(array(
-        CURLOPT_HTTPGET => FALSE,
-        CURLOPT_POST => TRUE,
-        CURLOPT_CUSTOMREQUEST => 'POST',
-        CURLOPT_POSTFIELDS => $serialized,
-        CURLOPT_URL => url('entity/' . $entity_type, array('absolute' => TRUE)),
-        CURLOPT_NOBODY => FALSE,
-        CURLOPT_HTTPHEADER => array('Content-Type: ' . $this->defaultMimeType),
-      ));
-      $this->assertResponse(403);
-      $this->assertFalse(entity_load_multiple($entity_type, NULL, TRUE), 'No entity has been created in the database.');
 
       // Try to send invalid data to trigger the entity validation constraints.
       // Send a UUID that is too long.
@@ -129,8 +122,7 @@ class CreateTest extends RESTTestBase {
     $this->assertResponse(404);
     $this->assertFalse(entity_load_multiple($entity_type, NULL, TRUE), 'No entity has been created in the database.');
 
-    // @todo Once EntityNG is implemented for other entity types add a security
-    // test. It should not be possible for example to create a test entity on a
-    // node resource route.
+    // @todo Add a security test. It should not be possible for example to
+    //   create a test entity on a node resource route.
   }
 }

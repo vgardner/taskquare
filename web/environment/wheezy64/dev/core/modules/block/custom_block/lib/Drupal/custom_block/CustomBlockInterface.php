@@ -8,11 +8,42 @@
 namespace Drupal\custom_block;
 
 use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\EntityChangedInterface;
 
 /**
  * Provides an interface defining a custom block entity.
  */
-interface CustomBlockInterface extends ContentEntityInterface {
+interface CustomBlockInterface extends ContentEntityInterface, EntityChangedInterface {
+
+  /**
+   * Returns the block revision log message.
+   *
+   * @return string
+   *   The revision log message.
+   */
+  public function getRevisionLog();
+
+  /**
+   * Sets the block description.
+   *
+   * @param string $info
+   *   The block description.
+   *
+   * @return \Drupal\custom_block\CustomBlockInterface
+   *   The class instance that this method is called on.
+   */
+  public function setInfo($info);
+
+  /**
+   * Sets the block revision log message.
+   *
+   * @param string $log
+   *   The revision log message.
+   *
+   * @return \Drupal\custom_block\CustomBlockInterface
+   *   The class instance that this method is called on.
+   */
+  public function setRevisionLog($log);
 
   /**
    * Sets the theme value.
@@ -23,6 +54,9 @@ interface CustomBlockInterface extends ContentEntityInterface {
    *
    * @param string $theme
    *   The theme name.
+   *
+   * @return \Drupal\custom_block\CustomBlockInterface
+   *   The class instance that this method is called on.
    */
   public function setTheme($theme);
 

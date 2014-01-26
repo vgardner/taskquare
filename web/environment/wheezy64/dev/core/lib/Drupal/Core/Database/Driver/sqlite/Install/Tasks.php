@@ -12,23 +12,35 @@ use Drupal\Core\Database\Driver\sqlite\Connection;
 use Drupal\Core\Database\DatabaseNotFoundException;
 use Drupal\Core\Database\Install\Tasks as InstallTasks;
 
+/**
+ * Specifies installation tasks for SQLite databases.
+ */
 class Tasks extends InstallTasks {
+
+  /**
+   * {@inheritdoc}
+   */
   protected $pdoDriver = 'sqlite';
 
+  /**
+   * {@inheritdoc}
+   */
   public function name() {
     return t('SQLite');
   }
 
   /**
-   * Minimum engine version.
-   *
-   * @todo Consider upping to 3.6.8 in Drupal 8 to get SAVEPOINT support.
+   * {@inheritdoc}
    */
   public function minimumVersion() {
+    // @todo Consider upping to 3.6.8 in Drupal 8 to get SAVEPOINT support.
     return '3.3.7';
   }
 
-  public function getFormOptions($database) {
+  /**
+   * {@inheritdoc}
+   */
+  public function getFormOptions(array $database) {
     $form = parent::getFormOptions($database);
 
     // Remove the options that only apply to client/server style databases.
@@ -43,8 +55,7 @@ class Tasks extends InstallTasks {
   }
 
   /**
-   * Check database connection and attempt to create database if the database is
-   * missing.
+   * {@inheritdoc}
    */
   protected function connect() {
     try {

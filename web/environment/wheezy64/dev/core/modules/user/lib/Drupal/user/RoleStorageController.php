@@ -24,14 +24,4 @@ class RoleStorageController extends ConfigStorageController implements RoleStora
       ->execute();
   }
 
-  /**
-   * {@inheritdoc}
-   */
-  protected function attachLoad(&$queried_entities, $revision_id = FALSE) {
-    // Sort the queried roles by their weight.
-    uasort($queried_entities, array($this->entityInfo['class'], 'sort'));
-
-    parent::attachLoad($queried_entities, $revision_id);
-  }
-
 }

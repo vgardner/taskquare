@@ -27,7 +27,7 @@ class LocaleStringTest extends WebTestBase {
   /**
    * The locale storage.
    *
-   * @var Drupal\locale\StringStorageInterface
+   * @var \Drupal\locale\StringStorageInterface
    */
   protected $storage;
 
@@ -73,7 +73,7 @@ class LocaleStringTest extends WebTestBase {
     // Check version handling and updating.
     $this->assertEqual($source->version, 'none', 'String originally created without version.');
     $string = $this->storage->findTranslation(array('lid' => $source->lid));
-    $this->assertEqual($string->version, VERSION, 'Checked and updated string version to Drupal version.');
+    $this->assertEqual($string->version, \Drupal::VERSION, 'Checked and updated string version to Drupal version.');
 
     // Create translation and find it by lid and source.
     $langcode = 'es';
@@ -96,7 +96,7 @@ class LocaleStringTest extends WebTestBase {
 
     // Create some translations and then delete string and all of its translations.
     $lid = $source->lid;
-    $translations = $this->createAllTranslations($source);
+    $this->createAllTranslations($source);
     $search = $this->storage->getTranslations(array('lid' => $source->lid));
     $this->assertEqual(count($search), 3, 'Created and retrieved all translations for our source string.');
 
@@ -144,7 +144,7 @@ class LocaleStringTest extends WebTestBase {
     // Not customized translations.
     $translate1 = $this->createAllTranslations($source1);
     // Customized translations.
-    $translate2 = $this->createAllTranslations($source2, array('customized' => LOCALE_CUSTOMIZED));
+    $this->createAllTranslations($source2, array('customized' => LOCALE_CUSTOMIZED));
     // Try quick search function with different field combinations.
     $langcode = 'es';
     $found = $this->storage->findTranslation(array('language' => $langcode, 'source' => $source1->source, 'context' => $source1->context));

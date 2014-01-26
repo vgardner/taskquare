@@ -67,7 +67,7 @@ class CommentAttributesTest extends CommentTestBase {
     $user_mapping->setFieldMapping('homepage', array('properties' => array('foaf:page'), 'mapping_type' => 'rel'))->save();
 
     // Save comment mapping.
-    $mapping = rdf_get_mapping('comment', 'comment_node_article');
+    $mapping = rdf_get_mapping('comment', 'node__comment');
     $mapping->setBundleMapping(array('types' => array('sioc:Post', 'sioct:Comment')))->save();
     $field_mappings = array(
       'subject' => array(
@@ -125,9 +125,6 @@ class CommentAttributesTest extends CommentTestBase {
       'datatype' => 'http://www.w3.org/2001/XMLSchema#integer',
     );
     $this->assertTrue($graph->hasProperty($this->node_uri, 'http://rdfs.org/sioc/ns#num_replies', $expected_value), 'Number of comments found in RDF output of teaser view (sioc:num_replies).');
-    // Makes sure we don't generate the wrong statement for number of comments.
-    $node_comments_uri = url('node/' . $this->node->id(), array('fragment' => 'comments', 'absolute' => TRUE));
-    $this->assertFalse($graph->hasProperty($node_comments_uri, 'http://rdfs.org/sioc/ns#num_replies', $expected_value), 'Number of comments found in RDF output of teaser view mode (sioc:num_replies).');
 
     // Tests number of comments in full node view, expected value is the same.
     $parser = new \EasyRdf_Parser_Rdfa();
@@ -334,10 +331,11 @@ class CommentAttributesTest extends CommentTestBase {
    */
   function saveComment($nid, $uid, $contact = NULL, $pid = 0) {
     $values = array(
-      'nid' => $nid,
+      'entity_id' => $nid,
+      'entity_type' => 'node',
+      'field_name' => 'comment',
       'uid' => $uid,
       'pid' => $pid,
-      'node_type' => 'comment_node_article',
       'subject' => $this->randomName(),
       'comment_body' => $this->randomName(),
       'status' => 1,

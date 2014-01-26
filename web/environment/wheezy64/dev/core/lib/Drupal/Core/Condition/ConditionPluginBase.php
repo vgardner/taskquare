@@ -15,9 +15,9 @@ use Drupal\Core\Executable\ExecutablePluginBase;
 abstract class ConditionPluginBase extends ExecutablePluginBase implements ConditionInterface {
 
   /**
-   * Implements \Drupal\Core\Form\FormInterface::getFormID().
+   * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     $definition = $this->getPluginDefinition();
     return implode('_', array($definition['module'], $definition['id'], 'condition'));
   }
@@ -35,7 +35,7 @@ abstract class ConditionPluginBase extends ExecutablePluginBase implements Condi
   public function buildForm(array $form, array &$form_state) {
     $form['negate'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Negate the condition.'),
+      '#title' => $this->t('Negate the condition.'),
       '#default_value' => isset($this->configuration['negate']) ? $this->configuration['negate'] : FALSE,
     );
     return $form;

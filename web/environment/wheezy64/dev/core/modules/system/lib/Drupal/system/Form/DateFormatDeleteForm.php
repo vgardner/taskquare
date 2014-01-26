@@ -62,8 +62,10 @@ class DateFormatDeleteForm extends EntityConfirmFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getCancelPath() {
-    return 'admin/config/regional/date-time';
+  public function getCancelRoute() {
+    return array(
+      'route_name' => 'system.date_format_list',
+    );
   }
 
   /**
@@ -73,7 +75,7 @@ class DateFormatDeleteForm extends EntityConfirmFormBase {
     $this->entity->delete();
     drupal_set_message(t('Removed date format %format.', array('%format' => $this->entity->label())));
 
-    $form_state['redirect'] = 'admin/config/regional/date-time';
+    $form_state['redirect_route']['route_name'] = 'system.date_format_list';
   }
 
 }

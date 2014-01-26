@@ -16,15 +16,19 @@
  *   - contextualLinksQueue: queue of contextual links on entities for which it
  *     is not yet known whether the user has permission to edit at >=1 of them.
  */
+
 (function ($, _, Backbone, Drupal, drupalSettings) {
 
 "use strict";
 
-var options = $.extend({
-  strings: {
-    quickEdit: Drupal.t('Quick edit')
+var options = $.extend(drupalSettings.edit,
+  // Merge strings on top of drupalSettings so that they are not mutable.
+  {
+    strings: {
+      quickEdit: Drupal.t('Quick edit')
+    }
   }
-}, drupalSettings.edit);
+);
 
 /**
  * Tracks fields without metadata. Contains objects with the following keys:
@@ -51,17 +55,41 @@ var fieldsAvailableQueue = [];
  */
 var contextualLinksQueue = [];
 
+/**
+ * Tracks how many instances exist for each unique entity. Contains key-value
+ * pairs:
+ * - String entityID
+ * - Number count
+ */
+var entityInstancesTracker = {};
+
 Drupal.behaviors.edit = {
   attach: function (context) {
     // Initialize the Edit app once per page load.
     $('body').once('edit-init', initEdit);
+
+    // Process each entity element: identical entities that appear multiple
+    // times will get a numeric identifier, starting at 0.
+    $(context).find('[data-edit-entity-id]').once('edit').each(function (index, entityElement) {
+      var entityID = entityElement.getAttribute('data-edit-entity-id');
+      if (!entityInstancesTracker.hasOwnProperty(entityID)) {
+        entityInstancesTracker[entityID] = 0;
+      }
+      else {
+        entityInstancesTracker[entityID]++;
+      }
+
+      // Set the calculated entity instance ID for this element.
+      var entityInstanceID = entityInstancesTracker[entityID];
+      entityElement.setAttribute('data-edit-entity-instance-id', entityInstanceID);
+    });
 
     // Process each field element: queue to be used or to fetch metadata.
     // When a field is being rerendered after editing, it will be processed
     // immediately. New fields will be unable to be processed immediately, but
     // will instead be queued to have their metadata fetched, which occurs below
     // in fetchMissingMetaData().
-    $(context).find('[data-edit-id]').once('edit').each(function (index, fieldElement) {
+    $(context).find('[data-edit-field-id]').once('edit').each(function (index, fieldElement) {
       processField(fieldElement);
     });
 
@@ -116,9 +144,10 @@ Drupal.edit = {
  * processed.
  */
 $(document).on('drupalContextualLinkAdded', function (event, data) {
-  if (data.$region.is('[data-edit-entity]')) {
+  if (data.$region.is('[data-edit-entity-id]')) {
     var contextualLink = {
-      entityID: data.$region.attr('data-edit-entity'),
+      entityID: data.$region.attr('data-edit-entity-id'),
+      entityInstanceID: data.$region.attr('data-edit-entity-instance-id'),
       el: data.$el[0],
       region: data.$region[0]
     };
@@ -166,19 +195,26 @@ function initEdit (bodyElement) {
  * Fetch the field's metadata; queue or initialize it (if EntityModel exists).
  *
  * @param DOM fieldElement
- *   A Drupal Field API field's DOM element with a data-edit-id attribute.
+ *   A Drupal Field API field's DOM element with a data-edit-field-id attribute.
  */
 function processField (fieldElement) {
   var metadata = Drupal.edit.metadata;
-  var fieldID = fieldElement.getAttribute('data-edit-id');
+  var fieldID = fieldElement.getAttribute('data-edit-field-id');
   var entityID = extractEntityID(fieldID);
+  // Figure out the instance ID by looking at the ancestor [data-edit-entity-id]
+  // element's data-edit-entity-instance-id attribute.
+  var entityInstanceID = $(fieldElement)
+    .closest('[data-edit-entity-id="' + entityID + '"]')
+    .get(0)
+    .getAttribute('data-edit-entity-instance-id');
 
   // Early-return if metadata for this field is missing.
   if (!metadata.has(fieldID)) {
     fieldsMetadataQueue.push({
       el: fieldElement,
       fieldID: fieldID,
-      entityID: entityID
+      entityID: entityID,
+      entityInstanceID: entityInstanceID
     });
     return;
   }
@@ -189,13 +225,13 @@ function processField (fieldElement) {
 
   // If an EntityModel for this field already exists (and hence also a "Quick
   // edit" contextual link), then initialize it immediately.
-  if (Drupal.edit.collections.entities.where({ id: entityID }).length > 0) {
-    initializeField(fieldElement, fieldID);
+  if (Drupal.edit.collections.entities.where({ entityID: entityID, entityInstanceID: entityInstanceID }).length > 0) {
+    initializeField(fieldElement, fieldID, entityID, entityInstanceID);
   }
   // Otherwise: queue the field. It is now available to be set up when its
   // corresponding entity becomes in-place editable.
   else {
-    fieldsAvailableQueue.push({ el: fieldElement, fieldID: fieldID, entityID: entityID });
+    fieldsAvailableQueue.push({ el: fieldElement, fieldID: fieldID, entityID: entityID, entityInstanceID: entityInstanceID });
   }
 }
 
@@ -206,17 +242,24 @@ function processField (fieldElement) {
  *   The field's DOM element.
  * @param String fieldID
  *   The field's ID.
+ * @param String entityID
+ *   The field's entity's ID.
+ * @param String entityInstanceID
+ *   The field's entity's instance ID.
  */
-function initializeField (fieldElement, fieldID) {
-  var entityId = extractEntityID(fieldID);
-  var entity = Drupal.edit.collections.entities.where({ id: entityId })[0];
+function initializeField (fieldElement, fieldID, entityID, entityInstanceID) {
+  var entity = Drupal.edit.collections.entities.where({
+    entityID: entityID,
+    entityInstanceID: entityInstanceID
+  })[0];
 
   $(fieldElement).addClass('edit-field');
 
   // The FieldModel stores the state of an in-place editable entity field.
   var field = new Drupal.edit.FieldModel({
     el: fieldElement,
-    id: fieldID,
+    fieldID: fieldID,
+    id: fieldID + '[' + entity.get('entityInstanceID') + ']',
     entity: entity,
     metadata: Drupal.edit.metadata.get(fieldID),
     acceptStateChange: _.bind(Drupal.edit.app.acceptEditorStateChange, Drupal.edit.app)
@@ -278,8 +321,7 @@ function loadMissingEditors (callback) {
   var loadedEditors = _.keys(Drupal.edit.editors);
   var missingEditors = [];
   Drupal.edit.collections.fields.each(function (fieldModel) {
-    var id = fieldModel.id;
-    var metadata = Drupal.edit.metadata.get(id);
+    var metadata = Drupal.edit.metadata.get(fieldModel.get('fieldID'));
     if (metadata.access && _.indexOf(loadedEditors, metadata.editor) === -1) {
       missingEditors.push(metadata.editor);
     }
@@ -321,8 +363,11 @@ function loadMissingEditors (callback) {
  *
  * @param Object contextualLink
  *   An object with the following properties:
- *     - String entity: an Edit entity identifier, e.g. "node/1" or
+ *     - String entityID: an Edit entity identifier, e.g. "node/1" or
  *       "custom_block/5".
+ *     - String entityInstanceID: an Edit entity instance identifier, e.g. 0, 1
+ *       or n (depending on whether it's the first, second, or n+1st instance of
+ *       this entity).
  *     - DOM el: element pointing to the contextual links placeholder for this
  *       entity.
  *     - DOM region: element pointing to the contextual region for this entity.
@@ -351,8 +396,11 @@ function initializeEntityContextualLink (contextualLink) {
     return fieldIDs.length === metadata.intersection(fieldIDs).length;
   }
 
-  // Find all fields for this entity and collect their field IDs.
-  var fields = _.where(fieldsAvailableQueue, { entityID: contextualLink.entityID });
+  // Find all fields for this entity instance and collect their field IDs.
+  var fields = _.where(fieldsAvailableQueue, {
+    entityID: contextualLink.entityID,
+    entityInstanceID: contextualLink.entityInstanceID
+  });
   var fieldIDs = _.pluck(fields, 'fieldID');
 
   // No fields found yet.
@@ -360,38 +408,45 @@ function initializeEntityContextualLink (contextualLink) {
     return false;
   }
   // The entity for the given contextual link contains at least one field that
-  // the current user may edit in-place; instantiate EntityModel, EntityView and
-  // ContextualLinkView.
+  // the current user may edit in-place; instantiate EntityModel,
+  // EntityDecorationView and ContextualLinkView.
   else if (hasFieldWithPermission(fieldIDs)) {
     var entityModel = new Drupal.edit.EntityModel({
       el: contextualLink.region,
-      id: contextualLink.entityID,
+      entityID: contextualLink.entityID,
+      entityInstanceID: contextualLink.entityInstanceID,
+      id: contextualLink.entityID + '[' + contextualLink.entityInstanceID + ']',
       label: Drupal.edit.metadata.get(contextualLink.entityID, 'label')
     });
     Drupal.edit.collections.entities.add(entityModel);
-    // Create an EntityView associated with the root DOM node of the entity.
-    var entityView = new Drupal.edit.EntityView({
+    // Create an EntityDecorationView associated with the root DOM node of the
+    // entity.
+    var entityDecorationView = new Drupal.edit.EntityDecorationView({
       el: contextualLink.region,
       model: entityModel
     });
-    entityModel.set('entityView', entityView);
+    entityModel.set('entityDecorationView', entityDecorationView);
 
     // Initialize all queued fields within this entity (creates FieldModels).
     _.each(fields, function (field) {
-      initializeField(field.el, field.fieldID);
+      initializeField(field.el, field.fieldID, contextualLink.entityID, contextualLink.entityInstanceID);
     });
     fieldsAvailableQueue = _.difference(fieldsAvailableQueue, fields);
 
-    // Set up contextual link view after loading any missing in-place editors.
-    loadMissingEditors(function () {
+    // Initialization should only be called once. Use Underscore's once method
+    // to get a one-time use version of the function.
+    var initContextualLink = _.once(function () {
       var $links = $(contextualLink.el).find('.contextual-links');
       var contextualLinkView = new Drupal.edit.ContextualLinkView($.extend({
-        el: $('<li class="quick-edit"><a href=""></a></li>').prependTo($links),
+        el: $('<li class="quick-edit"><a href="" role="button" aria-pressed="false"></a></li>').prependTo($links),
         model: entityModel,
         appModel: Drupal.edit.app.model
       }, options));
       entityModel.set('contextualLinkView', contextualLinkView);
     });
+
+    // Set up ContextualLinkView after loading any missing in-place editors.
+    loadMissingEditors(initContextualLink);
 
     return true;
   }
@@ -421,7 +476,7 @@ function initializeEntityContextualLink (contextualLink) {
  *   The context within which to delete.
  */
 function deleteContainedModelsAndQueues($context) {
-  $context.find('[data-edit-entity]').addBack('[data-edit-entity]').each(function (index, entityElement) {
+  $context.find('[data-edit-entity-id]').addBack('[data-edit-entity-id]').each(function (index, entityElement) {
     // Delete entity model.
     // @todo change to findWhere() as soon as we have Backbone 1.0 in Drupal
     // core. @see https://drupal.org/node/1800022
@@ -430,8 +485,8 @@ function deleteContainedModelsAndQueues($context) {
       var contextualLinkView = entityModels[0].get('contextualLinkView');
       contextualLinkView.undelegateEvents();
       contextualLinkView.remove();
-      // Remove the EntityView.
-      entityModels[0].get('entityView').remove();
+      // Remove the EntityDecorationView.
+      entityModels[0].get('entityDecorationView').remove();
       // Destroy the EntityModel; this will also destroy its FieldModels.
       entityModels[0].destroy();
     }
@@ -443,7 +498,7 @@ function deleteContainedModelsAndQueues($context) {
     contextualLinksQueue = _.filter(contextualLinksQueue, hasOtherRegion);
   });
 
-  $context.find('[data-edit-id]').addBack('[data-edit-id]').each(function (index, fieldElement) {
+  $context.find('[data-edit-field-id]').addBack('[data-edit-field-id]').each(function (index, fieldElement) {
     // Delete field models.
     Drupal.edit.collections.fields.chain()
       .filter(function (fieldModel) { return fieldModel.get('el') === fieldElement; })

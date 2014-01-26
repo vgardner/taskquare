@@ -23,7 +23,6 @@ use Drupal\Core\Annotation\Translation;
  * @EntityType(
  *   id = "breakpoint",
  *   label = @Translation("Breakpoint"),
- *   module = "breakpoint",
  *   controllers = {
  *     "storage" = "Drupal\Core\Config\Entity\ConfigStorageController"
  *   },
@@ -166,8 +165,8 @@ class Breakpoint extends ConfigEntityBase implements BreakpointInterface {
       )));
     }
     // Check for illegal characters in breakpoint source.
-    if (preg_match('/[^a-z_]+/', $this->source)) {
-      throw new InvalidBreakpointSourceException(format_string("Invalid value '@source' for breakpoint source property. Breakpoint source property can only contain lowercase letters and underscores.", array('@source' => $this->source)));
+    if (preg_match('/[^0-9a-z_]+/', $this->source)) {
+      throw new InvalidBreakpointSourceException(format_string("Invalid value '@source' for breakpoint source property. Breakpoint source property can only contain lowercase alphanumeric characters and underscores.", array('@source' => $this->source)));
     }
     // Check for illegal characters in breakpoint names.
     if (preg_match('/[^0-9a-z_\-]/', $this->name)) {

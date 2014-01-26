@@ -25,6 +25,13 @@ class HistoryUserTimestamp extends FilterPluginBase {
   // Don't display empty space where the operator would be.
   var $no_operator = TRUE;
 
+  /**
+   * {@inheritdoc}
+   */
+  public function usesGroupBy() {
+    return FALSE;
+  }
+
   public function buildExposeForm(&$form, &$form_state) {
     parent::buildExposeForm($form, $form_state);
     // @todo There are better ways of excluding required and multiple (object flags)
@@ -53,9 +60,8 @@ class HistoryUserTimestamp extends FilterPluginBase {
   }
 
   public function query() {
-    global $user;
     // This can only work if we're authenticated in.
-    if (!$user->isAuthenticated()) {
+    if (!\Drupal::currentUser()->isAuthenticated()) {
       return;
     }
 
@@ -76,9 +82,9 @@ class HistoryUserTimestamp extends FilterPluginBase {
     $clause = '';
     $clause2 = '';
     if (module_exists('comment')) {
-      $ncs = $this->query->ensureTable('node_comment_statistics', $this->relationship);
-      $clause = ("OR $ncs.last_comment_timestamp > (***CURRENT_TIME*** - $limit)");
-      $clause2 = "OR $field < $ncs.last_comment_timestamp";
+      $ces = $this->query->ensureTable('comment_entity_statistics', $this->relationship);
+      $clause = ("OR $ces.last_comment_timestamp > (***CURRENT_TIME*** - $limit)");
+      $clause2 = "OR $field < $ces.last_comment_timestamp";
     }
 
     // NULL means a history record doesn't exist. That's clearly new content.

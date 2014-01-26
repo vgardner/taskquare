@@ -33,12 +33,16 @@ else {
 
 // Bootstrap to perform initial validation or other operations.
 drupal_bootstrap(DRUPAL_BOOTSTRAP_CODE);
-simpletest_classloader_register();
 
-if (!module_exists('simpletest')) {
-  simpletest_script_print_error("The simpletest module must be enabled before this script can run.");
+if (!\Drupal::moduleHandler()->moduleExists('simpletest')) {
+  simpletest_script_print_error("The Testing (simpletest) module must be installed before this script can run.");
   exit;
 }
+simpletest_classloader_register();
+// We have to add a Request.
+$request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
+$container = \Drupal::getContainer();
+$container->set('request', $request);
 
 if ($args['clean']) {
   // Clean up left-over times and directories.
@@ -201,7 +205,7 @@ function simpletest_script_parse_args() {
     'php' => '',
     'concurrency' => 1,
     'all' => FALSE,
-    'module' => FALSE,
+    'module' => NULL,
     'class' => FALSE,
     'file' => FALSE,
     'color' => FALSE,
@@ -266,6 +270,8 @@ function simpletest_script_init($server_software) {
 
   $host = 'localhost';
   $path = '';
+  $port = '80';
+
   // Determine location of php command automatically, unless a command line argument is supplied.
   if (!empty($args['php'])) {
     $php = $args['php'];
@@ -289,7 +295,8 @@ function simpletest_script_init($server_software) {
   if (!empty($args['url'])) {
     $parsed_url = parse_url($args['url']);
     $host = $parsed_url['host'] . (isset($parsed_url['port']) ? ':' . $parsed_url['port'] : '');
-    $path = isset($parsed_url['path']) ? rtrim($parsed_url['path']) : '';
+    $path = isset($parsed_url['path']) ? rtrim(rtrim($parsed_url['path']), '/') : '';
+    $port = (isset($parsed_url['port']) ? $parsed_url['port'] : $port);
     if ($path == '/') {
       $path = '';
     }
@@ -303,6 +310,7 @@ function simpletest_script_init($server_software) {
   $_SERVER['HTTP_HOST'] = $host;
   $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
   $_SERVER['SERVER_ADDR'] = '127.0.0.1';
+  $_SERVER['SERVER_PORT'] = $port;
   $_SERVER['SERVER_SOFTWARE'] = $server_software;
   $_SERVER['SERVER_NAME'] = 'localhost';
   $_SERVER['REQUEST_URI'] = $path .'/';
@@ -326,6 +334,10 @@ function simpletest_script_init($server_software) {
 /**
  * Get all available tests from simpletest and PHPUnit.
  *
+ * @param string $module
+ *   Name of a module. If set then only tests belonging to this module are
+ *   returned.
+ *
  * @return
  *   An array of tests keyed with the groups specified in each of the tests
  *   getInfo() method and then keyed by the test class. An example of the array
@@ -341,9 +353,9 @@ function simpletest_script_init($server_software) {
  *     );
  *   @endcode
  */
-function simpletest_script_get_all_tests() {
-  $tests = simpletest_test_get_all();
-  $tests['PHPUnit'] = simpletest_phpunit_get_available_tests();
+function simpletest_script_get_all_tests($module = NULL) {
+  $tests = simpletest_test_get_all($module);
+  $tests['PHPUnit'] = simpletest_phpunit_get_available_tests($module);
   return $tests;
 }
 
@@ -477,8 +489,11 @@ function simpletest_script_run_one_test($test_id, $test_class) {
   try {
     // Bootstrap Drupal.
     drupal_bootstrap(DRUPAL_BOOTSTRAP_CODE);
-
     simpletest_classloader_register();
+    // We have to add a Request.
+    $request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
+    $container = \Drupal::getContainer();
+    $container->set('request', $request);
 
     // Override configuration according to command line parameters.
     $conf['simpletest.settings']['verbose'] = $args['verbose'];
@@ -619,8 +634,8 @@ function simpletest_script_get_test_list() {
   global $args;
 
   $test_list = array();
-  if ($args['all']) {
-    $groups = simpletest_script_get_all_tests();
+  if ($args['all'] || $args['module']) {
+    $groups = simpletest_script_get_all_tests($args['module']);
     $all_tests = array();
     foreach ($groups as $group => $tests) {
       $all_tests = array_merge($all_tests, array_keys($tests));
@@ -631,20 +646,6 @@ function simpletest_script_get_test_list() {
     if ($args['class']) {
       foreach ($args['test_names'] as $class_name) {
         $test_list[] = $class_name;
-      }
-    }
-    elseif ($args['module']) {
-      $modules = drupal_system_listing('/^' . DRUPAL_PHP_FUNCTION_PATTERN . '\.module$/', 'modules', 'name', 0);
-      foreach ($args['test_names'] as $module) {
-        // PSR-0 only.
-        $dir = dirname($modules[$module]->uri) . "/lib/Drupal/$module/Tests";
-        $files = file_scan_directory($dir, '@\.php$@', array(
-          'key' => 'name',
-          'recurse' => TRUE,
-        ));
-        foreach ($files as $test => $file) {
-          $test_list[] = "Drupal\\$module\\Tests\\$test";
-        }
       }
     }
     elseif ($args['file']) {
@@ -668,7 +669,10 @@ function simpletest_script_get_test_list() {
         }
         else {
           foreach ($matches[1] as $class_name) {
-            $test_list[] = $namespace . '\\' . $class_name;
+            $namespace_class = $namespace . '\\' . $class_name;
+            if (is_subclass_of($namespace_class, '\Drupal\simpletest\TestBase') || is_subclass_of($namespace_class, '\Drupal\Tests\UnitTestCase')) {
+              $test_list[] = $namespace_class;
+            }
           }
         }
       }

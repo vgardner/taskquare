@@ -9,7 +9,7 @@ namespace Drupal\node\Access;
 
 use Drupal\Core\Access\AccessCheckInterface;
 use Drupal\Core\Database\Connection;
-use Drupal\Core\Entity\EntityManager;
+use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\node\NodeInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -51,12 +51,12 @@ class NodeRevisionAccessCheck implements AccessCheckInterface {
   /**
    * Constructs a new NodeRevisionAccessCheck.
    *
-   * @param \Drupal\Core\Entity\EntityManager $entity_manager
+   * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
    *   The entity manager.
    * @param \Drupal\Core\Database\Connection $connection
    *   The database connection.
    */
-  public function __construct(EntityManager $entity_manager, Connection $connection) {
+  public function __construct(EntityManagerInterface $entity_manager, Connection $connection) {
     $this->nodeStorage = $entity_manager->getStorageController('node');
     $this->nodeAccess = $entity_manager->getAccessController('node');
     $this->connection = $connection;
@@ -72,9 +72,19 @@ class NodeRevisionAccessCheck implements AccessCheckInterface {
   /**
    * {@inheritdoc}
    */
-  public function access(Route $route, Request $request) {
-    $revision = $this->nodeStorage->loadRevision($request->attributes->get('node_revision'));
-    return $this->checkAccess($revision, $route->getRequirement('_access_node_revision')) ? static::ALLOW : static::DENY;
+  public function access(Route $route, Request $request, AccountInterface $account) {
+    // If the route has a {node_revision} placeholder, load the node for that
+    // revision. Otherwise, try to use a {node} placeholder.
+    if ($request->attributes->has('node_revision')) {
+      $node = $this->nodeStorage->loadRevision($request->attributes->get('node_revision'));
+    }
+    elseif ($request->attributes->has('node')) {
+      $node = $request->attributes->get('node');
+    }
+    else {
+      return static::DENY;
+    }
+    return $this->checkAccess($node, $account, $route->getRequirement('_access_node_revision')) ? static::ALLOW : static::DENY;
   }
 
   /**
@@ -82,12 +92,11 @@ class NodeRevisionAccessCheck implements AccessCheckInterface {
    *
    * @param \Drupal\node\NodeInterface $node
    *   The node to check.
+   * @param \Drupal\Core\Session\AccountInterface $account
+   *   A user object representing the user for whom the operation is to be
+   *   performed.
    * @param string $op
    *   (optional) The specific operation being checked. Defaults to 'view.'
-   * @param \Drupal\Core\Session\AccountInterface|null $account
-   *   (optional) A user object representing the user for whom the operation is
-   *   to be performed. Determines access for a user other than the current user.
-   *   Defaults to NULL.
    * @param string|null $langcode
    *   (optional) Language code for the variant of the node. Different language
    *   variants might have different permissions associated. If NULL, the
@@ -96,7 +105,7 @@ class NodeRevisionAccessCheck implements AccessCheckInterface {
    * @return bool
    *   TRUE if the operation may be performed, FALSE otherwise.
    */
-  public function checkAccess(NodeInterface $node, $op = 'view', AccountInterface $account = NULL, $langcode = NULL) {
+  public function checkAccess(NodeInterface $node, AccountInterface $account, $op = 'view', $langcode = NULL) {
     $map = array(
       'view' => 'view all revisions',
       'update' => 'revert all revisions',
@@ -115,10 +124,6 @@ class NodeRevisionAccessCheck implements AccessCheckInterface {
       return FALSE;
     }
 
-    if (!isset($account)) {
-      $account = $GLOBALS['user'];
-    }
-
     // If no language code was provided, default to the node revision's langcode.
     if (empty($langcode)) {
       $langcode = $node->language()->id;
@@ -130,8 +135,9 @@ class NodeRevisionAccessCheck implements AccessCheckInterface {
 
     if (!isset($this->access[$cid])) {
       // Perform basic permission checks first.
-      if (!user_access($map[$op], $account) && !user_access($type_map[$op], $account) && !user_access('administer nodes', $account)) {
-        return $this->access[$cid] = FALSE;
+      if (!$account->hasPermission($map[$op]) && !$account->hasPermission($type_map[$op]) && !$account->hasPermission('administer nodes')) {
+        $this->access[$cid] = FALSE;
+        return FALSE;
       }
 
       // There should be at least two revisions. If the vid of the given node
@@ -142,7 +148,7 @@ class NodeRevisionAccessCheck implements AccessCheckInterface {
       if ($node->isDefaultRevision() && ($this->connection->query('SELECT COUNT(*) FROM {node_field_revision} WHERE nid = :nid AND default_langcode = 1', array(':nid' => $node->id()))->fetchField() == 1 || $op == 'update' || $op == 'delete')) {
         $this->access[$cid] = FALSE;
       }
-      elseif (user_access('administer nodes', $account)) {
+      elseif ($account->hasPermission('administer nodes')) {
         $this->access[$cid] = TRUE;
       }
       else {

@@ -18,7 +18,6 @@ use Drupal\config_test\ConfigTestInterface;
  * @EntityType(
  *   id = "config_test",
  *   label = @Translation("Test configuration"),
- *   module = "config_test",
  *   controllers = {
  *     "storage" = "Drupal\config_test\ConfigTestStorageController",
  *     "list" = "Drupal\config_test\ConfigTestListController",
@@ -28,13 +27,15 @@ use Drupal\config_test\ConfigTestInterface;
  *     },
  *     "access" = "Drupal\config_test\ConfigTestAccessController"
  *   },
- *   uri_callback = "config_test_uri",
  *   config_prefix = "config_test.dynamic",
  *   entity_keys = {
  *     "id" = "id",
  *     "label" = "label",
  *     "uuid" = "uuid",
  *     "status" = "status"
+ *   },
+ *   links = {
+ *     "edit-form" = "config_test.entity"
  *   }
  * )
  */

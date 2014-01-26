@@ -8,7 +8,6 @@
 namespace Drupal\views\Tests;
 
 use Drupal\views\Tests\ViewTestBase;
-use Drupal\Component\Utility\MapArray;
 use Drupal\Core\Language\Language;
 
 /**
@@ -74,14 +73,17 @@ class ViewsTaxonomyAutocompleteTest extends ViewTestBase {
   public function testTaxonomyAutocomplete() {
     $this->user = $this->drupalCreateUser(array('access content'));
     $this->drupalLogin($this->user);
-    $base_autocomplete_path = 'admin/views/ajax/autocomplete/taxonomy/' . $this->vocabulary->vid;
+    $base_autocomplete_path = 'taxonomy/autocomplete_vid/' . $this->vocabulary->vid;
 
     // Test that no terms returns an empty array.
     $this->assertIdentical(array(), $this->drupalGetJSON($base_autocomplete_path));
 
     // Test a with whole name term.
     $label = $this->term1->label();
-    $expected = MapArray::copyValuesToKeys((array) $label);
+    $expected = array(array(
+      'value' => $label,
+      'label' => check_plain($label),
+    ));
     $this->assertIdentical($expected, $this->drupalGetJSON($base_autocomplete_path, array('query' => array('q' => $label))));
     // Test a term by partial name.
     $partial = substr($label, 0, 2);

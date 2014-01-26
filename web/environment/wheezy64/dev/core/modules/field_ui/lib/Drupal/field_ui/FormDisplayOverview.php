@@ -8,7 +8,7 @@
 namespace Drupal\field_ui;
 
 use Drupal\Component\Utility\NestedArray;
-use Drupal\entity\EntityDisplayBaseInterface;
+use Drupal\Core\Entity\Display\EntityDisplayInterface;
 use Drupal\field\FieldInstanceInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -23,7 +23,7 @@ class FormDisplayOverview extends DisplayOverviewBase {
   public static function create(ContainerInterface $container) {
     return new static(
       $container->get('entity.manager'),
-      $container->get('plugin.manager.entity.field.field_type'),
+      $container->get('plugin.manager.field.field_type'),
       $container->get('plugin.manager.field.widget')
     );
   }
@@ -31,18 +31,29 @@ class FormDisplayOverview extends DisplayOverviewBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'field_ui_form_display_overview_form';
   }
 
   /**
    * {@inheritdoc}
    */
-  protected function buildFieldRow($field_id, FieldInstanceInterface $instance, EntityDisplayBaseInterface $entity_display, array $form, array &$form_state) {
+  public function buildForm(array $form, array &$form_state, $entity_type = NULL, $bundle = NULL) {
+    if ($this->getRequest()->attributes->has('form_mode_name')) {
+      $this->mode = $this->getRequest()->attributes->get('form_mode_name');
+    }
+
+    return parent::buildForm($form, $form_state, $entity_type, $bundle);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function buildFieldRow($field_id, FieldInstanceInterface $instance, EntityDisplayInterface $entity_display, array $form, array &$form_state) {
     $field_row = parent::buildFieldRow($field_id, $instance, $entity_display, $form, $form_state);
 
     // Update the (invisible) title of the 'plugin' column.
-    $field_row['plugin']['#title'] = $this->t('Formatter for @title', array('@title' => $instance['label']));
+    $field_row['plugin']['#title'] = $this->t('Formatter for @title', array('@title' => $instance->getLabel()));
     if (!empty($field_row['plugin']['settings_edit_form']) && ($plugin = $entity_display->getRenderer($field_id))) {
       $plugin_type_info = $plugin->getPluginDefinition();
       $field_row['plugin']['settings_edit_form']['label']['#markup'] = $this->t('Widget settings:') . ' <span class="plugin-name">' . $plugin_type_info['label'] . '</span>';
@@ -85,6 +96,13 @@ class FormDisplayOverview extends DisplayOverviewBase {
   /**
    * {@inheritdoc}
    */
+  protected function getPluginOptions($field_type) {
+    return parent::getPluginOptions($field_type) + array('hidden' => '- ' . t('Hidden') . ' -');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   protected function getDefaultPlugin($field_type) {
     return $this->fieldTypes[$field_type]['default_widget'];
   }
@@ -99,17 +117,8 @@ class FormDisplayOverview extends DisplayOverviewBase {
   /**
    * {@inheritdoc}
    */
-  protected function getDisplayModeSettings() {
-    return field_form_mode_settings($this->entity_type, $this->bundle);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function saveDisplayModeSettings($display_mode_settings) {
-    $bundle_settings = field_bundle_settings($this->entity_type, $this->bundle);
-    $bundle_settings['form_modes'] = NestedArray::mergeDeep($bundle_settings['form_modes'], $display_mode_settings);
-    field_bundle_settings($this->entity_type, $this->bundle, $bundle_settings);
+  protected function getDisplayType() {
+    return 'entity_form_display';
   }
 
   /**

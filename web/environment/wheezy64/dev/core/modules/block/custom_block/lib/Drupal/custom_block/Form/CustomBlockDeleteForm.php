@@ -7,13 +7,13 @@
 
 namespace Drupal\custom_block\Form;
 
-use Drupal\Core\Entity\EntityNGConfirmFormBase;
+use Drupal\Core\Entity\ContentEntityConfirmFormBase;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Provides a confirmation form for deleting a custom block entity.
  */
-class CustomBlockDeleteForm extends EntityNGConfirmFormBase {
+class CustomBlockDeleteForm extends ContentEntityConfirmFormBase {
 
   /**
    * {@inheritdoc}
@@ -25,8 +25,10 @@ class CustomBlockDeleteForm extends EntityNGConfirmFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getCancelPath() {
-    return 'admin/structure/block';
+  public function getCancelRoute() {
+    return array(
+      'route_name' => 'block.admin_display',
+    );
   }
 
   /**
@@ -44,7 +46,6 @@ class CustomBlockDeleteForm extends EntityNGConfirmFormBase {
     $instances = $this->entity->getInstances();
 
     $form['message'] = array(
-      '#type' => 'markup',
       '#markup' => format_plural(count($instances), 'This will also remove 1 placed block instance.', 'This will also remove @count placed block instances.'),
       '#access' => !empty($instances),
     );
@@ -59,7 +60,7 @@ class CustomBlockDeleteForm extends EntityNGConfirmFormBase {
     $this->entity->delete();
     drupal_set_message($this->t('Custom block %label has been deleted.', array('%label' => $this->entity->label())));
     watchdog('custom_block', 'Custom block %label has been deleted.', array('%label' => $this->entity->label()), WATCHDOG_NOTICE);
-    $form_state['redirect'] = 'admin/structure/custom-blocks';
+    $form_state['redirect_route']['route_name'] = 'custom_block.list';
   }
 
 }

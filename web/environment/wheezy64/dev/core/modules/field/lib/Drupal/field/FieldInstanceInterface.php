@@ -8,12 +8,12 @@
 namespace Drupal\field;
 
 use Drupal\Core\Config\Entity\ConfigEntityInterface;
-use Drupal\Core\Entity\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\FieldDefinitionInterface;
 
 /**
  * Provides an interface defining a field instance entity.
  */
-interface FieldInstanceInterface extends ConfigEntityInterface, FieldDefinitionInterface, \ArrayAccess {
+interface FieldInstanceInterface extends ConfigEntityInterface, FieldDefinitionInterface {
 
   /**
    * Returns the field entity for this instance.
@@ -31,5 +31,13 @@ interface FieldInstanceInterface extends ConfigEntityInterface, FieldDefinitionI
    * housekeeping.
    */
   public function allowBundleRename();
+
+  /**
+   * Returns the name of the bundle this field instance is attached to.
+   *
+   * @return string
+   *   The name of the bundle this field instance is attached to.
+   */
+  public function targetBundle();
 
 }

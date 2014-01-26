@@ -10,7 +10,7 @@ namespace Drupal\user\Plugin\entity_reference\selection;
 use Drupal\Core\Annotation\Translation;
 use Drupal\Core\Database\Database;
 use Drupal\Core\Database\Query\SelectInterface;
-use Drupal\Core\Entity\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\entity_reference\Annotation\EntityReferenceSelection;
 use Drupal\entity_reference\Plugin\entity_reference\selection\SelectionBase;
 
@@ -31,7 +31,7 @@ class UserSelection extends SelectionBase {
    * {@inheritdoc}
    */
   public static function settingsForm(FieldDefinitionInterface $field_definition) {
-    $selection_handler_settings = $field_definition->getFieldSetting('handler_settings');
+    $selection_handler_settings = $field_definition->getSetting('handler_settings');
 
     // Merge in default values.
     $selection_handler_settings += array(

@@ -7,8 +7,12 @@
 
 namespace Drupal\views\Plugin\views\display;
 
+use Drupal\Core\KeyValueStore\StateInterface;
+use Drupal\Core\Routing\RouteCompiler;
+use Drupal\Core\Routing\RouteProviderInterface;
 use Drupal\views\Views;
 
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Route;
@@ -16,8 +20,58 @@ use Symfony\Component\Routing\RouteCollection;
 
 /**
  * The base display plugin for path/callbacks. This is used for pages and feeds.
+ *
+ * @see \Drupal\views\EventSubscriber\RouteSubscriber
  */
 abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouterInterface {
+
+  /**
+   * The route provider.
+   *
+   * @var \Drupal\Core\Routing\RouteProviderInterface
+   */
+  protected $routeProvider;
+
+  /**
+   * The state key value store.
+   *
+   * @var \Drupal\Core\KeyValueStore\StateInterface
+   */
+  protected $state;
+
+  /**
+   * Constructs a PathPluginBase object.
+   *
+   * @param array $configuration
+   *   A configuration array containing information about the plugin instance.
+   * @param string $plugin_id
+   *   The plugin_id for the plugin instance.
+   * @param array $plugin_definition
+   *   The plugin implementation definition.
+   * @param \Drupal\Core\Routing\RouteProviderInterface $route_provider
+   *   The route provider.
+   * @param \Drupal\Core\KeyValueStore\StateInterface $state
+   *   The state key value store.
+   */
+  public function __construct(array $configuration, $plugin_id, array $plugin_definition, RouteProviderInterface $route_provider, StateInterface $state) {
+    parent::__construct($configuration, $plugin_id, $plugin_definition);
+
+    $this->routeProvider = $route_provider;
+    $this->state = $state;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container, array $configuration, $plugin_id, array $plugin_definition) {
+    return new static(
+      $configuration,
+      $plugin_id,
+      $plugin_definition,
+      $container->get('router.route_provider'),
+      $container->get('state')
+    );
+  }
 
   /**
    * Overrides \Drupal\views\Plugin\views\display\DisplayPluginBase::hasPath().
@@ -55,17 +109,23 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
   protected function defineOptions() {
     $options = parent::defineOptions();
     $options['path'] = array('default' => '');
+    $options['route_name'] = array('default' => '');
 
     return $options;
   }
 
   /**
-   * {@inheritdoc}
+   * Generates a route entry for a given view and display.
+   *
+   * @param string $view_id
+   *   The ID of the view.
+   * @param string $display_id
+   *   The current display ID.
+   *
+   * @return \Symfony\Component\Routing\Route
+   *   The route for the view.
    */
-  public function collectRoutes(RouteCollection $collection) {
-    $view_id = $this->view->storage->id();
-    $display_id = $this->display['id'];
-
+  protected function getRoute($view_id, $display_id) {
     $defaults = array(
       '_controller' => 'Drupal\views\Routing\ViewPageController::handle',
       'view_id' => $view_id,
@@ -80,7 +140,7 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
     $arg_counter = 0;
 
     $this->view->initHandlers();
-    $view_arguments = $this->view->argument;
+    $view_arguments = (array) $this->view->argument;
 
     $argument_ids = array_keys($view_arguments);
     $total_arguments = count($argument_ids);
@@ -126,8 +186,73 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
       $access_plugin = Views::pluginManager('access')->createInstance('none');
     }
     $access_plugin->alterRouteDefinition($route);
+    return $route;
+  }
 
-    $collection->add("view.$view_id.$display_id", $route);
+  /**
+   * {@inheritdoc}
+   */
+  public function collectRoutes(RouteCollection $collection) {
+    $view_id = $this->view->storage->id();
+    $display_id = $this->display['id'];
+
+    $route = $this->getRoute($view_id, $display_id);
+
+    if (!($route_name = $this->getOption('route_name'))) {
+      $route_name = "view.$view_id.$display_id";
+    }
+    $collection->add($route_name, $route);
+    return array("$view_id.$display_id" => $route_name);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function alterRoutes(RouteCollection $collection) {
+    $view_route_names = array();
+    $view_path = $this->getPath();
+    foreach ($collection->all() as $name => $route) {
+      // Find all paths which match the path of the current display..
+      $route_path = RouteCompiler::getPathWithoutDefaults($route);
+      $route_path = RouteCompiler::getPatternOutline($route_path);
+      // Ensure that we don't override a route which is already controlled by
+      // views.
+      if (!$route->hasDefault('view_id') && ('/' . $view_path == $route_path)) {
+        $parameters = $route->compile()->getPathVariables();
+
+        // @todo Figure out whether we need to merge some settings (like
+        // requirements).
+
+        // Replace the existing route with a new one based on views.
+        $collection->remove($name);
+
+        $view_id = $this->view->storage->id();
+        $display_id = $this->display['id'];
+        $route = $this->getRoute($view_id, $display_id);
+
+        $path = $route->getPath();
+        // Load the argument IDs from the view executable.
+        $view_arguments = (array) $this->view->argument;
+        $argument_ids = array_keys($view_arguments);
+
+        // Replace the path with the original parameter names and add a mapping.
+        $argument_map = array();
+        // We assume that the numeric ids of the parameters match the one from
+        // the view argument handlers.
+        foreach ($parameters as $position => $parameter_name) {
+          $path = str_replace('arg_' . $argument_ids[$position], $parameter_name, $path);
+          $argument_map['arg_' . $argument_ids[$position]] = $parameter_name;
+        }
+        // Set the corrected path and the mapping to the route object.
+        $route->setDefault('_view_argument_map', $argument_map);
+        $route->setPath($path);
+
+        $collection->add($name, $route);
+        $view_route_names[$view_id . '.' . $display_id] = $name;
+      }
+    }
+
+    return $view_route_names;
   }
 
   /**
@@ -157,9 +282,14 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
 
     $path = implode('/', $bits);
 
+    $view_route_names = $this->state->get('views.view_route_names') ?: array();
+
     if ($path) {
+      // Some views might override existing paths, so we have to set the route
+      // name based upon the altering.
+      $view_id_display =  "{$this->view->storage->id()}.{$this->display['id']}";
       $items[$path] = array(
-        'route_name' => "view.{$this->view->storage->id()}.{$this->display['id']}",
+        'route_name' => isset($view_route_names[$view_id_display]) ? $view_route_names[$view_id_display] : "view.$view_id_display",
         // Identify URL embedded arguments and correlate them to a handler.
         'load arguments'  => array($this->view->storage->id(), $this->display['id'], '%index'),
       );
@@ -188,17 +318,20 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
           $items[$path]['menu_name'] = $menu['name'];
           break;
         case 'tab':
-          $items[$path]['type'] = MENU_LOCAL_TASK;
+          $items[$path]['type'] = MENU_CALLBACK;
           break;
         case 'default tab':
-          $items[$path]['type'] = MENU_DEFAULT_LOCAL_TASK;
+          $items[$path]['type'] = MENU_CALLBACK;
           break;
       }
 
       // Add context for contextual links.
-      // @see menu_contextual_links()
-      if (!empty($menu['context'])) {
-        $items[$path]['context'] = MENU_CONTEXT_INLINE;
+      if (in_array($menu['type'], array('tab', 'default tab'))) {
+        // @todo Remove once contextual links are ported to a new plugin based
+        //   system.
+        if (!empty($menu['context'])) {
+          $items[$path]['context'] = TRUE;
+        }
       }
 
       // If this is a 'default' tab, check to see if we have to create the
@@ -209,6 +342,11 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
         $bits = explode('/', $path);
         // Remove the last piece.
         $bit = array_pop($bits);
+
+        // Default tabs are handled by the local task plugins.
+        if ($tab_options['type'] == 'tab') {
+          return $items;
+        }
 
         // we can't do this if they tried to make the last path bit variable.
         // @todo: We can validate this.
@@ -232,9 +370,6 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
             default:
             case 'normal':
               $items[$default_path]['type'] = MENU_NORMAL_ITEM;
-              break;
-            case 'tab':
-              $items[$default_path]['type'] = MENU_LOCAL_TASK;
               break;
           }
           if (isset($tab_options['weight'])) {
@@ -305,6 +440,7 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
         $form['#title'] .= t('The menu path or URL of this view');
         $form['path'] = array(
           '#type' => 'textfield',
+          '#title' => t('Path'),
           '#description' => t('This view will be displayed by visiting this path on your site. You may use "%" in your URL to represent values that will be used for contextual filters: For example, "node/%/feed".'),
           '#default_value' => $this->getOption('path'),
           '#field_prefix' => '<span dir="ltr">' . url(NULL, array('absolute' => TRUE)),
@@ -323,7 +459,7 @@ abstract class PathPluginBase extends DisplayPluginBase implements DisplayRouter
 
     if ($form_state['section'] == 'path') {
       if (strpos($form_state['values']['path'], '%') === 0) {
-        form_error($form['path'], t('"%" may not be used for the first segment of a path.'));
+        form_error($form['path'], $form_state, t('"%" may not be used for the first segment of a path.'));
       }
 
       // Automatically remove '/' and trailing whitespace from path.

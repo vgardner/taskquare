@@ -35,24 +35,13 @@ function simpletest_menu() {
   $items['admin/config/development/testing'] = array(
     'title' => 'Testing',
     'description' => 'Run tests against Drupal core and your modules. These tests help assure that your site code is working as designed.',
-    'route_name' => 'simpletest_test_form',
+    'route_name' => 'simpletest.test_form',
     'weight' => -5,
-  );
-  $items['admin/config/development/testing/list'] = array(
-    'title' => 'List',
-    'type' => MENU_DEFAULT_LOCAL_TASK,
-  );
-  $items['admin/config/development/testing/settings'] = array(
-    'title' => 'Settings',
-    'route_name' => 'simpletest_settings',
-    'access arguments' => array('administer unit tests'),
-    'type' => MENU_LOCAL_TASK,
-    'weight' => 100,
   );
   $items['admin/config/development/testing/results/%'] = array(
     'title' => 'Test result',
     'description' => 'View result of tests.',
-    'route_name' => 'simpletest_result_form',
+    'route_name' => 'simpletest.result_form',
   );
   return $items;
 }
@@ -159,7 +148,7 @@ function simpletest_run_tests($test_list, $reporter = 'drupal') {
   );
   batch_set($batch);
 
-  Drupal::moduleHandler()->invokeAll('test_group_started');
+  \Drupal::moduleHandler()->invokeAll('test_group_started');
 
   return $test_id;
 }
@@ -305,7 +294,7 @@ function _simpletest_batch_operation($test_list_init, $test_id, &$context) {
   $size = count($test_list);
   $info = $test->getInfo();
 
-  Drupal::moduleHandler()->invokeAll('test_finished', array($test->results));
+  \Drupal::moduleHandler()->invokeAll('test_finished', array($test->results));
 
   // Gather results and compose the report.
   $test_results[$test_class] = $test->results;
@@ -352,7 +341,7 @@ function _simpletest_batch_finished($success, $results, $operations, $elapsed) {
     drupal_set_message(t('The test run did not successfully finish.'), 'error');
     drupal_set_message(t('Use the <em>Clean environment</em> button to clean-up temporary files and tables.'), 'warning');
   }
-  Drupal::moduleHandler()->invokeAll('test_group_finished');
+  \Drupal::moduleHandler()->invokeAll('test_group_finished');
 }
 
 /**
@@ -419,6 +408,10 @@ function simpletest_log_read($test_id, $prefix, $test_class, $during_test = FALS
  * each module for files matching the PSR-0 standard. Once loaded the test list
  * is cached and stored in a static variable.
  *
+ * @param string $module
+ *   Name of a module. If set then only tests belonging to this module are
+ *   returned.
+ *
  * @return
  *   An array of tests keyed with the groups specified in each of the tests
  *   getInfo() method and then keyed by the test class. An example of the array
@@ -434,17 +427,20 @@ function simpletest_log_read($test_id, $prefix, $test_class, $during_test = FALS
  *     );
  *   @endcode
  */
-function simpletest_test_get_all() {
-  $groups = &drupal_static(__FUNCTION__);
+function simpletest_test_get_all($module = NULL) {
+  $all_groups = &drupal_static(__FUNCTION__);
+  $cid = "simpletest:$module";
 
-  if (!$groups) {
+  if (!isset($all_groups[$cid])) {
+    $all_groups[$cid] = array();
+    $groups = &$all_groups[$cid];
     // Make sure that namespaces for disabled modules are registered so that the
     // checks below will find them.
     simpletest_classloader_register();
 
     // Load test information from cache if available, otherwise retrieve the
     // information from each tests getInfo() method.
-    if ($cache = cache()->get('simpletest')) {
+    if ($cache = cache()->get($cid)) {
       $groups = $cache->data;
     }
     else {
@@ -453,6 +449,12 @@ function simpletest_test_get_all() {
       $module_data = system_rebuild_module_data();
       $all_data = $module_data + system_rebuild_theme_data();
       $all_data += drupal_system_listing('/\.profile$/', 'profiles', 'name');
+      // If module is set then we keep only that one module.
+      if (isset($module)) {
+        $all_data = array(
+          $module => $all_data[$module],
+        );
+      }
       foreach ($all_data as $name => $data) {
         // Build directory in which the test files would reside.
         $tests_dir = DRUPAL_ROOT . '/' . dirname($data->uri) . '/lib/Drupal/' . $name . '/Tests';
@@ -480,12 +482,27 @@ function simpletest_test_get_all() {
       foreach ($classes as $class) {
         // Test classes need to implement getInfo() to be valid.
         if (class_exists($class) && method_exists($class, 'getInfo')) {
-          $info = call_user_func(array($class, 'getInfo'));
-
+          $reflectionClass = new ReflectionClass($class);
+          // Skip abstract classes and interfaces.
+          if ($reflectionClass->isInstantiable()) {
+            $reflectionMethod = new ReflectionMethod($class, 'getInfo');
+            $declaringClass = $reflectionMethod->getDeclaringClass()->getName();
+            // Avoid testing intermediate classes which do not implement the
+            // method.
+            if ($class == $declaringClass) {
+              $info = call_user_func(array($class, 'getInfo'));
+            }
+            else {
+              continue;
+            }
+          }
+          else {
+            continue;
+          }
           // If this test class requires a non-existing module, skip it.
           if (!empty($info['dependencies'])) {
-            foreach ($info['dependencies'] as $module) {
-              if (!isset($module_data[$module])) {
+            foreach ($info['dependencies'] as $dependency) {
+              if (!isset($dependency_data[$dependency])) {
                 continue 2;
               }
             }
@@ -497,16 +514,16 @@ function simpletest_test_get_all() {
 
       // Sort the groups and tests within the groups by name.
       uksort($groups, 'strnatcasecmp');
-      foreach ($groups as $group => &$tests) {
+      foreach ($groups as &$tests) {
         uksort($tests, 'strnatcasecmp');
       }
 
       // Allow modules extending core tests to disable originals.
       drupal_alter('simpletest', $groups);
-      cache()->set('simpletest', $groups);
+      cache()->set($cid, $groups);
     }
   }
-  return $groups;
+  return $all_groups[$cid];
 }
 
 /**
@@ -573,7 +590,7 @@ function simpletest_generate_file($filename, $width, $lines, $type = 'binary-tex
 function simpletest_clean_environment() {
   simpletest_clean_database();
   simpletest_clean_temporary_directories();
-  if (Drupal::config('simpletest.settings')->get('clear_results')) {
+  if (\Drupal::config('simpletest.settings')->get('clear_results')) {
     $count = simpletest_clean_results_table();
     drupal_set_message(format_plural($count, 'Removed 1 test result.', 'Removed @count test results.'));
   }
@@ -643,7 +660,7 @@ function simpletest_clean_temporary_directories() {
  *   The number of results removed.
  */
 function simpletest_clean_results_table($test_id = NULL) {
-  if (Drupal::config('simpletest.settings')->get('clear_results')) {
+  if (\Drupal::config('simpletest.settings')->get('clear_results')) {
     if ($test_id) {
       $count = db_query('SELECT COUNT(test_id) FROM {simpletest_test_id} WHERE test_id = :test_id', array(':test_id' => $test_id))->fetchField();
 
@@ -686,7 +703,7 @@ function simpletest_mail_alter(&$message) {
 function simpletest_library_info() {
   $libraries['drupal.simpletest'] = array(
     'title' => 'Simpletest',
-    'version' => VERSION,
+    'version' => \Drupal::VERSION,
     'js' => array(
       drupal_get_path('module', 'simpletest') . '/simpletest.js' => array(),
     ),
@@ -707,17 +724,26 @@ function simpletest_library_info() {
 }
 
 /**
- * Get PHPUnit Classes
+ * Gets PHPUnit Classes.
  *
- * @param bool $name_only
- *  If TRUE, returns a flat array of class names only.
+ * @param string $module
+ *   Name of a module. If set then only tests belonging to this module is
+ *   returned.
+ *
+ * @return array
+ *   Returns an array of test classes.
  */
-function simpletest_phpunit_get_available_tests() {
+function simpletest_phpunit_get_available_tests($module = NULL) {
   // Try to load the class names array from cache.
-  if ($cache = \Drupal::cache()->get('simpletest_phpunit')) {
+  $cid = 'simpletest_phpunit:' . $module;
+  if ($cache = \Drupal::cache()->get($cid)) {
     $test_classes = $cache->data;
   }
   else {
+    if ($module) {
+      $prefix = 'Drupal\\' . $module . '\\';
+      $n = strlen($prefix);
+    }
     // If there was no cached data available we have to find the tests.
     // Load the PHPUnit configuration file, which tells us where to find the
     // tests.
@@ -735,13 +761,13 @@ function simpletest_phpunit_get_available_tests() {
       }
 
       $name = get_class($test);
-      if (!array_key_exists($name, $test_classes)) {
+      if (!array_key_exists($name, $test_classes) && (!$module || substr($name, 0, $n) == $prefix)) {
         $test_classes[$name] = $test->getInfo();
       }
     }
 
     // Since we have recalculated, we now need to store the new data into cache.
-    \Drupal::cache()->set('simpletest_phpunit', $test_classes);
+    \Drupal::cache()->set($cid, $test_classes);
   }
 
   return $test_classes;
@@ -784,7 +810,7 @@ function simpletest_phpunit_xml_to_rows($test_id, $phpunit_xml_file) {
 /**
  * Find all testcases recursively from a testsuite list.
  *
- * @param array $suite
+ * @param \SimpleXMLElement[] $suite
  *   The list of testcases contained in the PHPUnit XML.
  *
  * @return array
@@ -801,6 +827,8 @@ function simpletest_phpunit_find_testcases($suite) {
     }
     elseif (isset($testcase->testcase) && ((int) $testcase->attributes()->tests) > 0) {
       foreach ($testcase->testcase as $childtestcase) {
+        // Add the class attribute since the child test case will not have it.
+        $childtestcase->addAttribute('class', $suite->attributes()->name);
         $testcases[] = $childtestcase;
       }
     }

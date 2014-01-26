@@ -2,7 +2,8 @@
  * @file
  * A Backbone View that provides an entity level toolbar.
  */
-(function ($, Backbone, Drupal, debounce) {
+
+(function ($, _, Backbone, Drupal, debounce) {
 
 "use strict";
 
@@ -29,8 +30,8 @@ Drupal.edit.EntityToolbarView = Backbone.View.extend({
 
     // Rerender whenever the entity state changes.
     this.model.on('change:isActive change:isDirty change:state', this.render, this);
-    // Also rerender whenever the highlighted or active in-place editor changes.
-    this.appModel.on('change:highlightedEditor change:activeEditor', this.render, this);
+    // Also rerender whenever a different field is highlighted or activated.
+    this.appModel.on('change:highlightedField change:activeField', this.render, this);
     // Rerender when a field of the entity changes state.
     this.model.get('fields').on('change:state', this.fieldStateChange, this);
 
@@ -164,6 +165,10 @@ Drupal.edit.EntityToolbarView = Backbone.View.extend({
     var delay = 0;
     // Determines what check in the series of checks below should be evaluated
     var check = 0;
+    // When positioned against an active field that has padding, we should
+    // ignore that padding when positioning the toolbar, to not unnecessarily
+    // move the toolbar horizontally, which feels annoying.
+    var horizontalPadding = 0;
     var of, activeField, highlightedField;
     // There are several elements in the page that the entity toolbar might be
     // positioned against. They are considered below in a priority order.
@@ -175,16 +180,19 @@ Drupal.edit.EntityToolbarView = Backbone.View.extend({
           break;
         case 1:
           // Position against a form container.
-          activeField = Drupal.edit.app.model.get('activeEditor');
+          activeField = Drupal.edit.app.model.get('activeField');
           of = activeField && activeField.editorView && activeField.editorView.$formContainer && activeField.editorView.$formContainer.find('.edit-form');
           break;
         case 2:
           // Position against an active field.
           of = activeField && activeField.editorView && activeField.editorView.getEditedElement();
+          if (activeField && activeField.editorView && activeField.editorView.getEditUISettings().padding) {
+            horizontalPadding = 5;
+          }
           break;
         case 3:
           // Position against a highlighted field.
-          highlightedField = Drupal.edit.app.model.get('highlightedEditor');
+          highlightedField = Drupal.edit.app.model.get('highlightedField');
           of = highlightedField && highlightedField.editorView && highlightedField.editorView.getEditedElement();
           delay = 250;
           break;
@@ -217,13 +225,35 @@ Drupal.edit.EntityToolbarView = Backbone.View.extend({
      *     element that the 'my' element will be positioned against. Also known
      *     as the 'of' element.
      */
-    function refinePosition (suggested, info) {
+    function refinePosition (view, suggested, info) {
+      // Determine if the pointer should be on the top or bottom.
+      var isBelow = suggested.top > info.target.top;
+      info.element.element.toggleClass('edit-toolbar-pointer-top', isBelow);
+      // Don't position the toolbar past the first or last editable field if
+      // the entity is the target.
+      if (view.$entity[0] === info.target.element[0]) {
+        // Get the first or last field according to whether the toolbar is above
+        // or below the entity.
+        var $field = view.$entity.find('.edit-editable').eq((isBelow) ? -1 : 0);
+        if ($field.length > 0) {
+          suggested.top = (isBelow) ? ($field.offset().top + $field.outerHeight(true)) : $field.offset().top - info.element.element.outerHeight(true);
+        }
+      }
+      // Don't let the toolbar go outside the fence.
+      var fenceTop = view.$fence.offset().top;
+      var fenceHeight = view.$fence.height();
+      var toolbarHeight = info.element.element.outerHeight(true);
+      if (suggested.top < fenceTop) {
+        suggested.top = fenceTop;
+      }
+      else if ((suggested.top + toolbarHeight) > (fenceTop + fenceHeight)) {
+        suggested.top = fenceTop + fenceHeight - toolbarHeight;
+      }
+      // Position the toolbar.
       info.element.element.css({
         left: Math.floor(suggested.left),
         top: Math.floor(suggested.top)
       });
-      // Determine if the pointer should be on the top or bottom.
-      info.element.element.toggleClass('edit-toolbar-pointer-top', info.element.top > info.target.top);
     }
 
     /**
@@ -233,11 +263,13 @@ Drupal.edit.EntityToolbarView = Backbone.View.extend({
       that.$el
         .position({
           my: edge + ' bottom',
-          // Move the toolbar 2px towards the start edge of the 'of' element.
-          at: edge + '+1 top',
+          // Move the toolbar 1px towards the start edge of the 'of' element,
+          // plus any horizontal padding that may have been added to the element
+          // that is being added, to prevent unwanted horizontal movement.
+          at: edge + '+' + (1 + horizontalPadding) + ' top',
           of: of,
           collision: 'flipfit',
-          using: refinePosition,
+          using: refinePosition.bind(null, that),
           within: that.$fence
         })
         // Resize the toolbar to match the dimensions of the field, up to a
@@ -356,11 +388,11 @@ Drupal.edit.EntityToolbarView = Backbone.View.extend({
     var entityLabel = this.model.get('label');
 
     // Label of an active field, if it exists.
-    var activeEditor = Drupal.edit.app.model.get('activeEditor');
-    var activeFieldLabel = activeEditor && activeEditor.get('metadata').label;
+    var activeField = Drupal.edit.app.model.get('activeField');
+    var activeFieldLabel = activeField && activeField.get('metadata').label;
     // Label of a highlighted field, if it exists.
-    var highlightedEditor = Drupal.edit.app.model.get('highlightedEditor');
-    var highlightedFieldLabel = highlightedEditor && highlightedEditor.get('metadata').label;
+    var highlightedField = Drupal.edit.app.model.get('highlightedField');
+    var highlightedFieldLabel = highlightedField && highlightedField.get('metadata').label;
     // The label is constructed in a priority order.
     if (activeFieldLabel) {
       label = Drupal.theme('editEntityToolbarLabel', {
@@ -430,6 +462,7 @@ Drupal.edit.EntityToolbarView = Backbone.View.extend({
   show: function (toolgroup) {
     this.$el.removeClass('edit-animate-invisible');
   }
+
 });
 
-})(jQuery, Backbone, Drupal, Drupal.debounce);
+})(jQuery, _, Backbone, Drupal, Drupal.debounce);

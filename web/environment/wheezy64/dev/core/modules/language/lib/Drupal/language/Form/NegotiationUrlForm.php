@@ -7,17 +7,17 @@
 
 namespace Drupal\language\Form;
 
-use Drupal\system\SystemConfigFormBase;
+use Drupal\Core\Form\ConfigFormBase;
 
 /**
  * Configure the URL language negotiation method for this site.
  */
-class NegotiationUrlForm extends SystemConfigFormBase {
+class NegotiationUrlForm extends ConfigFormBase {
 
   /**
-   * Implements \Drupal\Core\Form\FormInterface::getFormID().
+   * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'language_negotiation_configure_url_form';
   }
 
@@ -86,7 +86,7 @@ class NegotiationUrlForm extends SystemConfigFormBase {
       );
     }
 
-    $form_state['redirect'] = 'admin/config/regional/language/detection';
+    $form_state['redirect_route']['route_name'] = 'language.negotiation';
 
     return parent::buildForm($form, $form_state);
   }
@@ -106,18 +106,18 @@ class NegotiationUrlForm extends SystemConfigFormBase {
         if (!$language->default && $form_state['values']['language_negotiation_url_part'] == LANGUAGE_NEGOTIATION_URL_PREFIX) {
           // Throw a form error if the prefix is blank for a non-default language,
           // although it is required for selected negotiation type.
-          form_error($form['prefix'][$langcode], t('The prefix may only be left blank for the default language.'));
+          $this->setFormError("prefix][$langcode", $form_state, t('The prefix may only be left blank for the default language.'));
         }
       }
       elseif (strpos($value, '/') !== FALSE) {
         // Throw a form error if the string contains a slash,
         // which would not work.
-        form_error($form['prefix'][$langcode], t('The prefix may not contain a slash.'));
+        $this->setFormError("prefix][$langcode", $form_state, t('The prefix may not contain a slash.'));
       }
       elseif (isset($count[$value]) && $count[$value] > 1) {
         // Throw a form error if there are two languages with the same
         // domain/prefix.
-        form_error($form['prefix'][$langcode], t('The prefix for %language, %value, is not unique.', array('%language' => $language->name, '%value' => $value)));
+        $this->setFormError("prefix][$langcode", $form_state, t('The prefix for %language, %value, is not unique.', array('%language' => $language->name, '%value' => $value)));
       }
     }
 
@@ -130,13 +130,13 @@ class NegotiationUrlForm extends SystemConfigFormBase {
         if (!$language->default && $form_state['values']['language_negotiation_url_part'] == LANGUAGE_NEGOTIATION_URL_DOMAIN) {
           // Throw a form error if the domain is blank for a non-default language,
           // although it is required for selected negotiation type.
-          form_error($form['domain'][$langcode], t('The domain may only be left blank for the default language.'));
+          $this->setFormError("domain][$langcode", $form_state, t('The domain may only be left blank for the default language.'));
         }
       }
       elseif (isset($count[$value]) && $count[$value] > 1) {
         // Throw a form error if there are two languages with the same
         // domain/domain.
-        form_error($form['domain'][$langcode], t('The domain for %language, %value, is not unique.', array('%language' => $language->name, '%value' => $value)));
+        $this->setFormError("domain][$langcode", $form_state, t('The domain for %language, %value, is not unique.', array('%language' => $language->name, '%value' => $value)));
       }
     }
 
@@ -147,7 +147,7 @@ class NegotiationUrlForm extends SystemConfigFormBase {
         // Ensure we have exactly one protocol when checking the hostname.
         $host = 'http://' . str_replace(array('http://', 'https://'), '', $value);
         if (parse_url($host, PHP_URL_HOST) != $value) {
-          form_error($form['domain'][$langcode], t('The domain for %language may only contain the domain name, not a protocol and/or port.', array('%language' => $name)));
+          $this->setFormError("domain][$langcode", $form_state, t('The domain for %language may only contain the domain name, not a protocol and/or port.', array('%language' => $name)));
         }
       }
     }

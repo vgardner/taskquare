@@ -1,4 +1,4 @@
-(function ($, window) {
+(function ($, window, Drupal, drupalSettings) {
 
 "use strict";
 
@@ -258,7 +258,7 @@ Drupal.ajax = function (base, element, element_settings) {
   }
 
   // Bind the ajaxSubmit function to the element event.
-  $(ajax.element).bind(element_settings.event, function (event) {
+  $(ajax.element).on(element_settings.event, function (event) {
     return ajax.eventResponse(this, event);
   });
 
@@ -266,7 +266,7 @@ Drupal.ajax = function (base, element, element_settings) {
   // can be triggered through keyboard input as well as e.g. a mousedown
   // action.
   if (element_settings.keypress) {
-    $(ajax.element).keypress(function (event) {
+    $(ajax.element).on('keypress', function (event) {
       return ajax.keypressResponse(this, event);
     });
   }
@@ -275,7 +275,7 @@ Drupal.ajax = function (base, element, element_settings) {
   // For example, prevent the browser default action of a click, even if the
   // AJAX behavior binds to mousedown.
   if (element_settings.prevent) {
-    $(ajax.element).bind(element_settings.prevent, false);
+    $(ajax.element).on(element_settings.prevent, false);
   }
 };
 
@@ -366,7 +366,7 @@ Drupal.ajax.prototype.beforeSerialize = function (element, options) {
   // $.ajax(). When there is no form and $.ajax() is used, beforeSerialize()
   // isn't called, but don't rely on that: explicitly check this.form.
   if (this.form) {
-    var settings = this.settings || Drupal.settings;
+    var settings = this.settings || drupalSettings;
     Drupal.detachBehaviors(this.form, settings, 'serialize');
   }
 
@@ -382,10 +382,10 @@ Drupal.ajax.prototype.beforeSerialize = function (element, options) {
 
   // Allow Drupal to return new JavaScript and CSS files to load without
   // returning the ones already loaded.
-  // @see ajax_base_page_theme()
+  // @see \Drupal\Core\Theme\AjaxBasePageNegotiator
   // @see drupal_get_css()
   // @see drupal_get_js()
-  var pageState = Drupal.settings.ajaxPageState;
+  var pageState = drupalSettings.ajaxPageState;
   options.data['ajax_page_state[theme]'] = pageState.theme;
   options.data['ajax_page_state[theme_token]'] = pageState.theme_token;
   for (var cssFile in pageState.css) {
@@ -492,7 +492,7 @@ Drupal.ajax.prototype.success = function (response, status) {
   // commands is not sufficient, because behaviors from the entire form need
   // to be reattached.
   if (this.form) {
-    var settings = this.settings || Drupal.settings;
+    var settings = this.settings || drupalSettings;
     Drupal.attachBehaviors(this.form, settings);
   }
 
@@ -545,7 +545,7 @@ Drupal.ajax.prototype.error = function (response, uri) {
   $(this.element).removeClass('progress-disabled').prop('disabled', false);
   // Reattach behaviors, if they were detached in beforeSerialize().
   if (this.form) {
-    var settings = response.settings || this.settings || Drupal.settings;
+    var settings = response.settings || this.settings || drupalSettings;
     Drupal.attachBehaviors(this.form, settings);
   }
   throw new Drupal.AjaxError(response, uri);
@@ -596,7 +596,7 @@ Drupal.AjaxCommands.prototype = {
       case 'replaceAll':
       case 'empty':
       case 'remove':
-        settings = response.settings || ajax.settings || Drupal.settings;
+        settings = response.settings || ajax.settings || drupalSettings;
         Drupal.detachBehaviors(wrapper, settings);
     }
 
@@ -624,7 +624,7 @@ Drupal.AjaxCommands.prototype = {
     // optional.
     if (new_content.parents('html').length > 0) {
       // Apply any settings from the returned JSON if available.
-      settings = response.settings || ajax.settings || Drupal.settings;
+      settings = response.settings || ajax.settings || drupalSettings;
       Drupal.attachBehaviors(new_content, settings);
     }
   },
@@ -633,7 +633,7 @@ Drupal.AjaxCommands.prototype = {
    * Command to remove a chunk from the page.
    */
   remove: function (ajax, response, status) {
-    var settings = response.settings || ajax.settings || Drupal.settings;
+    var settings = response.settings || ajax.settings || drupalSettings;
     Drupal.detachBehaviors($(response.selector), settings);
     $(response.selector).remove();
   },
@@ -676,7 +676,7 @@ Drupal.AjaxCommands.prototype = {
    */
   settings: function (ajax, response, status) {
     if (response.merge) {
-      $.extend(true, Drupal.settings, response.settings);
+      $.extend(true, drupalSettings, response.settings);
     }
     else {
       ajax.settings = response.settings;
@@ -733,4 +733,4 @@ Drupal.AjaxCommands.prototype = {
   }
 };
 
-})(jQuery, this);
+})(jQuery, this, Drupal, drupalSettings);

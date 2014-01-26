@@ -43,22 +43,6 @@ class ContentTranslationController implements ContentTranslationControllerInterf
   }
 
   /**
-   * Implements ContentTranslationControllerInterface::removeTranslation().
-   */
-  public function removeTranslation(EntityInterface $entity, $langcode) {
-    $translations = $entity->getTranslationLanguages();
-    // @todo Handle properties.
-    // Remove field translations.
-    foreach (field_info_instances($entity->entityType(), $entity->bundle()) as $instance) {
-      $field_name = $instance['field_name'];
-      $field = $instance->getField();
-      if ($field['translatable']) {
-        $entity->{$field_name}[$langcode] = array();
-      }
-    }
-  }
-
-  /**
    * Implements ContentTranslationControllerInterface::retranslate().
    */
   public function retranslate(EntityInterface $entity, $langcode = NULL) {
@@ -67,27 +51,6 @@ class ContentTranslationController implements ContentTranslationControllerInterf
     foreach ($translations as $langcode => $language) {
       $entity->translation[$langcode]['outdated'] = $langcode != $updated_langcode;
     }
-  }
-
-  /**
-   * Implements ContentTranslationControllerInterface::getBasePath().
-   */
-  public function getBasePath(EntityInterface $entity) {
-    return $this->getPathInstance($this->entityInfo['menu_base_path'], $entity->id());
-  }
-
-  /**
-   * Implements ContentTranslationControllerInterface::getEditPath().
-   */
-  public function getEditPath(EntityInterface $entity) {
-    return isset($this->entityInfo['menu_edit_path']) ? $this->getPathInstance($this->entityInfo['menu_edit_path'], $entity->id()) : FALSE;
-  }
-
-  /**
-   * Implements ContentTranslationControllerInterface::getViewPath().
-   */
-  public function getViewPath(EntityInterface $entity) {
-    return isset($this->entityInfo['menu_view_path']) ? $this->getPathInstance($this->entityInfo['menu_view_path'], $entity->id()) : FALSE;
   }
 
   /**
@@ -141,7 +104,7 @@ class ContentTranslationController implements ContentTranslationControllerInterf
         $t_args = array('%language' => $languages[$form_langcode]->name, '%title' => $entity->label());
         $title = empty($source_langcode) ? $title . ' [' . t('%language translation', $t_args) . ']' : t('Create %language translation of %title', $t_args);
       }
-      drupal_set_title($title, PASS_THROUGH);
+      $form['#title'] = $title;
     }
 
     // Display source language selector only if we are creating a new
@@ -155,6 +118,8 @@ class ContentTranslationController implements ContentTranslationControllerInterf
         '#weight' => -100,
         '#multilingual' => TRUE,
         'source' => array(
+          '#title' => t('Select source language'),
+          '#title_display' => 'invisible',
           '#type' => 'select',
           '#default_value' => $source_langcode,
           '#options' => array(),
@@ -234,7 +199,7 @@ class ContentTranslationController implements ContentTranslationControllerInterf
         // A new translation is not available in the translation metadata, hence
         // it should count as one more.
         $published = $new_translation;
-        foreach ($entity->translation as $langcode => $translation) {
+        foreach ($entity->translation as $translation) {
           $published += $translation['status'];
         }
         $enabled = $published > 1;
@@ -269,14 +234,21 @@ class ContentTranslationController implements ContentTranslationControllerInterf
         );
       }
 
-      $name = $new_translation ? $GLOBALS['user']->getUsername() : user_load($entity->translation[$form_langcode]['uid'])->getUsername();
+      // Default to the anonymous user.
+      $name = '';
+      if ($new_translation) {
+        $name = \Drupal::currentUser()->getUsername();
+      }
+      elseif ($entity->translation[$form_langcode]['uid']) {
+        $name = user_load($entity->translation[$form_langcode]['uid'])->getUsername();
+      }
       $form['content_translation']['name'] = array(
         '#type' => 'textfield',
         '#title' => t('Authored by'),
         '#maxlength' => 60,
-        '#autocomplete_route_name' => 'user_autocomplete',
+        '#autocomplete_route_name' => 'user.autocomplete',
         '#default_value' => $name,
-        '#description' => t('Leave blank for %anonymous.', array('%anonymous' => variable_get('anonymous', t('Anonymous')))),
+        '#description' => t('Leave blank for %anonymous.', array('%anonymous' => \Drupal::config('user.settings')->get('anonymous'))),
       );
 
       $date = $new_translation ? REQUEST_TIME : $entity->translation[$form_langcode]['created'];
@@ -442,11 +414,11 @@ class ContentTranslationController implements ContentTranslationControllerInterf
       $translation = $form_state['values']['content_translation'];
       // Validate the "authored by" field.
       if (!empty($translation['name']) && !($account = user_load_by_name($translation['name']))) {
-        form_set_error('content_translation][name', t('The translation authoring username %name does not exist.', array('%name' => $translation['name'])));
+        form_set_error('content_translation][name', $form_state, t('The translation authoring username %name does not exist.', array('%name' => $translation['name'])));
       }
       // Validate the "authored on" field.
       if (!empty($translation['created']) && strtotime($translation['created']) === FALSE) {
-        form_set_error('content_translation][created', t('You have to specify a valid translation authoring date.'));
+        form_set_error('content_translation][created', $form_state, t('You have to specify a valid translation authoring date.'));
       }
     }
   }
@@ -460,7 +432,9 @@ class ContentTranslationController implements ContentTranslationControllerInterf
     $form_controller = content_translation_form_controller($form_state);
     $entity = $form_controller->getEntity();
     $source = $form_state['values']['source_langcode']['source'];
-    $path = $this->getBasePath($entity) . '/translations/add/' . $source . '/' . $form_controller->getFormLangcode($form_state);
+
+    $uri = $entity->uri('drupal:content-translation-overview');
+    $path = $uri['path'] . '/add/' . $source . '/' . $form_controller->getFormLangcode($form_state);
     $form_state['redirect'] = $path;
     $languages = language_list();
     drupal_set_message(t('Source language set to: %language', array('%language' => $languages[$source]->name)));
@@ -487,9 +461,9 @@ class ContentTranslationController implements ContentTranslationControllerInterf
   function entityFormDeleteTranslation($form, &$form_state) {
     $form_controller = content_translation_form_controller($form_state);
     $entity = $form_controller->getEntity();
-    $base_path = $this->getBasePath($entity);
+    $uri = $entity->uri('drupal:content-translation-overview');
     $form_langcode = $form_controller->getFormLangcode($form_state);
-    $form_state['redirect'] = $base_path . '/translations/delete/' . $form_langcode;
+    $form_state['redirect'] = $uri['path'] . '/delete/' . $form_langcode;
   }
 
   /**
@@ -502,17 +476,4 @@ class ContentTranslationController implements ContentTranslationControllerInterf
     return $entity->label();
   }
 
-  /**
-   * Returns an instance of the given path.
-   *
-   * @param $path
-   *   An internal path containing the entity id wildcard.
-   *
-   * @return string
-   *   The instantiated path.
-   */
-  protected function getPathInstance($path, $entity_id) {
-    $wildcard = $this->entityInfo['menu_path_wildcard'];
-    return str_replace($wildcard, $entity_id, $path);
-  }
 }

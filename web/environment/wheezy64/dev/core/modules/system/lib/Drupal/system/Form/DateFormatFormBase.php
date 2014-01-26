@@ -9,7 +9,9 @@ namespace Drupal\system\Form;
 
 use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Ajax\ReplaceCommand;
+use Drupal\Core\Config\Entity\ConfigStorageController;
 use Drupal\Core\Datetime\Date;
+use Drupal\Core\Language\Language;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\Entity\Query\QueryFactory;
@@ -42,19 +44,29 @@ abstract class DateFormatFormBase extends EntityFormController {
   protected $dateService;
 
   /**
+   * The date format storage controller.
+   *
+   * @var \Drupal\Core\Config\Entity\ConfigStorageController
+   */
+  protected $dateFormatStorage;
+
+  /**
    * Constructs a new date format form.
    *
    * @param \Drupal\Core\Entity\Query\QueryFactory $query_factory
    *   The entity query factory.
    * @param \Drupal\Core\Datetime\Date $date_service
    *   The date service.
+   * @param \Drupal\Core\Config\Entity\ConfigStorageController $date_format_storage
+   *   The date format storage controller.
    */
-  public function __construct(QueryFactory $query_factory, Date $date_service) {
+  public function __construct(QueryFactory $query_factory, Date $date_service, ConfigStorageController $date_format_storage) {
     $date = new DrupalDateTime();
     $this->patternType = $date->canUseIntl() ? DrupalDateTime::INTL : DrupalDateTime::PHP;
 
     $this->queryFactory = $query_factory;
     $this->dateService = $date_service;
+    $this->dateFormatStorage = $date_format_storage;
   }
 
   /**
@@ -63,7 +75,8 @@ abstract class DateFormatFormBase extends EntityFormController {
   public static function create(ContainerInterface $container) {
     return new static(
       $container->get('entity.query'),
-      $container->get('date')
+      $container->get('date'),
+      $container->get('entity.manager')->getStorageController('date_format')
     );
   }
 
@@ -125,12 +138,13 @@ abstract class DateFormatFormBase extends EntityFormController {
 
     $form['id'] = array(
       '#type' => 'machine_name',
-      '#title' => t('Machine-readable name'),
       '#description' => t('A unique machine-readable name. Can only contain lowercase letters, numbers, and underscores.'),
       '#disabled' => !$this->entity->isNew(),
       '#default_value' => $this->entity->id(),
       '#machine_name' => array(
         'exists' => array($this, 'exists'),
+        'replace_pattern' =>'([^a-z0-9_]+)|(^custom$)',
+        'error' => 'The machine-readable name must be unique, and can only contain lowercase letters, numbers, and underscores. Additionally, it can not be the reserved word "custom".',
       ),
     );
 
@@ -155,22 +169,12 @@ abstract class DateFormatFormBase extends EntityFormController {
       '#required' => TRUE,
     );
 
-    $languages = language_list();
-
-    $options = array();
-    foreach ($languages as $langcode => $data) {
-      $options[$langcode] = $data->name;
-    }
-
-    if (!empty($options)) {
-      $form['locales'] = array(
-        '#title' => t('Languages'),
-        '#type' => 'select',
-        '#options' => $options,
-        '#multiple' => TRUE,
-        '#default_value' => $this->entity->getLocales(),
-      );
-    }
+    $form['langcode'] = array(
+      '#type' => 'language_select',
+      '#title' => t('Language'),
+      '#languages' => Language::STATE_ALL,
+      '#default_value' => $this->entity->langcode,
+    );
 
     return parent::form($form, $form_state);
   }
@@ -184,16 +188,12 @@ abstract class DateFormatFormBase extends EntityFormController {
     // The machine name field should already check to see if the requested
     // machine name is available. Regardless of machine_name or human readable
     // name, check to see if the provided pattern exists.
-    $format = trim($form_state['values']['date_format_pattern']);
-    $formats = $this->queryFactory
-      ->get($this->entity->entityType())
-      ->condition('pattern.' . $this->patternType, $format)
-      ->execute();
-
-    // Exclude the current format.
-    unset($formats[$this->entity->id()]);
-    if (!empty($formats)) {
-      form_set_error('date_format_pattern', t('This format already exists. Enter a unique format string.'));
+    $pattern = trim($form_state['values']['date_format_pattern']);
+    foreach ($this->dateFormatStorage->loadMultiple() as $format) {
+      if ($format->getPattern() == $pattern && ($this->entity->isNew() || $format->id() != $this->entity->id())) {
+        $this->setFormError('date_format_pattern', $form_state, $this->t('This format already exists. Enter a unique format string.'));
+        continue;
+      }
     }
   }
 
@@ -201,7 +201,7 @@ abstract class DateFormatFormBase extends EntityFormController {
    * {@inheritdoc}
    */
   public function submit(array $form, array &$form_state) {
-    $form_state['redirect'] = 'admin/config/regional/date-time';
+    $form_state['redirect_route']['route_name'] = 'system.date_format_list';
     $form_state['values']['pattern'][$this->patternType] = trim($form_state['values']['date_format_pattern']);
 
     parent::submit($form, $form_state);

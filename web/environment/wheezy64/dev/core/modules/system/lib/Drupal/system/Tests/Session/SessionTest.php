@@ -65,7 +65,7 @@ class SessionTest extends WebTestBase {
       'name' => $user->getUsername(),
       'pass' => $user->pass_raw
     );
-    $this->drupalPost('user', $edit, t('Log in'));
+    $this->drupalPostForm('user', $edit, t('Log in'));
     $this->drupalGet('user');
     $pass = $this->assertText($user->getUsername(), format_string('Found name: %name', array('%name' => $user->getUsername())), 'User login');
     $this->_logged_in = $pass;
@@ -78,8 +78,7 @@ class SessionTest extends WebTestBase {
   }
 
   /**
-   * Test data persistence via the session_test module callbacks. Also tests
-   * drupal_session_count() since session data is already generated here.
+   * Test data persistence via the session_test module callbacks.
    */
   function testDataPersistence() {
     $user = $this->drupalCreateUser(array('access content'));

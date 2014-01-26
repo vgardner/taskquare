@@ -19,7 +19,7 @@ use Drupal\Component\Annotation\PluginID;
  */
 class Name extends InOperator {
 
-  var $always_multiple = TRUE;
+  protected $alwaysMultiple = TRUE;
 
   protected function valueForm(&$form, &$form_state) {
     $values = array();
@@ -42,7 +42,7 @@ class Name extends InOperator {
       '#title' => t('Usernames'),
       '#description' => t('Enter a comma separated list of user names.'),
       '#default_value' => $default_value,
-      '#autocomplete_route_name' => 'user_autocomplete_anonymous',
+      '#autocomplete_route_name' => 'user.autocomplete_anonymous',
     );
 
     if (!empty($form_state['exposed']) && !isset($form_state['input'][$this->options['expose']['identifier']])) {
@@ -52,7 +52,7 @@ class Name extends InOperator {
 
   protected function valueValidate($form, &$form_state) {
     $values = drupal_explode_tags($form_state['values']['options']['value']);
-    $uids = $this->validate_user_strings($form['value'], $values);
+    $uids = $this->validate_user_strings($form['value'], $form_state, $values);
 
     if ($uids) {
       $form_state['values']['options']['value'] = $uids;
@@ -92,7 +92,7 @@ class Name extends InOperator {
     $values = drupal_explode_tags($input);
 
     if (!$this->options['is_grouped'] || ($this->options['is_grouped'] && ($input != 'All'))) {
-      $uids = $this->validate_user_strings($form[$identifier], $values);
+      $uids = $this->validate_user_strings($form[$identifier], $form_state, $values);
     }
     else {
       $uids = FALSE;
@@ -108,11 +108,10 @@ class Name extends InOperator {
    * or the exposed filter, this is abstracted out a bit so it can
    * handle the multiple input sources.
    */
-  function validate_user_strings(&$form, $values) {
+  function validate_user_strings(&$form, array &$form_state, $values) {
     $uids = array();
     $placeholders = array();
     $args = array();
-    $results = array();
     foreach ($values as $value) {
       if (strtolower($value) == 'anonymous') {
         $uids[] = 0;
@@ -135,7 +134,7 @@ class Name extends InOperator {
     }
 
     if ($missing) {
-      form_error($form, format_plural(count($missing), 'Unable to find user: @users', 'Unable to find users: @users', array('@users' => implode(', ', array_keys($missing)))));
+      form_error($form, $form_state, format_plural(count($missing), 'Unable to find user: @users', 'Unable to find users: @users', array('@users' => implode(', ', array_keys($missing)))));
     }
 
     return $uids;

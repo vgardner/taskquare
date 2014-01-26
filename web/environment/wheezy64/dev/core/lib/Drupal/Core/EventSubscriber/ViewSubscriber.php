@@ -7,6 +7,8 @@
 
 namespace Drupal\Core\EventSubscriber;
 
+use Drupal\Core\Controller\TitleResolverInterface;
+use Symfony\Cmf\Component\Routing\RouteObjectInterface;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\KernelEvents;
@@ -25,10 +27,31 @@ use Drupal\Core\ContentNegotiation;
  */
 class ViewSubscriber implements EventSubscriberInterface {
 
+  /**
+   * The content negotiation.
+   *
+   * @var \Drupal\Core\ContentNegotiation
+   */
   protected $negotiation;
 
-  public function __construct(ContentNegotiation $negotiation) {
+  /**
+   * The title resolver.
+   *
+   * @var \Drupal\Core\Controller\TitleResolverInterface
+   */
+  protected $titleResolver;
+
+  /**
+   * Constructs a new ViewSubscriber.
+   *
+   * @param \Drupal\Core\ContentNegotiation $negotiation
+   *   The content negotiation.
+   * @param \Drupal\Core\Controller\TitleResolverInterface $title_resolver
+   *   The title resolver.
+   */
+  public function __construct(ContentNegotiation $negotiation, TitleResolverInterface $title_resolver) {
     $this->negotiation = $negotiation;
+    $this->titleResolver = $title_resolver;
   }
 
   /**
@@ -71,6 +94,12 @@ class ViewSubscriber implements EventSubscriberInterface {
           '#markup' => $page_result,
         );
       }
+
+      // If no title was returned fall back to one defined in the route.
+      if (!isset($page_result['#title'])) {
+        $page_result['#title'] = $this->titleResolver->getTitle($request, $request->attributes->get(RouteObjectInterface::ROUTE_OBJECT));
+      }
+
       $event->setResponse(new Response(drupal_render_page($page_result)));
     }
     else {
@@ -83,6 +112,12 @@ class ViewSubscriber implements EventSubscriberInterface {
           '#markup' => $page_result,
         );
       }
+
+      // If no title was returned fall back to one defined in the route.
+      if (!isset($page_result['#title'])) {
+        $page_result['#title'] = $this->titleResolver->getTitle($request, $request->attributes->get(RouteObjectInterface::ROUTE_OBJECT));
+      }
+
       $event->setResponse(new Response(drupal_render($page_result)));
     }
   }
@@ -142,6 +177,19 @@ class ViewSubscriber implements EventSubscriberInterface {
    */
   public function onHtml(GetResponseForControllerResultEvent $event) {
     $page_callback_result = $event->getControllerResult();
+    $request = $event->getRequest();
+
+    // Convert string content to a renderable array, so we can set a title.
+    if (!is_array($page_callback_result)) {
+      $page_callback_result = array(
+        '#markup' => $page_callback_result,
+      );
+    }
+    // If no title was returned fall back to one defined in the route.
+    if (!isset($page_callback_result['#title'])) {
+      $page_callback_result['#title'] = $this->titleResolver->getTitle($request, $request->attributes->get(RouteObjectInterface::ROUTE_OBJECT));
+    }
+
     return new Response(drupal_render_page($page_callback_result));
   }
 

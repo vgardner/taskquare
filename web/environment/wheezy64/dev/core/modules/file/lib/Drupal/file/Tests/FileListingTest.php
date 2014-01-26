@@ -7,8 +7,6 @@
 
 namespace Drupal\file\Tests;
 
-use Drupal\Core\Language\Language;
-
 /**
  * Tests file listing page functionality.
  */
@@ -62,7 +60,8 @@ class FileListingTest extends FileFieldTestBase {
    * Tests file overview with different user permissions.
    */
   function testFileListingPages() {
-    // Users without sufficent permissions should not see file listing.
+    $file_usage = $this->container->get('file.usage');
+    // Users without sufficient permissions should not see file listing.
     $this->drupalLogin($this->base_user);
     $this->drupalGet('admin/content/files');
     $this->assertResponse(403);
@@ -74,19 +73,31 @@ class FileListingTest extends FileFieldTestBase {
       $nodes[] = $this->drupalCreateNode(array('type' => 'article'));
     }
 
+    $this->drupalGet('admin/content/files');
+    $this->assertResponse(200);
+    $this->assertText('No files available.');
+    $this->drupalGet('admin/content/files');
+    $this->assertResponse(200);
+
+    // Create a file with no usage.
+    $file = $this->createFile();
+
+    $this->drupalGet('admin/content/files/usage/' . $file->id());
+    $this->assertResponse(200);
+    $this->assertTitle(t('File usage information for @file | Drupal', array('@file' => $file->getFilename())));
+
     foreach ($nodes as &$node) {
       $this->drupalGet('node/' . $node->id() . '/edit');
       $file = $this->getTestFile('image');
 
       $edit = array(
-        'files[file_' . Language::LANGCODE_NOT_SPECIFIED . '_' . 0 . ']' => drupal_realpath($file->getFileUri()),
+        'files[file_0]' => drupal_realpath($file->getFileUri()),
       );
-      $this->drupalPost(NULL, $edit, t('Save'));
+      $this->drupalPostForm(NULL, $edit, t('Save'));
       $node = entity_load('node', $node->id());
     }
 
     $this->drupalGet('admin/content/files');
-    $this->assertResponse(200);
 
     foreach ($nodes as $node) {
       $file = entity_load('file', $node->file->target_id);
@@ -104,14 +115,58 @@ class FileListingTest extends FileFieldTestBase {
 
     $this->drupalGet('admin/content/files');
     $file = entity_load('file', $orphaned_file);
-    $usage = $this->sumUsages(file_usage()->listUsage($file));
+    $usage = $this->sumUsages($file_usage->listUsage($file));
     $this->assertRaw('admin/content/files/usage/' . $file->id() . '">' . $usage);
 
     $file = entity_load('file', $used_file);
-    $usage = $this->sumUsages(file_usage()->listUsage($file));
+    $usage = $this->sumUsages($file_usage->listUsage($file));
     $this->assertRaw('admin/content/files/usage/' . $file->id() . '">' . $usage);
 
     $result = $this->xpath("//td[contains(@class, 'views-field-status') and contains(text(), :value)]", array(':value' => t('Temporary')));
     $this->assertEqual(1, count($result), 'Unused file marked as temporary.');
+
+    // Test file usage page.
+    foreach ($nodes as $node) {
+      $file = entity_load('file', $node->file->target_id);
+      $usage = $file_usage->listUsage($file);
+      $this->drupalGet('admin/content/files/usage/' . $file->id());
+      $this->assertResponse(200);
+      $this->assertText($node->getTitle(), 'Node title found on usage page.');
+      $this->assertText('node', 'Registering entity type found on usage page.');
+      $this->assertText('file', 'Registering module found on usage page.');
+      foreach ($usage as $module) {
+        foreach ($module as $entity_type) {
+          foreach ($entity_type as $entity) {
+            $this->assertText($entity, 'Usage count found on usage page.');
+          }
+        }
+      }
+      $this->assertLinkByHref('node/' . $node->id(), 0, 'Link to registering entity found on usage page.');
+    }
   }
+
+  /**
+   * Creates and saves a test file.
+   *
+   * @return \Drupal\Core\Entity\EntityInterface
+   *  A file entity.
+   */
+  protected function createFile() {
+    // Create a new file entity.
+    $file = entity_create('file', array(
+      'uid' => 1,
+      'filename' => 'druplicon.txt',
+      'uri' => 'public://druplicon.txt',
+      'filemime' => 'text/plain',
+      'timestamp' => 1,
+      'status' => FILE_STATUS_PERMANENT,
+    ));
+    file_put_contents($file->getFileUri(), 'hello world');
+
+    // Save it, inserting a new record.
+    $file->save();
+
+    return $file;
+  }
+
 }

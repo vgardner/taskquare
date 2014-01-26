@@ -7,6 +7,7 @@
 
 namespace Drupal\taxonomy\Tests\Views;
 
+use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Language\Language;
 use Drupal\views\Tests\ViewTestBase;
 use Drupal\views\Tests\ViewTestData;
@@ -33,14 +34,14 @@ abstract class TaxonomyTestBase extends ViewTestBase {
   /**
    * Stores the first term used in the different tests.
    *
-   * @var Drupal\taxonomy\Term
+   * @var \Drupal\taxonomy\Term
    */
   protected $term1;
 
   /**
    * Stores the second term used in the different tests.
    *
-   * @var Drupal\taxonomy\Term
+   * @var \Drupal\taxonomy\Term
    */
   protected $term2;
 
@@ -48,7 +49,7 @@ abstract class TaxonomyTestBase extends ViewTestBase {
     parent::setUp();
     $this->mockStandardInstall();
 
-    ViewTestData::importTestViews(get_class($this), array('taxonomy_test_views'));
+    ViewTestData::createTestViews(get_class($this), array('taxonomy_test_views'));
 
     $this->term1 = $this->createTerm();
     $this->term2 = $this->createTerm();
@@ -67,7 +68,7 @@ abstract class TaxonomyTestBase extends ViewTestBase {
    * @see http://drupal.org/node/1708692
    */
   protected function mockStandardInstall() {
-    $type = $this->drupalCreateContentType(array(
+    $this->drupalCreateContentType(array(
       'type' => 'article',
     ));
     // Create the vocabulary for the tag field.
@@ -82,7 +83,7 @@ abstract class TaxonomyTestBase extends ViewTestBase {
       'entity_type' => 'node',
       'type' => 'taxonomy_term_reference',
       // Set cardinality to unlimited for tagging.
-      'cardinality' => FIELD_CARDINALITY_UNLIMITED,
+      'cardinality' => FieldDefinitionInterface::CARDINALITY_UNLIMITED,
       'settings' => array(
         'allowed_values' => array(
           array(
@@ -92,7 +93,7 @@ abstract class TaxonomyTestBase extends ViewTestBase {
         ),
       ),
     ))->save();
-    $instance = entity_create('field_instance', array(
+    entity_create('field_instance', array(
       'field_name' => $this->field_name,
       'entity_type' => 'node',
       'label' => 'Tags',
@@ -123,7 +124,7 @@ abstract class TaxonomyTestBase extends ViewTestBase {
   /**
    * Returns a new term with random properties in vocabulary $vid.
    *
-   * @return Drupal\taxonomy\Term
+   * @return \Drupal\taxonomy\Term
    *   The created taxonomy term.
    */
   protected function createTerm() {

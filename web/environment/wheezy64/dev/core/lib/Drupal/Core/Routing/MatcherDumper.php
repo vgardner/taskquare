@@ -7,7 +7,6 @@
 
 namespace Drupal\Core\Routing;
 
-use Symfony\Component\Routing\Matcher\Dumper\MatcherDumperInterface;
 use Symfony\Component\Routing\RouteCollection;
 
 use Drupal\Core\Database\Connection;
@@ -18,14 +17,9 @@ use Drupal\Core\Database\Connection;
 class MatcherDumper implements MatcherDumperInterface {
 
   /**
-   * The maximum number of path elements for a route pattern;
-   */
-  const MAX_PARTS = 9;
-
-  /**
    * The database connection to which to dump route information.
    *
-   * @var Drupal\Core\Database\Connection
+   * @var \Drupal\Core\Database\Connection
    */
   protected $connection;
 
@@ -46,7 +40,7 @@ class MatcherDumper implements MatcherDumperInterface {
   /**
    * Construct the MatcherDumper.
    *
-   * @param Drupal\Core\Database\Connection $connection
+   * @param \Drupal\Core\Database\Connection $connection
    *   The database connection which will be used to store the route
    *   information.
    * @param string $table
@@ -59,10 +53,7 @@ class MatcherDumper implements MatcherDumperInterface {
   }
 
   /**
-   * Adds additional routes to be dumped.
-   *
-   * @param Symfony\Component\Routing\RouteCollection $routes
-   *   A collection of routes to add to this dumper.
+   * {@inheritdoc}
    */
   public function addRoutes(RouteCollection $routes) {
     if (empty($this->routes)) {
@@ -77,8 +68,8 @@ class MatcherDumper implements MatcherDumperInterface {
    * Dumps a set of routes to the router table in the database.
    *
    * Available options:
-   * - route_set:  The route grouping that is being dumped. All existing
-   *   routes with this route set will be deleted on dump.
+   * - provider: The route grouping that is being dumped. All existing
+   *   routes with this provider will be deleted on dump.
    * - base_class: The base class name.
    *
    * @param array $options
@@ -86,15 +77,15 @@ class MatcherDumper implements MatcherDumperInterface {
    */
   public function dump(array $options = array()) {
     $options += array(
-      'route_set' => '',
+      'provider' => '',
     );
 
     // Convert all of the routes into database records.
     $insert = $this->connection->insert($this->tableName)->fields(array(
       'name',
-      'route_set',
+      'provider',
       'fit',
-      'pattern',
+      'path',
       'pattern_outline',
       'number_parts',
       'route',
@@ -105,9 +96,9 @@ class MatcherDumper implements MatcherDumperInterface {
       $compiled = $route->compile();
       $values = array(
         'name' => $name,
-        'route_set' => $options['route_set'],
+        'provider' => $options['provider'],
         'fit' => $compiled->getFit(),
-        'pattern' => $compiled->getPattern(),
+        'path' => $compiled->getPath(),
         'pattern_outline' => $compiled->getPatternOutline(),
         'number_parts' => $compiled->getNumParts(),
         'route' => serialize($route),
@@ -115,22 +106,23 @@ class MatcherDumper implements MatcherDumperInterface {
       $insert->values($values);
     }
 
-    // Delete any old records in this route set first, then insert the new ones.
+    // Delete any old records in this provider first, then insert the new ones.
     // That avoids stale data. The transaction makes it atomic to avoid
     // unstable router states due to random failures.
-    $txn = $this->connection->startTransaction();
-
-    $this->connection->delete($this->tableName)
-      ->condition('route_set', $options['route_set'])
-      ->execute();
-
-    $insert->execute();
-
-    // We want to reuse the dumper for multiple route sets, so on dump, flush
-    // the queued routes.
-    $this->routes = NULL;
-
-    // Transaction ends here.
+    $transaction = $this->connection->startTransaction();
+    try {
+      $this->connection->delete($this->tableName)
+        ->condition('provider', $options['provider'])
+        ->execute();
+      $insert->execute();
+      // We want to reuse the dumper for multiple providers, so on dump, flush
+      // the queued routes.
+      $this->routes = NULL;
+    } catch (\Exception $e) {
+      $transaction->rollback();
+      watchdog_exception('Routing', $e);
+      throw $e;
+    }
   }
 
   /**

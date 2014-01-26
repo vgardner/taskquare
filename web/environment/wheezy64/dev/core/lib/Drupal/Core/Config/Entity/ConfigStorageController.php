@@ -7,7 +7,6 @@
 
 namespace Drupal\Core\Config\Entity;
 
-use Drupal\Component\Uuid\Uuid;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityMalformedException;
 use Drupal\Core\Entity\EntityStorageControllerBase;
@@ -15,6 +14,7 @@ use Drupal\Core\Config\Config;
 use Drupal\Core\Config\ConfigFactory;
 use Drupal\Core\Config\StorageInterface;
 use Drupal\Core\Entity\Query\QueryFactory;
+use Drupal\Component\Uuid\UuidInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -40,6 +40,13 @@ class ConfigStorageController extends EntityStorageControllerBase {
    * @var string
    */
   protected $uuidKey = 'uuid';
+
+  /**
+   * The UUID service.
+   *
+   * @var \Drupal\Component\Uuid\UuidInterface
+   */
+  protected $uuidService;
 
   /**
    * Name of the entity's status key or FALSE if a status is not supported.
@@ -82,8 +89,10 @@ class ConfigStorageController extends EntityStorageControllerBase {
    *   The config storage service.
    * @param \Drupal\Core\Entity\Query\QueryFactory $entity_query_factory
    *   The entity query factory.
+   * @param \Drupal\Component\Uuid\UuidInterface $uuid_service
+   *   The UUID service.
    */
-  public function __construct($entity_type, array $entity_info, ConfigFactory $config_factory, StorageInterface $config_storage, QueryFactory $entity_query_factory) {
+  public function __construct($entity_type, array $entity_info, ConfigFactory $config_factory, StorageInterface $config_storage, QueryFactory $entity_query_factory, UuidInterface $uuid_service) {
     parent::__construct($entity_type, $entity_info);
 
     $this->idKey = $this->entityInfo['entity_keys']['id'];
@@ -98,6 +107,7 @@ class ConfigStorageController extends EntityStorageControllerBase {
     $this->configFactory = $config_factory;
     $this->configStorage = $config_storage;
     $this->entityQueryFactory = $entity_query_factory;
+    $this->uuidService = $uuid_service;
   }
 
   /**
@@ -109,7 +119,8 @@ class ConfigStorageController extends EntityStorageControllerBase {
       $entity_info,
       $container->get('config.factory'),
       $container->get('config.storage'),
-      $container->get('entity.query')
+      $container->get('entity.query'),
+      $container->get('uuid')
     );
   }
 
@@ -130,11 +141,11 @@ class ConfigStorageController extends EntityStorageControllerBase {
       $queried_entities = $this->buildQuery($ids);
     }
 
-    // Pass all entities loaded from the database through $this->attachLoad(),
+    // Pass all entities loaded from the database through $this->postLoad(),
     // which calls the
     // entity type specific load callback, for example hook_node_type_load().
     if (!empty($queried_entities)) {
-      $this->attachLoad($queried_entities);
+      $this->postLoad($queried_entities);
       $entities += $queried_entities;
     }
 
@@ -275,38 +286,6 @@ class ConfigStorageController extends EntityStorageControllerBase {
   }
 
   /**
-   * Attaches data to entities upon loading.
-   *
-   * This will attach fields, if the entity is fieldable. It calls
-   * hook_entity_load() for modules which need to add data to all entities.
-   * It also calls hook_TYPE_load() on the loaded entities. For example
-   * hook_node_load() or hook_user_load(). If your hook_TYPE_load()
-   * expects special parameters apart from the queried entities, you can set
-   * $this->hookLoadArguments prior to calling the method.
-   * See Drupal\node\NodeStorageController::attachLoad() for an example.
-   *
-   * @param $queried_entities
-   *   Associative array of query results, keyed on the entity ID.
-   * @param $revision_id
-   *   ID of the revision that was loaded, or FALSE if the most current revision
-   *   was loaded.
-   */
-  protected function attachLoad(&$queried_entities, $revision_id = FALSE) {
-    // Call hook_entity_load().
-    foreach (\Drupal::moduleHandler()->getImplementations('entity_load') as $module) {
-      $function = $module . '_entity_load';
-      $function($queried_entities, $this->entityType);
-    }
-    // Call hook_TYPE_load(). The first argument for hook_TYPE_load() are
-    // always the queried entities, followed by additional arguments set in
-    // $this->hookLoadArguments.
-    $args = array_merge(array($queried_entities), $this->hookLoadArguments);
-    foreach (\Drupal::moduleHandler()->getImplementations($this->entityType . '_load') as $module) {
-      call_user_func_array($module . '_' . $this->entityType . '_load', $args);
-    }
-  }
-
-  /**
    * Implements Drupal\Core\Entity\EntityStorageControllerInterface::create().
    */
   public function create(array $values) {
@@ -323,8 +302,7 @@ class ConfigStorageController extends EntityStorageControllerBase {
 
     // Assign a new UUID if there is none yet.
     if (!isset($entity->{$this->uuidKey})) {
-      $uuid = new Uuid();
-      $entity->{$this->uuidKey} = $uuid->generate();
+      $entity->{$this->uuidKey} = $this->uuidService->generate();
     }
     $entity->postCreate($this);
 
@@ -383,8 +361,8 @@ class ConfigStorageController extends EntityStorageControllerBase {
 
     // Load the stored entity, if any.
     // At this point, the original ID can only be NULL or a valid ID.
-    if ($entity->getOriginalID() !== NULL) {
-      $id = $entity->getOriginalID();
+    if ($entity->getOriginalId() !== NULL) {
+      $id = $entity->getOriginalId();
     }
     $config = $this->configFactory->get($prefix . $id);
     $is_new = $config->isNew();
@@ -422,7 +400,7 @@ class ConfigStorageController extends EntityStorageControllerBase {
       $this->invokeHook('update', $entity);
 
       // Immediately update the original ID.
-      $entity->setOriginalID($entity->id());
+      $entity->setOriginalId($entity->id());
     }
     else {
       $return = SAVED_NEW;
@@ -474,6 +452,7 @@ class ConfigStorageController extends EntityStorageControllerBase {
    */
   public function importCreate($name, Config $new_config, Config $old_config) {
     $entity = $this->create($new_config->get());
+    $entity->setSyncing(TRUE);
     $entity->save();
     return TRUE;
   }
@@ -494,6 +473,7 @@ class ConfigStorageController extends EntityStorageControllerBase {
   public function importUpdate($name, Config $new_config, Config $old_config) {
     $id = static::getIDFromConfigName($name, $this->entityInfo['config_prefix']);
     $entity = $this->load($id);
+    $entity->setSyncing(TRUE);
     $entity->original = clone $entity;
 
     foreach ($old_config->get() as $property => $value) {
@@ -524,6 +504,7 @@ class ConfigStorageController extends EntityStorageControllerBase {
   public function importDelete($name, Config $new_config, Config $old_config) {
     $id = static::getIDFromConfigName($name, $this->entityInfo['config_prefix']);
     $entity = $this->load($id);
+    $entity->setSyncing(TRUE);
     $entity->delete();
     return TRUE;
   }

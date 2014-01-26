@@ -8,7 +8,7 @@
 namespace Drupal\entity\Form;
 
 use Drupal\Core\Entity\EntityFormController;
-use Drupal\Core\Entity\EntityManager;
+use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Entity\Query\QueryFactory;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -43,10 +43,10 @@ abstract class EntityDisplayModeFormBase extends EntityFormController {
    *
    * @param \Drupal\Core\Entity\Query\QueryFactory $query_factory
    *   The entity query factory.
-   * @param \Drupal\Core\Entity\EntityManager $entity_manager
+   * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
    *   The entity manager.
    */
-  public function __construct(QueryFactory $query_factory, EntityManager $entity_manager) {
+  public function __construct(QueryFactory $query_factory, EntityManagerInterface $entity_manager) {
     $this->queryFactory = $query_factory;
     $this->entityManager = $entity_manager;
   }
@@ -82,7 +82,6 @@ abstract class EntityDisplayModeFormBase extends EntityFormController {
 
     $form['id'] = array(
       '#type' => 'machine_name',
-      '#title' => t('Machine-readable name'),
       '#description' => t('A unique machine-readable name. Can only contain lowercase letters, numbers, and underscores.'),
       '#disabled' => !$this->entity->isNew(),
       '#default_value' => $this->entity->id(),
@@ -123,8 +122,7 @@ abstract class EntityDisplayModeFormBase extends EntityFormController {
     drupal_set_message(t('Saved the %label @entity-type.', array('%label' => $this->entity->label(), '@entity-type' => strtolower($this->entityInfo['label']))));
     $this->entity->save();
     entity_info_cache_clear();
-    $short_type = str_replace('_mode', '', $this->entity->entityType());
-    $form_state['redirect'] = "admin/structure/display-modes/$short_type";
+    $form_state['redirect_route']['route_name'] = 'entity.' . $this->entity->entityType() . '_list';
   }
 
 }

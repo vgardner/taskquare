@@ -7,8 +7,9 @@
 
 namespace Drupal\file\Tests;
 
-use Drupal\Core\Entity\Field\FieldItemInterface;
-use Drupal\Core\Entity\Field\FieldInterface;
+use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\FieldItemInterface;
+use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\field\Tests\FieldUnitTestBase;
 
 /**
@@ -48,7 +49,7 @@ class FileItemTest extends FieldUnitTestBase {
       'name' => 'file_test',
       'entity_type' => 'entity_test',
       'type' => 'file',
-      'cardinality' => FIELD_CARDINALITY_UNLIMITED,
+      'cardinality' => FieldDefinitionInterface::CARDINALITY_UNLIMITED,
     ))->save();
     entity_create('field_instance', array(
       'entity_type' => 'entity_test',
@@ -75,7 +76,7 @@ class FileItemTest extends FieldUnitTestBase {
     $entity->save();
 
     $entity = entity_load('entity_test', $entity->id());
-    $this->assertTrue($entity->file_test instanceof FieldInterface, 'Field implements interface.');
+    $this->assertTrue($entity->file_test instanceof FieldItemListInterface, 'Field implements interface.');
     $this->assertTrue($entity->file_test[0] instanceof FieldItemInterface, 'Field item implements interface.');
     $this->assertEqual($entity->file_test->target_id, $this->file->id());
     $this->assertEqual($entity->file_test->display, 1);
@@ -94,6 +95,11 @@ class FileItemTest extends FieldUnitTestBase {
     $entity->file_test->target_id = $file2->id();
     $this->assertEqual($entity->file_test->entity->id(), $file2->id());
     $this->assertEqual($entity->file_test->entity->getFileUri(), $file2->getFileUri());
+
+    // Test the deletion of an entity having an entity reference field targeting
+    // a non-existing entity.
+    $file2->delete();
+    $entity->delete();
   }
 
 }

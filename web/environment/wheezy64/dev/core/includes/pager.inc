@@ -6,6 +6,7 @@
  */
 
 use Drupal\Core\Template\Attribute;
+use Drupal\Component\Utility\Url;
 
 /**
  * Returns the current page being requested for display within a pager.
@@ -15,18 +16,18 @@ use Drupal\Core\Template\Attribute;
  *
  * @return
  *  The number of the current requested page, within the pager represented by
- *  $element. This is determined from the URL query parameter $_GET['page'], or
- *  0 by default. Note that this number may differ from the actual page being
- *  displayed. For example, if a search for "example text" brings up three
- *  pages of results, but a users visits search/node/example+text?page=10, this
- *  function will return 10, even though the default pager implementation
- *  adjusts for this and still displays the third page of search results at
- *  that URL.
+ *  $element. This is determined from the URL query parameter
+ *  \Drupal::request()->query->get('page'), or 0 by default. Note that this
+ *  number may differ from the actual page being displayed. For example, if a
+ *  search for "example text" brings up three pages of results, but a users
+ *  visits search/node/example+text?page=10, this function will return 10, even
+ *  though the default pager implementation adjusts for this and still displays
+ * the third page of search results at that URL.
  *
  * @see pager_default_initialize()
  */
 function pager_find_page($element = 0) {
-  $page = isset($_GET['page']) ? $_GET['page'] : '';
+  $page = \Drupal::request()->query->get('page', '');
   $page_array = explode(',', $page);
   if (!isset($page_array[$element])) {
     $page_array[$element] = 0;
@@ -60,7 +61,7 @@ function pager_find_page($element = 0) {
  *   // First find the total number of items and initialize the pager.
  *   $where = "status = 1";
  *   $total = mymodule_select("SELECT COUNT(*) FROM data " . $where)->result();
- *   $num_per_page = variable_get('mymodule_num_per_page', 10);
+ *   $num_per_page = \Drupal::config('mymodule.settings')->get('num_per_page');
  *   $page = pager_default_initialize($total, $num_per_page);
  *
  *   // Next, retrieve and display the items for the current page.
@@ -84,7 +85,7 @@ function pager_find_page($element = 0) {
  *   // parameter corresponds to an actual page of results that will exist
  *   // within the set.
  *   $page = pager_find_page();
- *   $num_per_page = variable_get('mymodule_num_per_page', 10);
+ *   $num_per_page = \Drupal::config('mymodule.settings')->get('num_per_page');
  *   $offset = $num_per_page * $page;
  *   $result = mymodule_remote_search($keywords, $offset, $num_per_page);
  *
@@ -108,10 +109,11 @@ function pager_find_page($element = 0) {
  *
  * @return
  *   The number of the current page, within the pager represented by $element.
- *   This is determined from the URL query parameter $_GET['page'], or 0 by
- *   default. However, if a page that does not correspond to the actual range
- *   of the result set was requested, this function will return the closest
- *   page actually within the result set.
+ *   This is determined from the URL query parameter
+ *   \Drupal::request()->query->get('page), or 0 by default. However, if a page
+ *   that does not correspond to the actual range of the result set was
+ *   requested, this function will return the closest page actually within the
+ *   result set.
  */
 function pager_default_initialize($total, $limit, $element = 0) {
   global $pager_page_array, $pager_total, $pager_total_items, $pager_limits;
@@ -136,7 +138,7 @@ function pager_default_initialize($total, $limit, $element = 0) {
 function pager_get_query_parameters() {
   $query = &drupal_static(__FUNCTION__);
   if (!isset($query)) {
-    $query = drupal_get_query_parameters($_GET, array('page'));
+    $query = Url::filterQueryParameters(\Drupal::request()->query->all(), array('page'));
   }
   return $query;
 }
@@ -160,7 +162,6 @@ function pager_get_query_parameters() {
  *   - quantity: The number of pages in the list.
  */
 function template_preprocess_pager(&$variables) {
-  $tags = $variables['tags'];
   $element = $variables['element'];
   $parameters = $variables['parameters'];
   $quantity = $variables['quantity'];
@@ -425,7 +426,7 @@ function pager_query_add_page(array $query, $element, $index) {
   // Determine the first result to display on the linked page.
   $page_new = pager_load_array($index, $element, $pager_page_array);
 
-  $page = isset($_GET['page']) ? $_GET['page'] : '';
+  $page = \Drupal::request()->query->get('page', '');
   if ($new_page = implode(',', pager_load_array($page_new[$element], $element, explode(',', $page)))) {
     $query['page'] = $new_page;
   }

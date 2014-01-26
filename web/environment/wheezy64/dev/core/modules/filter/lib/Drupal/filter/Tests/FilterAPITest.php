@@ -8,6 +8,7 @@
 namespace Drupal\filter\Tests;
 
 use Drupal\Core\TypedData\AllowedValuesInterface;
+use Drupal\Core\TypedData\DataDefinition;
 use Drupal\filter\Plugin\DataType\FilterFormat;
 use Drupal\system\Tests\Entity\EntityUnitTestBase;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
@@ -31,7 +32,6 @@ class FilterAPITest extends EntityUnitTestBase {
     parent::setUp();
 
     $this->installConfig(array('system', 'filter'));
-    $this->installSchema('user', array('users_roles'));
 
     // Create Filtered HTML format.
     $filtered_html_format = entity_create('filter_format', array(
@@ -192,7 +192,7 @@ class FilterAPITest extends EntityUnitTestBase {
    * Tests the function of the typed data type.
    */
   function testTypedDataAPI() {
-    $definition = array('type' => 'filter_format');
+    $definition = DataDefinition::create('filter_format');
     $data = \Drupal::typedData()->create($definition);
 
     $this->assertTrue($data instanceof AllowedValuesInterface, 'Typed data object implements \Drupal\Core\TypedData\AllowedValuesInterface');
@@ -205,15 +205,18 @@ class FilterAPITest extends EntityUnitTestBase {
     $user = drupal_anonymous_user();
     $this->container->set('current_user', $user);
 
-    $available_values = $data->getPossibleValues();
-    $this->assertEqual($available_values, array('filtered_html', 'full_html', 'plain_text'));
-    $available_options = $data->getPossibleOptions();
     $expected_available_options = array(
       'filtered_html' => 'Filtered HTML',
       'full_html' => 'Full HTML',
+      'filter_test' => 'Test format',
       'plain_text' => 'Plain text',
     );
+
+    $available_values = $data->getPossibleValues();
+    $this->assertEqual($available_values, array_keys($expected_available_options));
+    $available_options = $data->getPossibleOptions();
     $this->assertEqual($available_options, $expected_available_options);
+
     $allowed_values = $data->getSettableValues($user);
     $this->assertEqual($allowed_values, array('plain_text'));
     $allowed_options = $data->getSettableOptions($user);

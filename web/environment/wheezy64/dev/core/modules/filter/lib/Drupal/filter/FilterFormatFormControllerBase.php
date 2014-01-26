@@ -232,7 +232,7 @@ abstract class FilterFormatFormControllerBase extends EntityFormController {
       ->condition('name', $format_name)
       ->execute();
     if ($format_exists) {
-      form_set_error('name', t('Text format names must be unique. A format named %name already exists.', array('%name' => $format_name)));
+      $this->setFormError('name', $form_state, $this->t('Text format names must be unique. A format named %name already exists.', array('%name' => $format_name)));
     }
   }
 
@@ -263,7 +263,7 @@ abstract class FilterFormatFormControllerBase extends EntityFormController {
       }
     }
 
-    $form_state['redirect'] = 'admin/config/content/formats';
+    $form_state['redirect_route']['route_name'] = 'filter.admin_overview';
 
     return $this->entity;
   }

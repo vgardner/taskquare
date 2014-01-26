@@ -17,7 +17,7 @@ use Drupal\views\Plugin\views\field\FieldPluginBase;
  */
 class FieldUnitTest extends ViewUnitTestBase {
 
-  public static $modules = array('user');
+  public static $modules = array('user', 'field');
 
   /**
    * Views used by this test.
@@ -36,6 +36,12 @@ class FieldUnitTest extends ViewUnitTestBase {
       'description' => 'Tests the generic field handler.',
       'group' => 'Views Handlers',
     );
+  }
+
+  protected function setUp() {
+    parent::setUp();
+
+    $this->installSchema('user', 'users');
   }
 
   /**
@@ -553,7 +559,7 @@ class FieldUnitTest extends ViewUnitTestBase {
       'сд асд асд ас',
       'асд асд асд ас'
     );
-    // Just test maxlength without word boundry.
+    // Just test maxlength without word boundary.
     $alter = array(
       'max_length' => 10,
     );

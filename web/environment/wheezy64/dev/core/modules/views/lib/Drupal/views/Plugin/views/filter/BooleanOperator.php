@@ -32,7 +32,7 @@ use Drupal\views\ViewExecutable;
 class BooleanOperator extends FilterPluginBase {
 
   // exposed filter options
-  var $always_multiple = TRUE;
+  protected $alwaysMultiple = TRUE;
   // Don't display empty space where the operator would be.
   var $no_operator = TRUE;
   // Whether to accept NULL as a false value or not
@@ -165,7 +165,7 @@ class BooleanOperator extends FilterPluginBase {
 
   protected function valueValidate($form, &$form_state) {
     if (isset($form_state['values']['options']['value']) && $form_state['values']['options']['value'] == 'All' && !empty($form_state['values']['options']['expose']['required'])) {
-      form_set_error('value', t('You must select a value unless this is an non-required exposed filter.'));
+      form_set_error('value', $form_state, t('You must select a value unless this is an non-required exposed filter.'));
     }
   }
 

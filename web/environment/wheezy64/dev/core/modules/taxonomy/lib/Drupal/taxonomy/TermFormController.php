@@ -9,21 +9,15 @@ namespace Drupal\taxonomy;
 
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Config\ConfigFactory;
-use Drupal\Core\Entity\EntityFormControllerNG;
+use Drupal\Core\Entity\ContentEntityFormController;
+use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Language\Language;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Base for controller for taxonomy term edit forms.
  */
-class TermFormController extends EntityFormControllerNG {
-
-  /**
-   * The vocabulary storage.
-   *
-   * @var \Drupal\taxonomy\VocabularyStorageControllerInterface
-   */
-  protected $vocabStorage;
+class TermFormController extends ContentEntityFormController {
 
   /**
    * The config factory.
@@ -35,13 +29,13 @@ class TermFormController extends EntityFormControllerNG {
   /**
    * Constructs a new TermFormController.
    *
-   * @param \Drupal\taxonomy\VocabularyStorageControllerInterface $vocab_storage
-   *   The vocabulary storage.
+   * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
+   *   The entity manager.
    * @param \Drupal\Core\Config\ConfigFactory $config_factory
    *   The config factory.
    */
-  public function __construct(VocabularyStorageControllerInterface $vocab_storage, ConfigFactory $config_factory) {
-    $this->vocabStorage = $vocab_storage;
+  public function __construct(EntityManagerInterface $entity_manager, ConfigFactory $config_factory) {
+    parent::__construct($entity_manager);
     $this->configFactory = $config_factory;
   }
 
@@ -50,7 +44,7 @@ class TermFormController extends EntityFormControllerNG {
    */
   public static function create(ContainerInterface $container) {
     return new static(
-      $container->get('entity.manager')->getStorageController('taxonomy_vocabulary'),
+      $container->get('entity.manager'),
       $container->get('config.factory')
     );
   }
@@ -60,7 +54,8 @@ class TermFormController extends EntityFormControllerNG {
    */
   public function form(array $form, array &$form_state) {
     $term = $this->entity;
-    $vocabulary = $this->vocabStorage->load($term->bundle());
+    $vocab_storage = $this->entityManager->getStorageController('taxonomy_vocabulary');
+    $vocabulary = $vocab_storage->load($term->bundle());
 
     $parent = array_keys(taxonomy_term_load_parents($term->id()));
     $form_state['taxonomy']['parent'] = $parent;
@@ -79,7 +74,7 @@ class TermFormController extends EntityFormControllerNG {
       '#type' => 'text_format',
       '#title' => $this->t('Description'),
       '#default_value' => $term->description->value,
-      '#format' => $term->format->value,
+      '#format' => $term->description->format,
       '#weight' => 0,
     );
     $language_configuration = $this->moduleHandler->moduleExists('language') ? language_get_default_configuration('taxonomy_term', $vocabulary->id()) : FALSE;
@@ -166,7 +161,7 @@ class TermFormController extends EntityFormControllerNG {
 
     // Ensure numeric values.
     if (isset($form_state['values']['weight']) && !is_numeric($form_state['values']['weight'])) {
-      form_set_error('weight', $this->t('Weight value must be numeric.'));
+      $this->setFormError('weight', $form_state, $this->t('Weight value must be numeric.'));
     }
   }
 
@@ -183,7 +178,7 @@ class TermFormController extends EntityFormControllerNG {
     // \Drupal\Core\Entity\Entity::save() method.
     $description = $form_state['values']['description'];
     $term->description->value = $description['value'];
-    $term->format->value = $description['format'];
+    $term->description->format = $description['format'];
 
     // Assign parents with proper delta values starting from 0.
     $term->parent = array_keys($form_state['values']['parent']);
@@ -239,11 +234,14 @@ class TermFormController extends EntityFormControllerNG {
    */
   public function delete(array $form, array &$form_state) {
     $destination = array();
-    if (isset($_GET['destination'])) {
+    if ($this->getRequest()->query->has('destination')) {
       $destination = drupal_get_destination();
-      unset($_GET['destination']);
     }
-    $form_state['redirect'] = array('taxonomy/term/' . $this->entity->id() . '/delete', array('query' => $destination));
+    $form_state['redirect_route'] = array(
+      'route_name' => 'taxonomy.term_delete',
+      'route_parameters' => array('taxonomy_term' => $this->entity->id()),
+      'options' => array('query' => $destination),
+    );
   }
 
 }

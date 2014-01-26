@@ -1,4 +1,4 @@
-(function (Drupal, CKEDITOR, $) {
+(function (Drupal, debounce, CKEDITOR, $) {
 
 "use strict";
 
@@ -31,9 +31,9 @@ Drupal.editors.ckeditor = {
   onChange: function (element, callback) {
     var editor = CKEDITOR.dom.element.get(element).getEditor();
     if (editor) {
-      editor.on('change', function () {
+      editor.on('change', debounce(function () {
         callback(editor.getData());
-      });
+      }, 400));
     }
     return !!editor;
   },
@@ -217,9 +217,7 @@ Drupal.ckeditor = {
     var classes = dialogSettings.dialogClass ? dialogSettings.dialogClass.split(' ') : [];
     classes.push('editor-dialog');
     dialogSettings.dialogClass = classes.join(' ');
-    dialogSettings.maxHeight = '95%';
-    dialogSettings.resizable = false;
-    dialogSettings.autoResize = $(window).width() > 600;
+    dialogSettings.autoResize = Drupal.checkWidthBreakpoint(600);
 
     // Add a "Loading…" message, hide it underneath the CKEditor toolbar, create
     // a Drupal.ajax instance to load the dialog and trigger it.
@@ -271,4 +269,4 @@ $(window).on('dialog:afterclose', function (e, dialog, $element) {
   }
 });
 
-})(Drupal, CKEDITOR, jQuery);
+})(Drupal, Drupal.debounce, CKEDITOR, jQuery);

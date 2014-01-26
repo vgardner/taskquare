@@ -165,7 +165,6 @@ class ViewEditFormController extends ViewFormControllerBase {
         '#type' => 'container',
         '#id' => 'edit-display-settings',
       );
-      $display_title = $this->getDisplayLabel($view, $display_id, FALSE);
 
       // Add a text that the display is disabled.
       if ($view->getExecutable()->displayHandlers->has($display_id)) {
@@ -200,7 +199,7 @@ class ViewEditFormController extends ViewFormControllerBase {
         '#id' => 'views-ajax-popup',
       );
       $form['ajax-area']['ajax-title'] = array(
-        '#markup' => '<h2 id="views-ajax-title"></h2>',
+        '#markup' => '<div id="views-ajax-title"></div>',
       );
       $form['ajax-area']['ajax-body'] = array(
         '#type' => 'container',
@@ -237,7 +236,7 @@ class ViewEditFormController extends ViewFormControllerBase {
     $view = $this->entity;
     foreach ($view->getExecutable()->validate() as $display_errors) {
       foreach ($display_errors as $error) {
-        form_set_error('', $error);
+        $this->setFormError('', $form_state, $error);
       }
     }
   }
@@ -267,7 +266,10 @@ class ViewEditFormController extends ViewFormControllerBase {
         $displays[$new_id] = $displays[$id];
         unset($displays[$id]);
         // Redirect the user to the renamed display to be sure that the page itself exists and doesn't throw errors.
-        $form_state['redirect'] = 'admin/structure/views/view/' . $view->id() . '/edit/' . $new_id;
+        $form_state['redirect_route'] = array(
+          'route_name' => 'views_ui.edit_display',
+          'route_parameters' => array('view' => $view->id(), 'display_id' => $id),
+        );
       }
     }
     $view->set('display', $displays);
@@ -290,9 +292,6 @@ class ViewEditFormController extends ViewFormControllerBase {
         if (($display->getPluginId() == 'page') && ($old_path == $destination) && ($old_path != $view->getExecutable()->displayHandlers->get($id)->getOption('path'))) {
           $destination = $view->getExecutable()->displayHandlers->get($id)->getOption('path');
           $query->remove('destination');
-          // @todo For whatever reason drupal_goto is still using $_GET.
-          // @see http://drupal.org/node/1668866
-          unset($_GET['destination']);
         }
       }
       $form_state['redirect'] = $destination;
@@ -317,7 +316,7 @@ class ViewEditFormController extends ViewFormControllerBase {
     // Remove this view from cache so edits will be lost.
     $view = $this->entity;
     $this->tempStore->delete($view->id());
-    $form_state['redirect'] = 'admin/structure/views';
+    $form_state['redirect_route']['route_name'] = 'views_ui.list';
   }
 
   /**
@@ -330,7 +329,6 @@ class ViewEditFormController extends ViewFormControllerBase {
     // If the plugin doesn't exist, display an error message instead of an edit
     // page.
     if (empty($display)) {
-      $title = isset($display->display['display_title']) ? $display->display['display_title'] : $this->t('Invalid');
       // @TODO: Improved UX for the case where a plugin is missing.
       $build['#markup'] = $this->t("Error: Display @display refers to a plugin named '@plugin', but that plugin is not available.", array('@display' => $display->display['id'], '@plugin' => $display->display['display_plugin']));
     }
@@ -565,7 +563,10 @@ class ViewEditFormController extends ViewFormControllerBase {
     $view->cacheSet();
 
     // Redirect to the top-level edit page.
-    $form_state['redirect'] = 'admin/structure/views/view/' . $view->id() . '/edit/' . $id;
+    $form_state['redirect_route'] = array(
+      'route_name' => 'views_ui.edit_display',
+      'route_parameters' => array('view' => $view->id(), 'display_id' => $id),
+    );
   }
 
   /**
@@ -581,7 +582,10 @@ class ViewEditFormController extends ViewFormControllerBase {
     $view->cacheSet();
 
     // Redirect to the top-level edit page.
-    $form_state['redirect'] = 'admin/structure/views/view/' . $view->id() . '/edit/' . $id;
+    $form_state['redirect_route'] = array(
+      'route_name' => 'views_ui.edit_display',
+      'route_parameters' => array('view' => $view->id(), 'display_id' => $id),
+    );
   }
 
   /**
@@ -596,7 +600,10 @@ class ViewEditFormController extends ViewFormControllerBase {
     $view->cacheSet();
 
     // Redirect to the top-level edit page.
-    $form_state['redirect'] = 'admin/structure/views/view/' . $view->id() . '/edit/' . $id;
+    $form_state['redirect_route'] = array(
+      'route_name' => 'views_ui.edit_display',
+      'route_parameters' => array('view' => $view->id(), 'display_id' => $id),
+    );
   }
 
   /**
@@ -614,7 +621,10 @@ class ViewEditFormController extends ViewFormControllerBase {
 
     // Redirect to the top-level edit page. The first remaining display will
     // become the active display.
-    $form_state['redirect'] = 'admin/structure/views/view/' . $view->id();
+    $form_state['redirect_route'] = array(
+      'route_name' => 'views_ui.edit',
+      'route_parameters' => array('view' => $view->id()),
+    );
   }
 
   /**
@@ -681,6 +691,13 @@ class ViewEditFormController extends ViewFormControllerBase {
         ),
       ),
     );
+
+    if ($view->access('delete')) {
+      $element['extra_actions']['#links']['delete'] = array(
+        'title' => $this->t('Delete view'),
+        'href' => "admin/structure/views/view/{$view->id()}/delete",
+      );
+    }
 
     // Let other modules add additional links here.
     \Drupal::moduleHandler()->alter('views_ui_display_top_links', $element['extra_actions']['#links'], $view, $display_id);
@@ -768,7 +785,8 @@ class ViewEditFormController extends ViewFormControllerBase {
 
     // Create the new display.
     $displays = $view->get('display');
-    $new_display_id = $view->addDisplay($displays[$display_id]['display_plugin']);
+    $display = $view->getExecutable()->newDisplay($displays[$display_id]['display_plugin']);
+    $new_display_id = $display->display['id'];
     $displays[$new_display_id] = $displays[$display_id];
     $displays[$new_display_id]['id'] = $new_display_id;
     $view->set('display', $displays);
@@ -779,7 +797,10 @@ class ViewEditFormController extends ViewFormControllerBase {
     $view->cacheSet();
 
     // Redirect to the new display's edit page.
-    $form_state['redirect'] = 'admin/structure/views/view/' . $view->id() . '/edit/' . $new_display_id;
+    $form_state['redirect_route'] = array(
+      'route_name' => 'views_ui.edit_display',
+      'route_parameters' => array('view' => $view->id(), 'display_id' => $new_display_id),
+    );
   }
 
   /**
@@ -790,14 +811,18 @@ class ViewEditFormController extends ViewFormControllerBase {
     // Create the new display.
     $parents = $form_state['triggering_element']['#parents'];
     $display_type = array_pop($parents);
-    $display_id = $view->addDisplay($display_type);
+    $display = $view->getExecutable()->newDisplay($display_type);
+    $display_id = $display->display['id'];
     // A new display got added so the asterisks symbol should appear on the new
     // display.
     $view->getExecutable()->current_display = $display_id;
     $view->cacheSet();
 
     // Redirect to the new display's edit page.
-    $form_state['redirect'] = 'admin/structure/views/view/' . $view->id() . '/edit/' . $display_id;
+    $form_state['redirect_route'] = array(
+      'route_name' => 'views_ui.edit_display',
+      'route_parameters' => array('view' => $view->id(), 'display_id' => $display_id),
+    );
   }
 
   /**
@@ -810,7 +835,8 @@ class ViewEditFormController extends ViewFormControllerBase {
     // Create the new display.
     $parents = $form_state['triggering_element']['#parents'];
     $display_type = array_pop($parents);
-    $new_display_id = $view->addDisplay($display_type);
+    $display = $view->getExecutable()->newDisplay($display_type);
+    $new_display_id = $display->display['id'];
     $displays = $view->get('display');
 
     // Let the display title be generated by the addDisplay method and set the
@@ -829,7 +855,10 @@ class ViewEditFormController extends ViewFormControllerBase {
     $view->cacheSet();
 
     // Redirect to the new display's edit page.
-    $form_state['redirect'] = 'admin/structure/views/view/' . $view->id() . '/edit/' . $new_display_id;
+    $form_state['redirect_route'] = array(
+      'route_name' => 'views_ui.edit_display',
+      'route_parameters' => array('view' => $view->id(), 'display_id' => $new_display_id),
+    );
   }
 
   /**
@@ -889,7 +918,6 @@ class ViewEditFormController extends ViewFormControllerBase {
     $build['#name'] = $build['#title'] = $types[$type]['title'];
 
     $rearrange_url = "admin/structure/views/nojs/rearrange/{$view->id()}/{$display['id']}/$type";
-    $rearrange_text = $this->t('Rearrange');
     $class = 'icon compact rearrange';
 
     // Different types now have different rearrange forms, so we use this switch
@@ -899,7 +927,6 @@ class ViewEditFormController extends ViewFormControllerBase {
         // The rearrange form for filters contains the and/or UI, so override
         // the used path.
         $rearrange_url = "admin/structure/views/nojs/rearrange-filter/{$view->id()}/{$display['id']}";
-        $rearrange_text = $this->t('And/Or, Rearrange');
         // TODO: Add another class to have another symbol for filter rearrange.
         $class = 'icon compact rearrange';
         break;
@@ -1004,9 +1031,9 @@ class ViewEditFormController extends ViewFormControllerBase {
       $build['fields'][$id]['#theme'] = 'views_ui_display_tab_setting';
 
       $handler = $executable->display_handler->getHandler($type, $id);
-      if (empty($handler)) {
+      if ($handler->broken()) {
         $build['fields'][$id]['#class'][] = 'broken';
-        $field_name = $this->t('Broken/missing handler: @table > @field', array('@table' => $field['table'], '@field' => $field['field']));
+        $field_name = $handler->adminLabel();
         $build['fields'][$id]['#link'] = l($field_name, "admin/structure/views/nojs/config-item/{$view->id()}/{$display['id']}/$type/$id", array('attributes' => array('class' => array('views-ajax-link')), 'html' => TRUE));
         continue;
       }

@@ -40,14 +40,16 @@ class SearchMultilingualEntityTest extends SearchTestBase {
       'name' => 'Hungarian',
     ));
     language_save($language);
+
     $language = new Language(array(
       'id' => 'sv',
       'name' => 'Swedish',
     ));
     language_save($language);
 
-    // Make the body field translatable.
-    // The parent class has already created the article and page content types.
+    // Make the body field translatable. The title is already translatable by
+    // definition. The parent class has already created the article and page
+    // content types.
     $field = field_info_field('node', 'body');
     $field->translatable = TRUE;
     $field->save();
@@ -56,16 +58,19 @@ class SearchMultilingualEntityTest extends SearchTestBase {
     $default_format = filter_default_format();
     $nodes = array(
       array(
+        'title' => 'First node en',
         'type' => 'page',
         'body' => array(array('value' => $this->randomName(32), 'format' => $default_format)),
         'langcode' => 'en',
       ),
       array(
+        'title' => 'Second node this is the English title',
         'type' => 'page',
         'body' => array(array('value' => $this->randomName(32), 'format' => $default_format)),
         'langcode' => 'en',
       ),
       array(
+        'title' => 'Third node en',
         'type' => 'page',
         'body' => array(array('value' => $this->randomName(32), 'format' => $default_format)),
         'langcode' => 'en',
@@ -76,14 +81,15 @@ class SearchMultilingualEntityTest extends SearchTestBase {
       $this->searchable_nodes[] = $this->drupalCreateNode($setting);
     }
     // Add a single translation to the second node.
-    $translation = $this->searchable_nodes[1]->getTranslation('hu');
+
+    $translation = $this->searchable_nodes[1]->addTranslation('hu', array('title' => 'Second node hu'));
     $translation->body->value = $this->randomName(32);
     $this->searchable_nodes[1]->save();
 
     // Add two translations to the third node.
-    $translation = $this->searchable_nodes[2]->getTranslation('hu');
+    $translation = $this->searchable_nodes[2]->addTranslation('hu', array('title' => 'Third node this is the Hungarian title'));
     $translation->body->value = $this->randomName(32);
-    $translation = $this->searchable_nodes[2]->getTranslation('sv');
+    $translation = $this->searchable_nodes[2]->addTranslation('sv', array('title' => 'Third node sv'));
     $translation->body->value = $this->randomName(32);
     $this->searchable_nodes[2]->save();
   }
@@ -95,7 +101,8 @@ class SearchMultilingualEntityTest extends SearchTestBase {
     // Index only 4 items per cron run.
     \Drupal::config('search.settings')->set('index.cron_limit', 4)->save();
     // Update the index. This does the initial processing.
-    node_update_index();
+    $plugin = $this->container->get('plugin.manager.search')->createInstance('node_search');
+    $plugin->updateIndex();
     // Run the shutdown function. Testing is a unique case where indexing
     // and searching has to happen in the same request, so running the shutdown
     // function manually is needed to finish the indexing process.
@@ -104,7 +111,7 @@ class SearchMultilingualEntityTest extends SearchTestBase {
     // the first has one, the second has two and the third has three language
     // variants. Indexing the third would exceed the throttle limit, so we
     // expect that only the first two will be indexed.
-    $status = module_invoke('node', 'search_status');
+    $status = $plugin->indexStatus();
     $this->assertEqual($status['remaining'], 1, 'Remaining items after updating the search index is 1.');
   }
 
@@ -114,14 +121,22 @@ class SearchMultilingualEntityTest extends SearchTestBase {
   function testSearchingMultilingualFieldValues() {
     // Update the index and then run the shutdown method.
     // See testIndexingThrottle() for further explanation.
-    node_update_index();
+    $plugin = $this->container->get('plugin.manager.search')->createInstance('node_search');
+    $plugin->updateIndex();
     search_update_totals();
-    foreach ($this->searchable_nodes as $node) {
-      // Each searchable node that we created contains values in the body field
-      // in one or more languages.
-      $search_result = node_search_execute($node->body->value);
-      // See whether we get the same node as a result.
-      $this->assertEqual($search_result[0]['node']->id(), $node->id(), 'The search has resulted the correct node.');
-    }
+
+    // This should find two results for the second and third node.
+    $plugin->setSearch('English OR Hungarian', array(), array());
+    $search_result = $plugin->execute();
+
+    $this->assertEqual($search_result[0]['title'], 'Third node this is the Hungarian title', 'The search finds the correct Hungarian title.');
+    $this->assertEqual($search_result[1]['title'], 'Second node this is the English title', 'The search finds the correct English title.');
+
+    // Now filter for Hungarian results only.
+    $plugin->setSearch('English OR Hungarian', array('f' => array('langcode:hu')), array());
+    $search_result = $plugin->execute();
+
+    $this->assertEqual(count($search_result), 1, 'The search found only one result');
+    $this->assertEqual($search_result[0]['title'], 'Third node this is the Hungarian title', 'The search finds the correct Hungarian title.');
   }
 }

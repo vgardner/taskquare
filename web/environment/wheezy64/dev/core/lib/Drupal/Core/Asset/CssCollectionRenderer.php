@@ -6,13 +6,30 @@
 
 namespace Drupal\Core\Asset;
 
-use Drupal\Core\Asset\AssetCollectionRendererInterface;
 use Drupal\Component\Utility\String;
+use Drupal\Core\KeyValueStore\StateInterface;
 
 /**
  * Renders CSS assets.
  */
 class CssCollectionRenderer implements AssetCollectionRendererInterface {
+
+  /**
+   * The state key/value store.
+   *
+   * @var \Drupal\Core\KeyValueStore\StateInterface
+   */
+  protected $state;
+
+  /**
+   * Constructs a CssCollectionRenderer.
+   *
+   * @param \Drupal\Core\KeyValueStore\StateInterface
+   *   The state key/value store.
+   */
+  public function __construct(StateInterface $state) {
+    $this->state = $state;
+  }
 
   /**
    * {@inheritdoc}
@@ -24,7 +41,7 @@ class CssCollectionRenderer implements AssetCollectionRendererInterface {
     // browser-caching. The string changes on every update or full cache
     // flush, forcing browsers to load a new copy of the files, as the
     // URL changed.
-    $query_string = variable_get('css_js_query_string', '0');
+    $query_string = $this->state->get('system.css_js_query_string') ?: '0';
 
     // Defaults for LINK and STYLE elements.
     $link_element_defaults = array(

@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of \Drupal\editor\Tests\EditorAdminTest.
+ * Contains \Drupal\editor\Tests\EditorAdminTest.
  */
 
 namespace Drupal\editor\Tests;
@@ -29,7 +29,7 @@ class EditorAdminTest extends WebTestBase {
     );
   }
 
-  function setUp() {
+  public function setUp() {
     parent::setUp();
 
     // Add text format.
@@ -48,7 +48,7 @@ class EditorAdminTest extends WebTestBase {
   /**
    * Tests an existing format without any editors available.
    */
-  function testNoEditorAvailable() {
+  public function testNoEditorAvailable() {
     $this->drupalLogin($this->admin_user);
     $this->drupalGet('admin/config/content/formats/manage/filtered_html');
 
@@ -72,21 +72,21 @@ class EditorAdminTest extends WebTestBase {
   /**
    * Tests adding a text editor to an existing text format.
    */
-  function testAddEditorToExistingFormat() {
+  public function testAddEditorToExistingFormat() {
     $this->enableUnicornEditor();
     $this->drupalLogin($this->admin_user);
     $this->drupalGet('admin/config/content/formats/manage/filtered_html');
     $edit = $this->selectUnicornEditor();
     // Configure Unicorn Editor's setting to another value.
     $edit['editor[settings][foo]'] = 'baz';
-    $this->drupalPost(NULL, $edit, t('Save configuration'));
+    $this->drupalPostForm(NULL, $edit, t('Save configuration'));
     $this->verifyUnicornEditorConfiguration('filtered_html', 'baz');
   }
 
   /**
    * Tests adding a text editor to a new text format.
    */
-  function testAddEditorToNewFormat() {
+  public function testAddEditorToNewFormat() {
     $this->enableUnicornEditor();
     $this->drupalLogin($this->admin_user);
     $this->drupalGet('admin/config/content/formats/add');
@@ -96,7 +96,7 @@ class EditorAdminTest extends WebTestBase {
       'format' => 'monocerus',
     );
     $edit += $this->selectUnicornEditor();
-    $this->drupalPost(NULL, $edit, t('Save configuration'));
+    $this->drupalPostForm(NULL, $edit, t('Save configuration'));
     $this->verifyUnicornEditorConfiguration($edit['format']);
   }
 
@@ -104,7 +104,7 @@ class EditorAdminTest extends WebTestBase {
    * Enables the unicorn editor.
    */
   protected function enableUnicornEditor() {
-    module_enable(array('editor_test'));
+    \Drupal::moduleHandler()->install(array('editor_test'));
     $this->rebuildContainer();
     $this->resetAll();
   }
@@ -133,7 +133,7 @@ class EditorAdminTest extends WebTestBase {
     $edit = array(
       'editor[editor]' => 'unicorn',
     );
-    $this->drupalPostAjax(NULL, $edit, 'editor_configure');
+    $this->drupalPostAjaxForm(NULL, $edit, 'editor_configure');
     $unicorn_setting_foo = $this->xpath('//input[@name="editor[settings][foo]" and @type="text" and @value="bar"]');
     $this->assertTrue(count($unicorn_setting_foo), "Unicorn Editor's settings form is present.");
 

@@ -6,13 +6,13 @@
 
 namespace Drupal\entity_test;
 
-use Drupal\Core\Entity\EntityFormControllerNG;
+use Drupal\Core\Entity\ContentEntityFormController;
 use Drupal\Core\Language\Language;
 
 /**
  * Form controller for the test entity edit forms.
  */
-class EntityTestFormController extends EntityFormControllerNG {
+class EntityTestFormController extends ContentEntityFormController {
 
   /**
    * Overrides Drupal\Core\Entity\EntityFormController::form().
@@ -93,7 +93,13 @@ class EntityTestFormController extends EntityFormControllerNG {
     drupal_set_message($message);
 
     if ($entity->id()) {
-      $form_state['redirect'] = $entity->entityType() . '/manage/' . $entity->id() . '/edit';
+      $entity_type = $entity->entityType();
+      $form_state['redirect_route'] = array(
+        'route_name' => "entity_test.edit_$entity_type",
+        'route_parameters' => array(
+          $entity_type => $entity->id(),
+        ),
+      );
     }
     else {
       // Error on save.
@@ -109,6 +115,6 @@ class EntityTestFormController extends EntityFormControllerNG {
     $entity = $this->entity;
     $entity->delete();
     drupal_set_message(t('%entity_type @id has been deleted.', array('@id' => $entity->id(), '%entity_type' => $entity->entityType())));
-    $form_state['redirect'] = '<front>';
+    $form_state['redirect_route']['route_name'] = '<front>';
   }
 }

@@ -70,7 +70,7 @@ class AssignOwnerNode extends ConfigurableActionBase implements ContainerFactory
   /**
    * {@inheritdoc}
    */
-  protected function getDefaultConfiguration() {
+  public function defaultConfiguration() {
     return array(
       'owner_uid' => '',
     );
@@ -107,7 +107,7 @@ class AssignOwnerNode extends ConfigurableActionBase implements ContainerFactory
         '#type' => 'textfield',
         '#title' => t('Username'),
         '#default_value' => $owner_name,
-        '#autocomplete_route_name' => 'user_autocomplete',
+        '#autocomplete_route_name' => 'user.autocomplete',
         '#size' => '6',
         '#maxlength' => '60',
         '#description' => $description,
@@ -122,7 +122,7 @@ class AssignOwnerNode extends ConfigurableActionBase implements ContainerFactory
   public function validateConfigurationForm(array &$form, array &$form_state) {
     $exists = (bool) $this->connection->queryRange('SELECT 1 FROM {users} WHERE name = :name', 0, 1, array(':name' => $form_state['values']['owner_name']))->fetchField();
     if (!$exists) {
-      form_set_error('owner_name', t('Enter a valid username.'));
+      form_set_error('owner_name', $form_state, t('Enter a valid username.'));
     }
   }
 

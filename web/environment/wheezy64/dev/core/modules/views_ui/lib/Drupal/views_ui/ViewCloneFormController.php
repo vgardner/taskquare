@@ -15,15 +15,6 @@ class ViewCloneFormController extends ViewFormControllerBase {
   /**
    * {@inheritdoc}
    */
-  public function init(array &$form_state) {
-    parent::init($form_state);
-
-    drupal_set_title($this->t('Clone of @label', array('@label' => $this->entity->label())));
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   protected function prepareEntity() {
     // Do not prepare the entity while it is being added.
   }
@@ -34,12 +25,13 @@ class ViewCloneFormController extends ViewFormControllerBase {
   public function form(array $form, array &$form_state) {
     parent::form($form, $form_state);
 
+    $form['#title'] = $this->t('Clone of @label', array('@label' => $this->entity->label()));
+
     $form['label'] = array(
       '#type' => 'textfield',
       '#title' => $this->t('View name'),
       '#required' => TRUE,
       '#size' => 32,
-      '#default_value' => '',
       '#maxlength' => 255,
       '#default_value' => $this->t('Clone of @label', array('@label' => $this->entity->label())),
     );

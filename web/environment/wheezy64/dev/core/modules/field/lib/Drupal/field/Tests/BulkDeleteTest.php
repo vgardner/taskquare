@@ -7,7 +7,7 @@
 
 namespace Drupal\field\Tests;
 
-use Drupal\Core\Entity\DatabaseStorageController;
+use Drupal\Core\Entity\FieldableDatabaseStorageController;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\field\FieldInterface;
 
@@ -143,7 +143,7 @@ class BulkDeleteTest extends FieldUnitTestBase {
       for ($i = 0; $i < 10; $i++) {
         $entity = entity_create($this->entity_type, array('type' => $bundle));
         foreach ($this->fields as $field) {
-          $entity->{$field['field_name']}->setValue($this->_generateTestFieldValues($field->cardinality));
+          $entity->{$field->getName()}->setValue($this->_generateTestFieldValues($field->getCardinality()));
         }
         $entity->save();
       }
@@ -180,15 +180,15 @@ class BulkDeleteTest extends FieldUnitTestBase {
     $instance->delete();
 
     // The instance still exists, deleted.
-    $instances = field_read_instances(array('field_id' => $field->uuid, 'deleted' => TRUE), array('include_deleted' => TRUE, 'include_inactive' => TRUE));
+    $instances = field_read_instances(array('field_id' => $field->uuid, 'deleted' => TRUE), array('include_deleted' => TRUE));
     $this->assertEqual(count($instances), 1, 'There is one deleted instance');
     $instance = $instances[0];
-    $this->assertEqual($instance['bundle'], $bundle, 'The deleted instance is for the correct bundle');
+    $this->assertEqual($instance->bundle, $bundle, 'The deleted instance is for the correct bundle');
 
     // Check that the actual stored content did not change during delete.
-    $schema = DatabaseStorageController::_fieldSqlSchema($field);
-    $table = DatabaseStorageController::_fieldTableName($field);
-    $column = DatabaseStorageController::_fieldColumnName($field, 'value');
+    $schema = FieldableDatabaseStorageController::_fieldSqlSchema($field);
+    $table = FieldableDatabaseStorageController::_fieldTableName($field);
+    $column = FieldableDatabaseStorageController::_fieldColumnName($field, 'value');
     $result = db_select($table, 't')
       ->fields('t', array_keys($schema[$table]['fields']))
       ->execute();
@@ -258,18 +258,18 @@ class BulkDeleteTest extends FieldUnitTestBase {
     $this->checkHooksInvocations($hooks, $actual_hooks);
 
     // The instance still exists, deleted.
-    $instances = field_read_instances(array('field_id' => $field->uuid, 'deleted' => TRUE), array('include_deleted' => TRUE, 'include_inactive' => TRUE));
+    $instances = field_read_instances(array('field_id' => $field->uuid, 'deleted' => TRUE), array('include_deleted' => TRUE));
     $this->assertEqual(count($instances), 1, 'There is one deleted instance');
 
     // Purge the instance.
     field_purge_batch($batch_size);
 
     // The instance is gone.
-    $instances = field_read_instances(array('field_id' => $field->uuid, 'deleted' => TRUE), array('include_deleted' => TRUE, 'include_inactive' => TRUE));
+    $instances = field_read_instances(array('field_id' => $field->uuid, 'deleted' => TRUE), array('include_deleted' => TRUE));
     $this->assertEqual(count($instances), 0, 'The instance is gone');
 
     // The field still exists, not deleted, because it has a second instance.
-    $fields = field_read_fields(array('uuid' => $field->uuid), array('include_deleted' => TRUE, 'include_inactive' => TRUE));
+    $fields = field_read_fields(array('uuid' => $field->uuid), array('include_deleted' => TRUE));
     $this->assertTrue(isset($fields[$field->uuid]), 'The field exists and is not deleted');
   }
 
@@ -342,7 +342,7 @@ class BulkDeleteTest extends FieldUnitTestBase {
     field_purge_batch(0);
 
     // The field is gone.
-    $fields = field_read_fields(array('uuid' => $field->uuid), array('include_deleted' => TRUE, 'include_inactive' => TRUE));
+    $fields = field_read_fields(array('uuid' => $field->uuid), array('include_deleted' => TRUE));
     $this->assertEqual(count($fields), 0, 'The field is purged.');
   }
 

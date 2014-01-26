@@ -2,25 +2,58 @@
 
 /**
  * @file
- * Definition of Drupal\user\AccountFormController.
+ * Contains \Drupal\user\AccountFormController.
  */
 
 namespace Drupal\user;
 
-use Drupal\Core\Entity\EntityFormControllerNG;
+use Drupal\Core\Entity\ContentEntityFormController;
+use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Language\Language;
+use Drupal\Core\Language\LanguageManager;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Form controller for the user account forms.
  */
-abstract class AccountFormController extends EntityFormControllerNG {
+abstract class AccountFormController extends ContentEntityFormController {
+
+  /**
+   * The language manager.
+   *
+   * @var \Drupal\Core\Language\LanguageManager
+   */
+  protected $languageManager;
+
+  /**
+   * Constructs a new EntityFormController object.
+   *
+   * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
+   *   The entity manager.
+   * @param \Drupal\Core\Language\LanguageManager $language_manager
+   *   The language manager.
+   */
+  public function __construct(EntityManagerInterface $entity_manager, LanguageManager $language_manager) {
+    parent::__construct($entity_manager);
+    $this->languageManager = $language_manager;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('entity.manager'),
+      $container->get('language_manager')
+    );
+  }
 
   /**
    * {@inheritdoc}
    */
   public function form(array $form, array &$form_state) {
     $account = $this->entity;
-    global $user;
+    $user = $this->currentUser();
     $config = \Drupal::config('user.settings');
 
     $language_interface = language(Language::TYPE_INTERFACE);
@@ -185,7 +218,7 @@ abstract class AccountFormController extends EntityFormControllerNG {
     include_once DRUPAL_ROOT . '/core/includes/language.inc';
     $interface_language_is_default = language_negotiation_method_get_first(Language::TYPE_INTERFACE) != LANGUAGE_NEGOTIATION_SELECTED;
     $form['language'] = array(
-      '#type' => language_multilingual() ? 'details' : 'container',
+      '#type' => $this->languageManager->isMultilingual() ? 'details' : 'container',
       '#title' => $this->t('Language settings'),
       // Display language selector when either creating a user on the admin
       // interface or editing a user account.
@@ -200,14 +233,24 @@ abstract class AccountFormController extends EntityFormControllerNG {
       '#description' => $interface_language_is_default ? $this->t("This account's preferred language for e-mails and site presentation.") : $this->t("This account's preferred language for e-mails."),
     );
 
+    // Only show the account setting for Administration pages language to users
+    // if one of the detection and selection methods uses it.
+    $show_admin_language = FALSE;
+    if ($this->moduleHandler->moduleExists('language') && $this->languageManager->isMultilingual()) {
+      foreach (language_types_info() as $type_key => $language_type) {
+        $negotiation_settings = variable_get("language_negotiation_{$type_key}", array());
+        if ($show_admin_language = isset($negotiation_settings[LANGUAGE_NEGOTIATION_USER_ADMIN])) {
+          break;
+        }
+      }
+    }
     $form['language']['preferred_admin_langcode'] = array(
       '#type' => 'language_select',
       '#title' => $this->t('Administration pages language'),
       '#languages' => Language::STATE_CONFIGURABLE,
       '#default_value' => $user_preferred_admin_langcode,
-      '#access' => user_access('access administration pages', $account),
+      '#access' => $show_admin_language && user_access('access administration pages', $account),
     );
-
     // User entities contain both a langcode property (for identifying the
     // language of the entity data) and a preferred_langcode property (see
     // above). Rather than provide a UI forcing the user to choose both
@@ -253,7 +296,7 @@ abstract class AccountFormController extends EntityFormControllerNG {
     // Validate new or changing username.
     if (isset($form_state['values']['name'])) {
       if ($error = user_validate_name($form_state['values']['name'])) {
-        form_set_error('name', $error);
+        $this->setFormError('name', $form_state, $error);
       }
       // Cast the user ID as an integer. It might have been set to NULL, which
       // could lead to unexpected results.
@@ -267,7 +310,7 @@ abstract class AccountFormController extends EntityFormControllerNG {
         ->fetchField();
 
         if ($name_taken) {
-          form_set_error('name', $this->t('The name %name is already taken.', array('%name' => $form_state['values']['name'])));
+          $this->setFormError('name', $form_state, $this->t('The name %name is already taken.', array('%name' => $form_state['values']['name'])));
         }
       }
     }
@@ -286,10 +329,10 @@ abstract class AccountFormController extends EntityFormControllerNG {
       if ($mail_taken) {
         // Format error message dependent on whether the user is logged in or not.
         if ($GLOBALS['user']->isAuthenticated()) {
-          form_set_error('mail', $this->t('The e-mail address %email is already taken.', array('%email' => $mail)));
+          $this->setFormError('mail', $form_state, $this->t('The e-mail address %email is already taken.', array('%email' => $mail)));
         }
         else {
-          form_set_error('mail', $this->t('The e-mail address %email is already registered. <a href="@password">Have you forgotten your password?</a>', array('%email' => $mail, '@password' => url('user/password'))));
+          $this->setFormError('mail', $form_state, $this->t('The e-mail address %email is already registered. <a href="@password">Have you forgotten your password?</a>', array('%email' => $mail, '@password' => url('user/password'))));
         }
       }
     }
@@ -304,7 +347,7 @@ abstract class AccountFormController extends EntityFormControllerNG {
 
       $user_schema = drupal_get_schema('users');
       if (drupal_strlen($form_state['values']['signature']) > $user_schema['fields']['signature']['length']) {
-        form_set_error('signature', $this->t('The signature is too long: it must be %max characters or less.', array('%max' => $user_schema['fields']['signature']['length'])));
+        $this->setFormError('signature', $form_state, $this->t('The signature is too long: it must be %max characters or less.', array('%max' => $user_schema['fields']['signature']['length'])));
       }
     }
   }

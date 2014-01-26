@@ -7,6 +7,7 @@
 
 namespace Drupal\system\Tests\Theme;
 
+use Drupal\comment\CommentInterface;
 use Drupal\simpletest\WebTestBase;
 
 /**
@@ -34,7 +35,7 @@ class EntityFilteringThemeTest extends WebTestBase {
   /**
    * A test user.
    *
-   * @var Drupal\user\User
+   * @var \Drupal\user\User
    */
   protected $user;
 
@@ -42,7 +43,7 @@ class EntityFilteringThemeTest extends WebTestBase {
   /**
    * A test node.
    *
-   * @var Drupal\node\Node
+   * @var \Drupal\node\Node
    */
   protected $node;
 
@@ -50,7 +51,7 @@ class EntityFilteringThemeTest extends WebTestBase {
   /**
    * A test taxonomy term.
    *
-   * @var Drupal\taxonomy\Term
+   * @var \Drupal\taxonomy\Term
    */
   protected $term;
 
@@ -58,7 +59,7 @@ class EntityFilteringThemeTest extends WebTestBase {
   /**
    * A test comment.
    *
-   * @var Drupal\comment\Comment
+   * @var \Drupal\comment\Comment
    */
   protected $comment;
 
@@ -97,6 +98,8 @@ class EntityFilteringThemeTest extends WebTestBase {
     ));
     $this->term->save();
 
+    // Add a comment field.
+    $this->container->get('comment.manager')->addDefaultField('node', 'article', 'comment', COMMENT_OPEN);
     // Create a test node tagged with the test term.
     $this->node = $this->drupalCreateNode(array(
       'title' => $this->xss_label,
@@ -107,9 +110,10 @@ class EntityFilteringThemeTest extends WebTestBase {
 
     // Create a test comment on the test node.
     $this->comment = entity_create('comment', array(
-      'nid' => $this->node->id(),
-      'node_type' => $this->node->getType(),
-      'status' => COMMENT_PUBLISHED,
+      'entity_id' => $this->node->id(),
+      'entity_type' => 'node',
+      'field_name' => 'comment',
+      'status' => CommentInterface::PUBLISHED,
       'subject' => $this->xss_label,
       'comment_body' => array($this->randomName()),
     ));

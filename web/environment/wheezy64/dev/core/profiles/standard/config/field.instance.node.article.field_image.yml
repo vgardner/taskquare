@@ -1,9 +1,10 @@
 id: node.article.field_image
-field_name: field_image
+uuid: 9601b8f1-65a9-46a6-a500-d072d1232449
 entity_type: node
 bundle: article
+field_name: field_image
 label: Image
-description: 'Upload an image to go with this article.'
+description: ''
 required: false
 default_value: {  }
 default_value_function: ''
@@ -17,6 +18,11 @@ settings:
   title_field: ''
   alt_field_required: 0
   title_field_required: 0
-  default_image: 0
+  default_image:
+    fid: null
+    alt: ''
+    title: ''
+    width: null
+    height: null
 status: 1
 langcode: und

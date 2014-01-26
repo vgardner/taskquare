@@ -1,6 +1,7 @@
 <?php
 
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\comment\CommentInterface;
 
 /**
  * @file
@@ -18,7 +19,7 @@ use Drupal\Core\Entity\EntityInterface;
  * This hook is invoked from $comment->save() before the comment is saved to the
  * database.
  *
- * @param Drupal\comment\Comment $comment
+ * @param \Drupal\comment\Comment $comment
  *   The comment object.
  */
 function hook_comment_presave(Drupal\comment\Comment $comment) {
@@ -29,23 +30,27 @@ function hook_comment_presave(Drupal\comment\Comment $comment) {
 /**
  * Respond to creation of a new comment.
  *
- * @param Drupal\comment\Comment $comment
+ * @param \Drupal\comment\Comment $comment
  *   The comment object.
  */
 function hook_comment_insert(Drupal\comment\Comment $comment) {
   // Reindex the node when comments are added.
-  search_touch_node($comment->nid->target_id);
+  if ($comment->entity_type->value == 'node') {
+    node_reindex_node_search($comment->entity_id->value);
+  }
 }
 
 /**
  * Respond to updates to a comment.
  *
- * @param Drupal\comment\Comment $comment
+ * @param \Drupal\comment\Comment $comment
  *   The comment object.
  */
 function hook_comment_update(Drupal\comment\Comment $comment) {
   // Reindex the node when comments are updated.
-  search_touch_node($comment->nid->target_id);
+  if ($comment->entity_type->value == 'node') {
+    node_reindex_node_search($comment->entity_id->value);
+  }
 }
 
 /**
@@ -81,7 +86,7 @@ function hook_comment_load(Drupal\comment\Comment $comments) {
  *
  * @param \Drupal\comment\Entity\Comment $comment $comment
  *   Passes in the comment the action is being performed on.
- * @param \Drupal\entity\Entity\EntityDisplay $display
+ * @param \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display
  *   The entity_display object holding the display options configured for the
  *   comment components.
  * @param $view_mode
@@ -91,7 +96,7 @@ function hook_comment_load(Drupal\comment\Comment $comments) {
  *
  * @see hook_entity_view()
  */
-function hook_comment_view(\Drupal\comment\Entity\Comment $comment, \Drupal\entity\Entity\EntityDisplay $display, $view_mode, $langcode) {
+function hook_comment_view(\Drupal\comment\Entity\Comment $comment, \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display, $view_mode, $langcode) {
   // Only do the extra work if the component is configured to be displayed.
   // This assumes a 'mymodule_addition' extra field has been defined for the
   // node type in hook_field_extra_fields().
@@ -119,14 +124,14 @@ function hook_comment_view(\Drupal\comment\Entity\Comment $comment, \Drupal\enti
  *   A renderable array representing the comment.
  * @param \Drupal\comment\Entity\Comment $comment
  *   The comment being rendered.
- * @param \Drupal\entity\Entity\EntityDisplay $display
+ * @param \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display
  *   The entity_display object holding the display options configured for the
  *   comment components.
  *
  * @see comment_view()
  * @see hook_entity_view_alter()
  */
-function hook_comment_view_alter(&$build, \Drupal\comment\Entity\Comment $comment, \Drupal\entity\Entity\EntityDisplay $display) {
+function hook_comment_view_alter(&$build, \Drupal\comment\Entity\Comment $comment, \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display) {
   // Check for the existence of a field added by another module.
   if ($build['#view_mode'] == 'full' && isset($build['an_additional_field'])) {
     // Change its weight.
@@ -140,7 +145,7 @@ function hook_comment_view_alter(&$build, \Drupal\comment\Entity\Comment $commen
 /**
  * Respond to a comment being published by a moderator.
  *
- * @param Drupal\comment\Comment $comment
+ * @param \Drupal\comment\Comment $comment
  *   The comment the action is being performed on.
  */
 function hook_comment_publish(Drupal\comment\Comment $comment) {
@@ -150,7 +155,7 @@ function hook_comment_publish(Drupal\comment\Comment $comment) {
 /**
  * Respond to a comment being unpublished by a moderator.
  *
- * @param Drupal\comment\Comment $comment
+ * @param \Drupal\comment\Comment $comment
  *   The comment the action is being performed on.
  */
 function hook_comment_unpublish(Drupal\comment\Comment $comment) {
@@ -163,7 +168,7 @@ function hook_comment_unpublish(Drupal\comment\Comment $comment) {
  * This hook is invoked from entity_delete_multiple() before field values are
  * deleted and before the comment is actually removed from the database.
  *
- * @param Drupal\comment\Comment $comment
+ * @param \Drupal\comment\Comment $comment
  *   The comment object for the comment that is about to be deleted.
  *
  * @see hook_comment_delete()
@@ -182,7 +187,7 @@ function hook_comment_predelete(Drupal\comment\Comment $comment) {
  * This hook is invoked from entity_delete_multiple() after field values are
  * deleted and after the comment has been removed from the database.
  *
- * @param Drupal\comment\Comment $comment
+ * @param \Drupal\comment\Comment $comment
  *   The comment object for the comment that has been deleted.
  *
  * @see hook_comment_predelete()
@@ -190,6 +195,38 @@ function hook_comment_predelete(Drupal\comment\Comment $comment) {
  */
 function hook_comment_delete(Drupal\comment\Comment $comment) {
   drupal_set_message(t('Comment: @subject has been deleted', array('@subject' => $comment->subject->value)));
+}
+
+/**
+ * Alter the links of a comment.
+ *
+ * @param array &$links
+ *   A renderable array representing the comment links.
+ * @param \Drupal\comment\CommentInterface $entity
+ *   The comment being rendered.
+ * @param array &$context
+ *   Various aspects of the context in which the comment links are going to be
+ *   displayed, with the following keys:
+ *   - 'view_mode': the view mode in which the comment is being viewed
+ *   - 'langcode': the language in which the comment is being viewed
+ *   - 'commented_entity': the entity to which the comment is attached
+ *
+ * @see \Drupal\comment\CommentViewBuilder::renderLinks()
+ * @see \Drupal\comment\CommentViewBuilder::buildLinks()
+ */
+function hook_comment_links_alter(array &$links, CommentInterface $entity, array &$context) {
+  $links['mymodule'] = array(
+    '#theme' => 'links__comment__mymodule',
+    '#attributes' => array('class' => array('links', 'inline')),
+    '#links' => array(
+      'comment-report' => array(
+        'title' => t('Report'),
+        'href' => "comment/{$entity->id()}/report",
+        'html' => TRUE,
+        'query' => array('token' => \Drupal::getContainer()->get('csrf_token')->get("comment/{$entity->id()}/report")),
+      ),
+    ),
+  );
 }
 
 /**

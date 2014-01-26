@@ -28,7 +28,7 @@ class ViewExecutable {
   /**
    * The config entity in which the view is stored.
    *
-   * @var Drupal\views\Entity\View
+   * @var \Drupal\views\Entity\View
    */
   public $storage;
 
@@ -178,21 +178,21 @@ class ViewExecutable {
   /**
    * Where the $query object will reside.
    *
-   * @var Drupal\views\Plugin\query\QueryInterface
+   * @var \Drupal\views\Plugin\views\query\QueryPluginBase
    */
   public $query = NULL;
 
   /**
    * The used pager plugin used by the current executed view.
    *
-   * @var Drupal\views\Plugin\views\pager\PagerPluginBase
+   * @var \Drupal\views\Plugin\views\pager\PagerPluginBase
    */
   public $pager = NULL;
 
   /**
    * The current used display plugin.
    *
-   * @var Drupal\views\Plugin\views\display\DisplayPluginBase
+   * @var \Drupal\views\Plugin\views\display\DisplayPluginBase
    */
   public $display_handler;
 
@@ -556,7 +556,7 @@ class ViewExecutable {
 
   /**
    * Set the exposed filters input to an array. If unset they will be taken
-   * from $_GET when the time comes.
+   * from \Drupal::request()->query when the time comes.
    */
   public function setExposedInput($filters) {
     $this->exposed_input = $filters;
@@ -566,8 +566,8 @@ class ViewExecutable {
    * Figure out what the exposed input for this view is.
    */
   public function getExposedInput() {
-    // Fill our input either from $_GET or from something previously set on the
-    // view.
+    // Fill our input either from \Drupal::request()->query or from something
+    // previously set on the view.
     if (empty($this->exposed_input)) {
       $this->exposed_input = \Drupal::request()->query->all();
       // unset items that are definitely not our input:
@@ -698,6 +698,33 @@ class ViewExecutable {
     }
 
     return FALSE;
+  }
+
+  /**
+   * Creates a new display and a display handler instance for it.
+   *
+   * @param string $plugin_id
+   *   (optional) The plugin type from the Views plugin annotation. Defaults to
+   *   'page'.
+   * @param string $title
+   *   (optional) The title of the display. Defaults to NULL.
+   * @param string $id
+   *   (optional) The ID to use, e.g., 'default', 'page_1', 'block_2'. Defaults
+   *   to NULL.
+   *
+   * @return \Drupal\views\Plugin\views\display\DisplayPluginBase
+   *   A new display plugin instance if executable is set, the new display ID
+   *   otherwise.
+   */
+  public function newDisplay($plugin_id = 'page', $title = NULL, $id = NULL) {
+    $this->initDisplay();
+
+    $id = $this->storage->addDisplay($plugin_id, $title, $id);
+    $this->displayHandlers->addInstanceId($id);
+
+    $display = $this->displayHandlers->get($id);
+    $display->newDisplay();
+    return $display;
   }
 
   /**
@@ -874,20 +901,16 @@ class ViewExecutable {
 
     // build arguments.
     $position = -1;
-
-    // Create a title for use in the breadcrumb trail.
-    $title = $this->display_handler->getOption('title');
-
-    $this->build_info['breadcrumb'] = array();
-    $breadcrumb_args = array();
     $substitutions = array();
-
     $status = TRUE;
+
+    // Get the title.
+    $title = $this->display_handler->getOption('title');
 
     // Iterate through each argument and process.
     foreach ($this->argument as $id => $arg) {
       $position++;
-      $argument = &$this->argument[$id];
+      $argument = $this->argument[$id];
 
       if ($argument->broken()) {
         continue;
@@ -927,30 +950,10 @@ class ViewExecutable {
         $substitutions['%' . ($position + 1)] = $arg_title;
         $substitutions['!' . ($position + 1)] = strip_tags(decode_entities($arg));
 
-        // Since we're really generating the breadcrumb for the item above us,
-        // check the default action of this argument.
-        if ($this->display_handler->usesBreadcrumb() && $argument->usesBreadcrumb()) {
-          $path = $this->getUrl($breadcrumb_args);
-          if (strpos($path, '%') === FALSE) {
-            if (!empty($argument->options['breadcrumb_enable']) && !empty($argument->options['breadcrumb'])) {
-              $breadcrumb = $argument->options['breadcrumb'];
-            }
-            else {
-              $breadcrumb = $title;
-            }
-            $this->build_info['breadcrumb'][$path] = str_replace(array_keys($substitutions), $substitutions, $breadcrumb);
-          }
-        }
-
-        // Allow the argument to muck with this breadcrumb.
-        $argument->setBreadcrumb($this->build_info['breadcrumb']);
-
         // Test to see if we should use this argument's title
         if (!empty($argument->options['title_enable']) && !empty($argument->options['title'])) {
           $title = $argument->options['title'];
         }
-
-        $breadcrumb_args[] = $arg;
       }
       else {
         // determine default condition and handle.
@@ -1054,9 +1057,9 @@ class ViewExecutable {
     if ($this->display_handler->usesExposed()) {
       $exposed_form = $this->display_handler->getPlugin('exposed_form');
       $this->exposed_widgets = $exposed_form->renderExposedForm();
-      if (form_set_error() || !empty($this->build_info['abort'])) {
+      if (\Drupal::formBuilder()->getAnyErrors() || !empty($this->build_info['abort'])) {
         $this->built = TRUE;
-        // Don't execute the query, but rendering will still be executed to display the empty text.
+        // Don't execute the query, $form_state, but rendering will still be executed to display the empty text.
         $this->executed = TRUE;
         return empty($this->build_info['fail']);
       }
@@ -1261,7 +1264,7 @@ class ViewExecutable {
    * @param string $display_id
    *   The machine name of the display, which should be rendered.
    *
-   * @return (string|NULL)
+   * @return string|null
    *   Return the output of the rendered view or NULL if something failed in the process.
    */
   public function render($display_id = NULL) {
@@ -1274,8 +1277,6 @@ class ViewExecutable {
     if (!empty($this->build_info['denied'])) {
       return;
     }
-
-    drupal_theme_initialize();
 
     $exposed_form = $this->display_handler->getPlugin('exposed_form');
     $exposed_form->preRender($this->result);
@@ -1338,11 +1339,13 @@ class ViewExecutable {
       $module_handler->invokeAll('views_pre_render', array($this));
 
       // Let the themes play too, because pre render is a very themey thing.
-      foreach ($GLOBALS['base_theme_info'] as $base) {
-        $module_handler->invoke($base, 'views_pre_render', array($this));
-      }
+      if (isset($GLOBALS['base_theme_info']) && isset($GLOBALS['theme'])) {
+        foreach ($GLOBALS['base_theme_info'] as $base) {
+          $module_handler->invoke($base, 'views_pre_render', array($this));
+        }
 
-      $module_handler->invoke($GLOBALS['theme'], 'views_pre_render', array($this));
+        $module_handler->invoke($GLOBALS['theme'], 'views_pre_render', array($this));
+      }
 
       $this->display_handler->output = $this->display_handler->render();
       if ($cache) {
@@ -1360,11 +1363,13 @@ class ViewExecutable {
     $module_handler->invokeAll('views_post_render', array($this, &$this->display_handler->output, $cache));
 
     // Let the themes play too, because post render is a very themey thing.
-    foreach ($GLOBALS['base_theme_info'] as $base) {
-      $module_handler->invoke($base, 'views_post_render', array($this));
-    }
+    if (isset($GLOBALS['base_theme_info']) && isset($GLOBALS['theme'])) {
+      foreach ($GLOBALS['base_theme_info'] as $base) {
+        $module_handler->invoke($base, 'views_post_render', array($this));
+      }
 
-    $module_handler->invoke($GLOBALS['theme'], 'views_post_render', array($this));
+      $module_handler->invoke($GLOBALS['theme'], 'views_post_render', array($this));
+    }
 
     return $this->display_handler->output;
   }
@@ -1377,7 +1382,7 @@ class ViewExecutable {
    * This function should NOT be used by anything external as this
    * returns data in the format specified by the display. It can also
    * have other side effects that are only intended for the 'proper'
-   * use of the display, such as setting page titles and breadcrumbs.
+   * use of the display, such as setting page titles.
    *
    * If you simply want to view the display, use View::preview() instead.
    */
@@ -1513,7 +1518,7 @@ class ViewExecutable {
    * this sets the display handler if it hasn't been.
    */
   public function access($displays = NULL, $account = NULL) {
-    // Noone should have access to disabled views.
+    // No one should have access to disabled views.
     if (!$this->storage->status()) {
       return FALSE;
     }
@@ -1523,7 +1528,7 @@ class ViewExecutable {
     }
 
     if (!$account) {
-      $account = $GLOBALS['user'];
+      $account = \Drupal::currentUser();
     }
 
     // We can't use choose_display() here because that function
@@ -1694,40 +1699,6 @@ class ViewExecutable {
       }
     }
     return $this->display_handler->getPath();
-  }
-
-  /**
-   * Get the breadcrumb used for this view.
-   *
-   * @param $set
-   *   If true, use drupal_set_breadcrumb() to install the breadcrumb.
-   */
-  public function getBreadcrumb($set = FALSE) {
-    // Now that we've built the view, extract the breadcrumb.
-    $base = TRUE;
-    $breadcrumb = array();
-
-    if (!empty($this->build_info['breadcrumb'])) {
-      foreach ($this->build_info['breadcrumb'] as $path => $title) {
-        // Check to see if the frontpage is in the breadcrumb trail; if it
-        // is, we'll remove that from the actual breadcrumb later.
-        if ($path == \Drupal::config('system.site')->get('page.front')) {
-          $base = FALSE;
-          $title = t('Home');
-        }
-        if ($title) {
-          $breadcrumb[] = l($title, $path, array('html' => TRUE));
-        }
-      }
-
-      if ($set) {
-        if ($base && $current_breadcrumbs = drupal_set_breadcrumb()) {
-          $breadcrumb = array_merge($current_breadcrumbs, $breadcrumb);
-        }
-        drupal_set_breadcrumb($breadcrumb);
-      }
-    }
-    return $breadcrumb;
   }
 
   /**
@@ -2042,15 +2013,6 @@ class ViewExecutable {
     $fields = $this->displayHandlers->get($display_id)->getOption($types[$type]['plural']);
 
     return isset($fields[$id]) ? $fields[$id] : NULL;
-  }
-
-  /**
-   * Sets the build array used by the view.
-   *
-   * @param array $element
-   */
-  public function setElement(&$element) {
-    $this->element =& $element;
   }
 
   /**

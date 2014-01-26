@@ -8,20 +8,17 @@
 namespace Drupal\edit;
 
 use Drupal\Component\Plugin\PluginInspectionInterface;
-use Drupal\Core\Entity\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\FieldDefinitionInterface;
 
 /**
- * Defines an interface for in-place editors (Create.js PropertyEditor widgets).
- *
- * A PropertyEditor widget is a user-facing interface to edit an entity property
- * through Create.js.
+ * Defines an interface for in-place editors plugins.
  */
 interface EditPluginInterface extends PluginInspectionInterface {
 
   /**
    * Checks whether this editor is compatible with a given field instance.
    *
-   * @param \Drupal\Core\Entity\Field\FieldDefinitionInterface $field_definition
+   * @param \Drupal\Core\Field\FieldDefinitionInterface $field_definition
    *   The field definition of the field being edited.
    * @param array $items
    *   The field's item values.
@@ -37,7 +34,7 @@ interface EditPluginInterface extends PluginInspectionInterface {
    * Will only be called by \Drupal\edit\MetadataGeneratorInterface::generate()
    * when the passed in field instance & item values will use this editor.
    *
-   * @param \Drupal\Core\Entity\Field\FieldDefinitionInterface $field_definition
+   * @param \Drupal\Core\Field\FieldDefinitionInterface $field_definition
    *   The field definition of the field being edited.
    * @param array $items
    *   The field's item values.
@@ -57,4 +54,5 @@ interface EditPluginInterface extends PluginInspectionInterface {
    * @see drupal_process_attached()
    */
   public function getAttachments();
+
 }

@@ -29,9 +29,10 @@ class NodeTitleXSSTest extends NodeTestBase {
 
     $xss = '<script>alert("xss")</script>';
     $title = $xss . $this->randomName();
-    $edit = array("title" => $title);
+    $edit = array();
+    $edit['title[0][value]'] = $title;
 
-    $this->drupalPost('node/add/page', $edit, t('Preview'));
+    $this->drupalPostForm('node/add/page', $edit, t('Preview'));
     $this->assertNoRaw($xss, 'Harmful tags are escaped when previewing a node.');
 
     $settings = array('title' => $title);
@@ -39,7 +40,7 @@ class NodeTitleXSSTest extends NodeTestBase {
 
     $this->drupalGet('node/' . $node->id());
     // assertTitle() decodes HTML-entities inside the <title> element.
-    $this->assertTitle($edit["title"] . ' | Drupal', 'Title is diplayed when viewing a node.');
+    $this->assertTitle($title . ' | Drupal', 'Title is diplayed when viewing a node.');
     $this->assertNoRaw($xss, 'Harmful tags are escaped when viewing a node.');
 
     $this->drupalGet('node/' . $node->id() . '/edit');

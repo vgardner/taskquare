@@ -6,12 +6,11 @@
  */
 
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Entity\EntityNG;
-use Drupal\Core\Entity\Field\PrepareCacheInterface;
+use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Language\Language;
-use Drupal\entity\Entity\EntityDisplay;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
+use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\field\Field;
-
 
 /**
  * Returns information about field types.
@@ -24,16 +23,16 @@ use Drupal\field\Field;
  *   keyed by field type name.
  *
  * @deprecated as of Drupal 8.0. Use
- *   Drupal::service('plugin.manager.entity.field.field_type')->getDefinition()
+ *   \Drupal::service('plugin.manager.field.field_type')->getDefinition()
  *   or
- *   Drupal::service('plugin.manager.entity.field.field_type')->getDefinitions()
+ *   \Drupal::service('plugin.manager.field.field_type')->getConfigurableDefinitions().
  */
 function field_info_field_types($field_type = NULL) {
   if ($field_type) {
-    return Drupal::service('plugin.manager.entity.field.field_type')->getDefinition($field_type);
+    return \Drupal::service('plugin.manager.field.field_type')->getDefinition($field_type);
   }
   else {
-    return Drupal::service('plugin.manager.entity.field.field_type')->getDefinitions();
+    return \Drupal::service('plugin.manager.field.field_type')->getConfigurableDefinitions();
   }
 }
 
@@ -48,10 +47,10 @@ function field_info_field_types($field_type = NULL) {
  *   are not defined.
  *
  * @deprecated as of Drupal 8.0. Use
- *   Drupal::service('plugin.manager.entity.field.field_type')->getDefaultSettings()
+ *   \Drupal::service('plugin.manager.field.field_type')->getDefaultSettings()
  */
 function field_info_field_settings($type) {
-  return \Drupal::service('plugin.manager.entity.field.field_type')->getDefaultSettings($type);
+  return \Drupal::service('plugin.manager.field.field_type')->getDefaultSettings($type);
 }
 
 /**
@@ -65,10 +64,10 @@ function field_info_field_settings($type) {
  *   settings are not defined.
  *
  * @deprecated as of Drupal 8.0. Use
- *   Drupal::service('plugin.manager.entity.field.field_type')->getDefaultInstanceSettings()
+ *   \Drupal::service('plugin.manager.field.field_type')->getDefaultInstanceSettings()
  */
 function field_info_instance_settings($type) {
-  return \Drupal::service('plugin.manager.entity.field.field_type')->getDefaultInstanceSettings($type);
+  return \Drupal::service('plugin.manager.field.field_type')->getDefaultInstanceSettings($type);
 }
 
 /**
@@ -83,16 +82,16 @@ function field_info_instance_settings($type) {
  *   or an array of all existing widget types, keyed by widget type name.
  *
  * @deprecated as of Drupal 8.0. Use
- *   Drupal::service('plugin.manager.field.widget')->getDefinition()
+ *   \Drupal::service('plugin.manager.field.widget')->getDefinition()
  *   or
- *   Drupal::service('plugin.manager.field.widget')->getDefinitions()
+ *   \Drupal::service('plugin.manager.field.widget')->getDefinitions()
  */
 function field_info_widget_types($widget_type = NULL) {
   if ($widget_type) {
-    return drupal_container()->get('plugin.manager.field.widget')->getDefinition($widget_type);
+    return \Drupal::service('plugin.manager.field.widget')->getDefinition($widget_type);
   }
   else {
-    return drupal_container()->get('plugin.manager.field.widget')->getDefinitions();
+    return \Drupal::service('plugin.manager.field.widget')->getDefinitions();
   }
 }
 
@@ -108,7 +107,7 @@ function field_info_widget_types($widget_type = NULL) {
  *   undefined.
  *
  * @deprecated as of Drupal 8.0. Use
- *   Drupal::service('plugin.manager.field.widget')->getDefaultSettings()
+ *   \Drupal::service('plugin.manager.field.widget')->getDefaultSettings()
  */
 function field_info_widget_settings($type) {
   return \Drupal::service('plugin.manager.field.widget')->getDefaultSettings($type);
@@ -127,16 +126,16 @@ function field_info_widget_settings($type) {
  *   formatter type name.
  *
  * @deprecated as of Drupal 8.0. Use
- *   Drupal::service('plugin.manager.field.formatter')->getDefinition()
+ *   \Drupal::service('plugin.manager.field.formatter')->getDefinition()
  *   or
- *   Drupal::service('plugin.manager.field.formatter')->getDefinitions()
+ *   \Drupal::service('plugin.manager.field.formatter')->getDefinitions()
  */
 function field_info_formatter_types($formatter_type = NULL) {
   if ($formatter_type) {
-    return drupal_container()->get('plugin.manager.field.formatter')->getDefinition($formatter_type);
+    return \Drupal::service('plugin.manager.field.formatter')->getDefinition($formatter_type);
   }
   else {
-    return drupal_container()->get('plugin.manager.field.formatter')->getDefinitions();
+    return \Drupal::service('plugin.manager.field.formatter')->getDefinitions();
   }
 }
 
@@ -152,7 +151,7 @@ function field_info_formatter_types($formatter_type = NULL) {
  *   undefined.
  *
  * @deprecated as of Drupal 8.0. Use
- *   Drupal::service('plugin.manager.field.formatter')->getDefaultSettings()
+ *   \Drupal::service('plugin.manager.field.formatter')->getDefaultSettings()
  */
 function field_info_formatter_settings($type) {
   return \Drupal::service('plugin.manager.field.formatter')->getDefaultSettings($type);
@@ -161,7 +160,7 @@ function field_info_formatter_settings($type) {
 /**
  * Returns a lightweight map of fields across bundles.
  *
- * The function only returns active, non deleted fields.
+ * The function only returns non-deleted fields.
  *
  * @return
  *   An array keyed by entity type. Each value is an array which keys are
@@ -196,9 +195,7 @@ function field_info_field_map() {
  *   The entity type.
  * @param $field_name
  *   The name of the field to retrieve. $field_name can only refer to a
- *   non-deleted, active field. For deleted fields, use
- *   field_info_field_by_id(). To retrieve information about inactive fields,
- *   use field_read_fields().
+ *   non-deleted field. For deleted fields, use field_info_field_by_id().
  *
  * @return
  *   The field array, as returned by field_read_fields(), with an
@@ -219,8 +216,7 @@ function field_info_field($entity_type, $field_name) {
  * Returns data about an individual field, given a field ID.
  *
  * @param $field_id
- *   The ID of the field to retrieve. $field_id can refer to a deleted field,
- *   but not an inactive one.
+ *   The ID of the field to retrieve. $field_id can refer to a deleted field.
  *
  * @return
  *   The field array, as returned by field_read_fields(), with an additional
@@ -343,9 +339,7 @@ function field_info_instance($entity_type, $field_name, $bundle_name) {
  * @param $field_name
  *   The field name to read.
  * @param array $include_additional
- *   The default behavior of this function is to not return a field that is
- *   inactive. Setting $include_additional['include_inactive'] to TRUE will
- *   override this behavior.
+ *   Additional properties to match.
  *
  * @return
  *   A field definition array, or FALSE.
@@ -362,13 +356,12 @@ function field_read_field($entity_type, $field_name, $include_additional = array
  * Reads in fields that match an array of conditions.
  *
  * @param array $conditions
- *   An array of conditions to match against. Keys are names of properties found
- *   in field configuration files, and values are conditions to match.
+ *   An array of conditions to match against. Keys are names of properties
+ *   found in field configuration files, and values are conditions to match.
  * @param array $include_additional
- *   The default behavior of this function is to not return fields that are
- *   inactive or have been deleted. Setting
- *   $include_additional['include_inactive'] or
- *   $include_additional['include_deleted'] to TRUE will override this behavior.
+ *   The default behavior of this function is to not return fields that have
+ *   been deleted. Setting $include_additional['include_deleted'] to TRUE will
+ *   override this behavior.
  *
  * @return
  *   An array of fields matching $params. If
@@ -379,14 +372,11 @@ function field_read_field($entity_type, $field_name, $include_additional = array
  *   entity_load_multiple_by_properties('field_entity', $conditions).
  */
 function field_read_fields($conditions = array(), $include_additional = array()) {
-  // Include inactive fields if specified in the $include_additional parameter.
-  $include_inactive = isset($include_additional['include_inactive']) && $include_additional['include_inactive'];
   // Include deleted fields if specified either in the $include_additional or
   // the $conditions parameters.
   $include_deleted = (isset($include_additional['include_deleted']) && $include_additional['include_deleted']) || (isset($conditions['deleted']) && $conditions['deleted']);
 
-  // Pass include_inactive and include_deleted to the $conditions array.
-  $conditions['include_inactive'] = $include_inactive;
+  // Pass include_deleted to the $conditions array.
   $conditions['include_deleted'] = $include_deleted;
 
   return entity_load_multiple_by_properties('field_entity', $conditions);
@@ -407,9 +397,8 @@ function field_read_fields($conditions = array(), $include_additional = array())
  *   The bundle to which the field is bound.
  * @param array $include_additional
  *   The default behavior of this function is to not return an instance that has
- *   been deleted, or whose field is inactive. Setting
- *   $include_additional['include_inactive'] or
- *   $include_additional['include_deleted'] to TRUE will override this behavior.
+ *   been deleted. Setting $include_additional['include_deleted'] to TRUE will
+ *   override this behavior.
  *
  * @return
  *   An instance structure, or FALSE.
@@ -431,8 +420,7 @@ function field_read_instance($entity_type, $field_name, $bundle, $include_additi
  *   conditions to match.
  * @param $include_additional
  *   The default behavior of this function is to not return field instances that
- *   have been marked deleted, or whose field is inactive. Setting
- *   $include_additional['include_inactive'] or
+ *   have been marked deleted. Setting
  *   $include_additional['include_deleted'] to TRUE will override this behavior.
  *
  * @return
@@ -442,15 +430,11 @@ function field_read_instance($entity_type, $field_name, $bundle, $include_additi
  *   entity_load_multiple_by_properties('field_instance', $conditions).
  */
 function field_read_instances($conditions = array(), $include_additional = array()) {
-  // Include instances of inactive fields if specified in the
-  // $include_additional parameter.
-  $include_inactive = isset($include_additional['include_inactive']) && $include_additional['include_inactive'];
   // Include deleted instances if specified either in the $include_additional
   // or the $conditions parameters.
   $include_deleted = (isset($include_additional['include_deleted']) && $include_additional['include_deleted']) || (isset($conditions['deleted']) && $conditions['deleted']);
 
-  // Pass include_inactive and include_deleted to the $conditions array.
-  $conditions['include_inactive'] = $include_inactive;
+  // Pass include_deleted to the $conditions array.
   $conditions['include_deleted'] = $include_deleted;
 
   return entity_load_multiple_by_properties('field_instance', $conditions);
@@ -483,15 +467,10 @@ function field_read_instances($conditions = array(), $include_additional = array
  *   // most common case), and will therefore be repeated as many times as
  *   // needed, or 'multiple-values' (one single widget allows the input of
  *   // several values, e.g checkboxes, select box...).
- *   // The sub-array is nested into a $langcode key where $langcode has the
- *   // same value of the $langcode parameter above.
- *   // The '#language' key holds the same value of $langcode and it is used
- *   // to access the field sub-array when $langcode is unknown.
  *   'field_foo' => array(
- *     '#tree' => TRUE,
- *     '#field_name' => The name of the field,
- *     '#language' => $langcode,
- *     $langcode => array(
+ *     '#access' => TRUE if the current user has 'edit' grants for the field,
+ *       FALSE if not.
+ *     'widget' => array(
  *       '#field_name' => The name of the field,
  *       '#language' => $langcode,
  *       '#field_parents' => The 'parents' space for the field in the form,
@@ -504,6 +483,8 @@ function field_read_instances($conditions = array(), $include_additional = array
  *       // Only for 'single' widgets:
  *       '#theme' => 'field_multiple_value_form',
  *       '#cardinality' => The field cardinality,
+ *       '#cardinality_multiple => TRUE if the field can contain multiple items,
+ *         FALSE otherwise.
  *       // One sub-array per copy of the widget, keyed by delta.
  *       0 => array(
  *         '#entity_type' => The name of the entity type,
@@ -563,17 +544,12 @@ function field_read_instances($conditions = array(), $include_additional = array
  * @see field_form_set_state()
  */
 function field_attach_form(EntityInterface $entity, &$form, &$form_state, $langcode = NULL, array $options = array()) {
-  // Ensure we are working with a BC mode entity.
-  $entity = $entity->getBCEntity();
-
   // Set #parents to 'top-level' by default.
   $form += array('#parents' => array());
 
   // Get the entity_form_display object for this form.
   $form_display = $form_state['form_display'];
 
-  // If no language is provided use the default site language.
-  $options['langcode'] = field_valid_language($langcode);
   $form += (array) field_invoke_method('form', _field_invoke_widget_target($form_display), $entity, $form, $form_state, $options);
 
   $form['#entity_type'] = $entity->entityType();
@@ -582,7 +558,7 @@ function field_attach_form(EntityInterface $entity, &$form, &$form_state, $langc
   // Let other modules make changes to the form.
   // Avoid \Drupal::moduleHandler()->invokeAll()
   // to let parameters be taken by reference.
-  foreach (Drupal::moduleHandler()->getImplementations('field_attach_form') as $module) {
+  foreach (\Drupal::moduleHandler()->getImplementations('field_attach_form') as $module) {
     $function = $module . '_field_attach_form';
     $function($entity, $form, $form_state, $langcode);
   }
@@ -605,7 +581,7 @@ function field_attach_form(EntityInterface $entity, &$form, &$form_state, $langc
  * elements. Fieldable entity types should call this function during their own
  * form validation function.
  *
- * @param \Drupal\Core\Entity\EntityInterface $entity
+ * @param \Drupal\Core\Entity\ContentEntityInterface $entity
  *   The entity being submitted. The actual field values will be read
  *   from $form_state['values'].
  * @param $form
@@ -619,32 +595,27 @@ function field_attach_form(EntityInterface $entity, &$form, &$form_state, $langc
  *
  * @deprecated as of Drupal 8.0. Use the entity system instead.
  */
-function field_attach_form_validate(EntityInterface $entity, $form, &$form_state, array $options = array()) {
-  // Only support NG entities.
-  if (!($entity->getNGEntity() instanceof EntityNG)) {
-    return;
-  }
-
+function field_attach_form_validate(ContentEntityInterface $entity, $form, &$form_state, array $options = array()) {
   $has_violations = FALSE;
   foreach ($entity as $field_name => $field) {
     $definition = $field->getDefinition();
-    if (!empty($definition['configurable']) && (empty($options['field_name']) || $options['field_name'] == $field_name)) {
+    if ($definition->isConfigurable() && (empty($options['field_name']) || $options['field_name'] == $field_name)) {
       $field_violations = $field->validate();
       if (count($field_violations)) {
         $has_violations = TRUE;
 
         // Place violations in $form_state.
-        $langcode = field_is_translatable($entity->entityType(), field_info_field($entity->entityType(), $field_name)) ? $entity->language()->id : Language::LANGCODE_NOT_SPECIFIED;
-        $field_state = field_form_get_state($form['#parents'], $field_name, $langcode, $form_state);
+        $field_state = field_form_get_state($form['#parents'], $field_name, $form_state);
         $field_state['constraint_violations'] = $field_violations;
-        field_form_set_state($form['#parents'], $field_name, $langcode, $form_state, $field_state);
+        field_form_set_state($form['#parents'], $field_name, $form_state, $field_state);
       }
     }
   }
 
   if ($has_violations) {
     // Map errors back to form elements.
-    field_invoke_method('flagErrors', _field_invoke_widget_target($form_state['form_display']), $entity, $form, $form_state, $options);
+    $form_display = $form_state['form_display'];
+    field_invoke_method('flagErrors', _field_invoke_widget_target($form_display), $entity, $form, $form_state, $options);
   }
 }
 
@@ -669,9 +640,6 @@ function field_attach_form_validate(EntityInterface $entity, $form, &$form_state
  * @deprecated as of Drupal 8.0. Use the entity system instead.
  */
 function field_attach_extract_form_values(EntityInterface $entity, $form, &$form_state, array $options = array()) {
-  // Ensure we are working with a BC mode entity.
-  $entity = $entity->getBCEntity();
-
   // Extract field values from submitted values.
   $form_display = $form_state['form_display'];
   field_invoke_method('extractFormValues', _field_invoke_widget_target($form_display), $entity, $form, $form_state, $options);
@@ -679,7 +647,7 @@ function field_attach_extract_form_values(EntityInterface $entity, $form, &$form
   // Let other modules act on submitting the entity.
   // Avoid \Drupal::moduleHandler()->invokeAll()
   // to let $form_state be taken by reference.
-  foreach (Drupal::moduleHandler()->getImplementations('field_attach_extract_form_values') as $module) {
+  foreach (\Drupal::moduleHandler()->getImplementations('field_attach_extract_form_values') as $module) {
     $function = $module . 'field_attach_extract_form_values';
     $function($entity, $form, $form_state);
   }
@@ -712,23 +680,14 @@ function field_attach_extract_form_values(EntityInterface $entity, $form, &$form
  * @deprecated as of Drupal 8.0. Use the entity system instead.
  */
 function field_attach_prepare_view($entity_type, array $entities, array $displays, $langcode = NULL) {
-  $options['langcode'] = array();
-
   // To ensure hooks are only run once per entity, only process items without
   // the _field_view_prepared flag.
   // @todo: resolve this more generally for both entity and field level hooks.
   $prepare = array();
   foreach ($entities as $id => $entity) {
     if (empty($entity->_field_view_prepared)) {
-      // Ensure we are working with a BC mode entity.
-      $entity = $entity->getBCEntity();
-
       // Add this entity to the items to be prepared.
       $prepare[$id] = $entity;
-
-      // Determine the actual language code to display for each field, given the
-      // language codes available in the field data.
-      $options['langcode'][$id] = field_language($entity, NULL, $langcode);
 
       // Mark this item as prepared.
       $entity->_field_view_prepared = TRUE;
@@ -738,9 +697,9 @@ function field_attach_prepare_view($entity_type, array $entities, array $display
   // Then let the formatters do their own specific massaging. For each
   // instance, call the prepareView() method on the formatter object handed by
   // the entity display.
-  $target_function = function ($instance) use ($displays) {
-    if (isset($displays[$instance['bundle']])) {
-      return $displays[$instance['bundle']]->getRenderer($instance['field_name']);
+  $target_function = function (FieldDefinitionInterface $field_definition, $bundle) use ($displays) {
+    if (isset($displays[$bundle])) {
+      return $displays[$bundle]->getRenderer($field_definition->getName());
     }
   };
   $null = NULL;
@@ -761,36 +720,28 @@ function field_attach_prepare_view($entity_type, array $entities, array $display
  *
  * @param \Drupal\Core\Entity\EntityInterface $entity
  *   The entity with fields to render.
- * @param \Drupal\entity\Entity\EntityDisplay $display
+ * @param \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display
  *   The entity display object.
  * @param $langcode
  *   The language the field values are to be shown in. If no language is
  *   provided the current language is used.
  * @param array $options
  *   An associative array of additional options. See field_invoke_method() for
- *   details. Note: key "langcode" will be overridden inside this function.
+ *   details.
  *
  * @return array
  *   A renderable array for the field values.
  *
  * @deprecated as of Drupal 8.0. Use the entity system instead.
  */
-function field_attach_view(EntityInterface $entity, EntityDisplay $display, $langcode = NULL, array $options = array()) {
-  // Ensure we are working with a BC mode entity.
-  $entity = $entity->getBCEntity();
-  // Determine the actual language code to display for each field, given the
-  // language codes available in the field data.
-  $options['langcode'] = field_language($entity, NULL, $langcode);
-
-  // For each instance, call the view() method on the formatter object handed
+function field_attach_view(EntityInterface $entity, EntityViewDisplayInterface $display, $langcode = NULL, array $options = array()) {
+  // For each field, call the view() method on the formatter object handed
   // by the entity display.
-  $target_function = function ($instance) use ($display) {
-    return $display->getRenderer($instance['field_name']);
+  $target_function = function (FieldDefinitionInterface $field_definition) use ($display) {
+    return $display->getRenderer($field_definition->getName());
   };
   $null = NULL;
   $output = field_invoke_method('view', $target_function, $entity, $null, $null, $options);
-  // Remove the BC layer now.
-  $entity = $entity->getNGEntity();
 
   // Let other modules alter the renderable array.
   $view_mode = $display->originalMode;
@@ -828,7 +779,6 @@ function field_attach_view(EntityInterface $entity, EntityDisplay $display, $lan
  *   $entity->getTranslation($langcode)->{$field_name}
  */
 function field_get_items(EntityInterface $entity, $field_name, $langcode = NULL) {
-  $entity = $entity->getBCEntity();
   $langcode = field_language($entity, $field_name, $langcode);
   return isset($entity->{$field_name}[$langcode]) ? $entity->{$field_name}[$langcode] : array();
 }
@@ -849,8 +799,111 @@ function field_get_items(EntityInterface $entity, $field_name, $langcode = NULL)
  *   The default value for the field.
  *
  * @deprecated as of Drupal 8.0. Use
- *   $instance->getFieldDefaultValue($entity)
+ *   $instance->getDefaultValue($entity)
  */
 function field_get_default_value(EntityInterface $entity, $field, $instance, $langcode = NULL) {
-  return $instance->getFieldDefaultValue($entity);
+  return $instance->getDefaultValue($entity);
+}
+
+/**
+ * Determines whether the user has access to a given field.
+ *
+ * @param string $op
+ *   The operation to be performed. Possible values:
+ *   - edit
+ *   - view
+ * @param \Drupal\field\FieldInterface $field
+ *   The field on which the operation is to be performed.
+ * @param $entity_type
+ *   The type of $entity; for example, 'node' or 'user'.
+ * @param $entity
+ *   (optional) The entity for the operation.
+ * @param $account
+ *   (optional) The account to check, if not given use currently logged in user.
+ *
+ * @return
+ *   TRUE if the operation is allowed; FALSE if the operation is denied.
+ *
+ * @deprecated as of Drupal 8.0. Use
+ *   Drupal\Core\Entity\EntityAccessControllerInterface::fieldAccess()
+ */
+function field_access($op, FieldInterface $field, $entity_type, $entity = NULL, $account = NULL) {
+  $access_controller = \Drupal::entityManager()->getAccessController($entity_type);
+
+  $items = $entity ? $entity->get($field->id()) : NULL;
+  return $access_controller->fieldAccess($op, $field, $account, $items);
+}
+
+/**
+ * Ensures that a given language code is valid.
+ *
+ * Checks whether the given language code is one of the enabled language codes.
+ * Otherwise, it returns the current, global language code; or the site's
+ * default language code, if the additional parameter $default is TRUE.
+ *
+ * @param $langcode
+ *   The language code to validate.
+ * @param $default
+ *   Whether to return the default language code or the current language code in
+ *   case $langcode is invalid.
+ *
+ * @return
+ *   A valid language code.
+ *
+ * @deprecated This has been deprecated in favor of the Entity Field API.
+ */
+function field_valid_language($langcode, $default = TRUE) {
+  $languages = field_content_languages();
+  if (in_array($langcode, $languages)) {
+    return $langcode;
+  }
+  return $default ? language_default()->id : language(Language::TYPE_CONTENT)->id;
+}
+
+/**
+ * Returns the display language code for the fields attached to the given
+ * entity.
+ *
+ * The actual language code for each given field is determined based on the
+ * requested language code and the actual data available in the fields
+ * themselves.
+ * If there is no registered translation handler for the given entity type, the
+ * display language code to be used is just Language::LANGCODE_NOT_SPECIFIED, as
+ * no other language code is allowed by field_available_languages().
+ *
+ * If translation handlers are found, we let modules provide alternative display
+ * language codes for fields not having the requested language code available.
+ *
+ * @param \Drupal\Core\Entity\EntityInterface $entity
+ *   The entity to be displayed.
+ * @param $field_name
+ *   (optional) The name of the field to be displayed. Defaults to NULL. If
+ *   no value is specified, the display language codes for every field attached
+ *   to the given entity will be returned.
+ * @param $langcode
+ *   (optional) The language code $entity has to be displayed in. Defaults to
+ *   NULL. If no value is given the current language will be used.
+ *
+ * @return
+ *   A language code if a field name is specified, an array of language codes
+ *   keyed by field name otherwise.
+ *
+ * @see \Drupal\Core\Language\LanguageManager::getFallbackCandidates()
+ * @see \Drupal\Core\Entity\EntityInterface::getFieldLangcode()
+ *
+ * @deprecated This has been deprecated in favor of the Entity Field API.
+ */
+function field_language(EntityInterface $entity, $field_name = NULL, $langcode = NULL) {
+  $langcode = \Drupal::entityManager()->getTranslationFromContext($entity, $langcode)->language()->id;
+  $translatable = field_has_translation_handler($entity->entityType());
+  if (!isset($field_name)) {
+    $display_langcodes = array();
+    foreach ($entity->getPropertyDefinitions() as $name => $definition) {
+      $display_langcodes[$name] = $translatable ? $langcode : Language::LANGCODE_NOT_SPECIFIED;
+    }
+    return $display_langcodes;
+  }
+  else {
+    return $translatable ? $langcode : Language::LANGCODE_NOT_SPECIFIED;
+  }
 }

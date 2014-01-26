@@ -7,13 +7,12 @@
 
 namespace Drupal\Core\Image;
 
-use Drupal\system\Plugin\ImageToolkitInterface;
-use Drupal\Component\Utility\Image as ImageUtility;
+use Drupal\Core\ImageToolkit\ImageToolkitInterface;
 
 /**
  * Defines an image object to represent an image file.
  *
- * @see \Drupal\system\Plugin\ImageToolkitInterface
+ * @see \Drupal\Core\ImageToolkit\ImageToolkitInterface
  * @see \Drupal\image\ImageEffectInterface
  *
  * @ingroup image
@@ -30,7 +29,7 @@ class Image implements ImageInterface {
   /**
    * An image toolkit object.
    *
-   * @var \Drupal\system\Plugin\ImageToolkitInterface
+   * @var \Drupal\Core\ImageToolkit\ImageToolkitInterface
    */
   protected $toolkit;
 
@@ -63,7 +62,14 @@ class Image implements ImageInterface {
   protected $extension = '';
 
   /**
-   * MIME type ('image/jpeg', 'image/gif', 'image/png').
+   * Image type represented by a PHP IMAGETYPE_* constant (e.g. IMAGETYPE_JPEG).
+   *
+   * @var int
+   */
+  protected $type;
+
+  /**
+   * MIME type (e.g. 'image/jpeg', 'image/gif', 'image/png').
    *
    * @var string
    */
@@ -88,12 +94,19 @@ class Image implements ImageInterface {
    *
    * @param string $source
    *   The path to an image file.
-   * @param \Drupal\system\Plugin\ImageToolkitInterface $toolkit
+   * @param \Drupal\Core\ImageToolkit\ImageToolkitInterface $toolkit
    *   The image toolkit.
    */
   public function __construct($source, ImageToolkitInterface $toolkit) {
     $this->source = $source;
     $this->toolkit = $toolkit;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function isSupported() {
+    return in_array($this->getType(), $this->toolkit->supportedTypes());
   }
 
   /**
@@ -142,6 +155,14 @@ class Image implements ImageInterface {
   public function getFileSize() {
     $this->processInfo();
     return $this->fileSize;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getType() {
+    $this->processInfo();
+    return $this->type;
   }
 
   /**
@@ -245,82 +266,48 @@ class Image implements ImageInterface {
     if ($details = $this->toolkit->getInfo($this)) {
       $this->height = $details['height'];
       $this->width = $details['width'];
-      $this->extension = $details['extension'];
+      $this->type = $details['type'];
       $this->mimeType = $details['mime_type'];
       $this->fileSize = filesize($destination);
+      $this->extension = pathinfo($destination, PATHINFO_EXTENSION);
+
+      // It may be a temporary file, without extension, or an image created from
+      // an image resource. Fallback to default extension for this image type.
+      if (empty($this->extension)) {
+        $this->extension = image_type_to_extension($this->type, FALSE);
+      }
+
       $this->processed = TRUE;
     }
     return TRUE;
   }
 
   /**
-   * {@inheritdoc}
+   * Passes through calls that represent image toolkit operations onto the
+   * image toolkit.
+   *
+   * This is a temporary solution to keep patches reviewable. The __call()
+   * method will be replaced in https://drupal.org/node/2073759 with a new
+   * interface method ImageInterface::apply(). An image operation will be
+   * performed as in the next example:
+   * @code
+   * $image = new Image($path, $toolkit);
+   * $image->apply('scale', array('width' => 50, 'height' => 100));
+   * @endcode
+   * Also in https://drupal.org/node/2073759 operation arguments sent to toolkit
+   * will be moved to a keyed array, unifying the interface of toolkit
+   * operations.
+   *
+   * @todo Drop this in https://drupal.org/node/2073759 in favor of new apply().
    */
-  public function scale($width = NULL, $height = NULL, $upscale = FALSE) {
-    $dimensions = array(
-      'width' => $this->getWidth(),
-      'height' => $this->getHeight(),
-    );
-
-    // Scale the dimensions - if they don't change then just return success.
-    if (!ImageUtility::scaleDimensions($dimensions, $width, $height, $upscale)) {
-      return TRUE;
+  public function __call($method, $arguments) {
+    if (is_callable(array($this->toolkit, $method))) {
+      // @todo In https://drupal.org/node/2073759, call_user_func_array() will
+      //   be replaced by $this->toolkit->apply($name, $this, $arguments).
+      array_unshift($arguments, $this);
+      return call_user_func_array(array($this->toolkit, $method), $arguments);
     }
-
-    return $this->resize($dimensions['width'], $dimensions['height']);
-
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function scaleAndCrop($width, $height) {
-    $scale = max($width / $this->getWidth(), $height / $this->getHeight());
-    $x = ($this->getWidth() * $scale - $width) / 2;
-    $y = ($this->getHeight() * $scale - $height) / 2;
-
-    if ($this->resize($this->getWidth() * $scale, $this->getHeight() * $scale)) {
-      return $this->crop($x, $y, $width, $height);
-    }
-    return FALSE;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function crop($x, $y, $width, $height) {
-    $aspect = $this->getHeight() / $this->getWidth();
-    if (empty($height)) $height = $width * $aspect;
-    if (empty($width)) $width = $height / $aspect;
-
-    $width = (int) round($width);
-    $height = (int) round($height);
-
-    return $this->toolkit->crop($this, $x, $y, $width, $height);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function resize($width, $height) {
-    $width = (int) round($width);
-    $height = (int) round($height);
-
-    return $this->toolkit->resize($this, $width, $height);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function desaturate() {
-    return $this->toolkit->desaturate($this);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function rotate($degrees, $background = NULL) {
-    return $this->toolkit->rotate($this, $degrees, $background);
+    throw new \BadMethodCallException();
   }
 
   /**

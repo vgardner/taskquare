@@ -149,7 +149,6 @@ class FilterDateTest extends HandlerTestBase {
    * Make sure the validation callbacks works.
    */
   protected function _testUiValidation() {
-    $view = views_get_view('test_filter_date_between');
 
     $this->drupalLogin($this->drupalCreateUser(array('administer views', 'administer site configuration')));
     menu_router_rebuild();
@@ -159,7 +158,7 @@ class FilterDateTest extends HandlerTestBase {
     $edit = array();
     // Generate a definitive wrong value, which should be checked by validation.
     $edit['options[value][value]'] = $this->randomString() . '-------';
-    $this->drupalPost(NULL, $edit, t('Apply'));
+    $this->drupalPostForm(NULL, $edit, t('Apply'));
     $this->assertText(t('Invalid date format.'), 'Make sure that validation is runned and the invalidate date format is identified.');
   }
 

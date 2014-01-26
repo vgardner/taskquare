@@ -33,10 +33,8 @@ use Drupal\entity\EntityViewModeInterface;
  * @EntityType(
  *   id = "view_mode",
  *   label = @Translation("View mode"),
- *   module = "entity",
  *   controllers = {
  *     "list" = "Drupal\entity\EntityDisplayModeListController",
- *     "access" = "Drupal\entity\EntityDisplayModeAccessController",
  *     "form" = {
  *       "add" = "Drupal\entity\Form\EntityDisplayModeAddForm",
  *       "edit" = "Drupal\entity\Form\EntityDisplayModeEditForm",
@@ -44,27 +42,18 @@ use Drupal\entity\EntityViewModeInterface;
  *     },
  *     "storage" = "Drupal\entity\EntityDisplayModeStorageController"
  *   },
+ *   admin_permission = "administer display modes",
  *   config_prefix = "entity.view_mode",
  *   entity_keys = {
  *     "id" = "id",
  *     "label" = "label",
  *     "uuid" = "uuid"
+ *   },
+ *   links = {
+ *     "edit-form" = "entity.view_mode_edit"
  *   }
  * )
  */
 class EntityViewMode extends EntityDisplayModeBase implements EntityViewModeInterface {
-
-  /**
-   * {@inheritdoc}
-   */
-  public function uri() {
-    return array(
-      'path' => 'admin/structure/display-modes/view/manage/' . $this->id(),
-      'options' => array(
-        'entity_type' => $this->entityType,
-        'entity' => $this,
-      ),
-    );
-  }
 
 }

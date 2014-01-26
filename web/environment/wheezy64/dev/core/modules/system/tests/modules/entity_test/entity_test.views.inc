@@ -2,9 +2,7 @@
 
 /**
  * @file
- * Provide views data and handlers for entity_test.module.
- *
- * @ingroup views_module_handlers
+ * Provide views data for entity_test.module.
  */
 
 /**
@@ -55,7 +53,7 @@ function entity_test_views_data() {
     ),
   );
 
-  if (module_exists('langcode')) {
+  if (\Drupal::moduleHandler()->moduleExists('langcode')) {
     $data['entity_test']['langcode'] = array(
       'title' => t('Language'),
       'help' => t('The {language}.langcode of the original variant of this test entity.'),

@@ -8,6 +8,7 @@
 namespace Drupal\node\Tests;
 
 use Drupal\Core\Language\Language;
+use Drupal\comment\CommentInterface;
 use Drupal\simpletest\WebTestBase;
 
 /**
@@ -34,6 +35,7 @@ class NodeAccessPagerTest extends WebTestBase {
     parent::setUp();
 
     node_access_rebuild();
+    $this->container->get('comment.manager')->addDefaultField('node', 'page');
     $this->web_user = $this->drupalCreateUser(array('access content', 'access comments', 'node test view'));
   }
 
@@ -47,12 +49,14 @@ class NodeAccessPagerTest extends WebTestBase {
     // Create 60 comments.
     for ($i = 0; $i < 60; $i++) {
       $comment = entity_create('comment', array(
-        'nid' => $node->id(),
-        'node_type' => 'node_type_' . $node->bundle(),
+        'entity_id' => $node->id(),
+        'entity_type' => 'node',
+        'field_name' => 'comment',
         'subject' => $this->randomName(),
         'comment_body' => array(
           array('value' => $this->randomName()),
         ),
+        'status' => CommentInterface::PUBLISHED,
       ));
       $comment->save();
     }

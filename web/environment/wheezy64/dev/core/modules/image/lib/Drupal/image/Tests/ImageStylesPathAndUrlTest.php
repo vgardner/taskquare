@@ -143,10 +143,20 @@ class ImageStylesPathAndUrlTest extends WebTestBase {
     }
     // Add some extra chars to the token.
     $this->drupalGet(str_replace(IMAGE_DERIVATIVE_TOKEN . '=', IMAGE_DERIVATIVE_TOKEN . '=Zo', $generate_url));
-    $this->assertResponse(403, 'Image was inaccessible at the URL wih an invalid token.');
+    $this->assertResponse(403, 'Image was inaccessible at the URL with an invalid token.');
     // Change the parameter name so the token is missing.
     $this->drupalGet(str_replace(IMAGE_DERIVATIVE_TOKEN . '=', 'wrongparam=', $generate_url));
-    $this->assertResponse(403, 'Image was inaccessible at the URL wih a missing token.');
+    $this->assertResponse(403, 'Image was inaccessible at the URL with a missing token.');
+
+    // Check that the generated URL is the same when we pass in a relative path
+    // rather than a URI. We need to temporarily switch the default scheme to
+    // match the desired scheme before testing this, then switch it back to the
+    // "temporary" scheme used throughout this test afterwards.
+    \Drupal::config('system.file')->set('default_scheme', $scheme)->save();
+    $relative_path = file_uri_target($original_uri);
+    $generate_url_from_relative_path = $this->style->buildUrl($relative_path, $clean_url);
+    $this->assertEqual($generate_url, $generate_url_from_relative_path);
+    \Drupal::config('system.file')->set('default_scheme', 'temporary')->save();
 
     // Fetch the URL that generates the file.
     $this->drupalGet($generate_url);
@@ -195,7 +205,7 @@ class ImageStylesPathAndUrlTest extends WebTestBase {
     elseif ($clean_url) {
       // Add some extra chars to the token.
       $this->drupalGet(str_replace(IMAGE_DERIVATIVE_TOKEN . '=', IMAGE_DERIVATIVE_TOKEN . '=Zo', $generate_url));
-      $this->assertResponse(200, 'Existing image was accessible at the URL wih an invalid token.');
+      $this->assertResponse(200, 'Existing image was accessible at the URL with an invalid token.');
     }
 
     // Allow insecure image derivatives to be created for the remainder of this

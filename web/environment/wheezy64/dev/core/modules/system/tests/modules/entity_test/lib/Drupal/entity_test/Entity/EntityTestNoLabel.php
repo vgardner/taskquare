@@ -16,9 +16,8 @@ use Drupal\Core\Annotation\Translation;
  * @EntityType(
  *   id = "entity_test_no_label",
  *   label = @Translation("Entity Test without label"),
- *   module = "entity_test",
  *   controllers = {
- *     "storage" = "Drupal\entity_test\EntityTestStorageController"
+ *     "storage" = "Drupal\Core\Entity\FieldableDatabaseStorageController"
  *   },
  *   field_cache = FALSE,
  *   base_table = "entity_test",

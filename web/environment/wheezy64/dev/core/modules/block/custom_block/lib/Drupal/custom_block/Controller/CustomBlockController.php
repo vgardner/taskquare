@@ -8,13 +8,14 @@
 namespace Drupal\custom_block\Controller;
 
 use Drupal\Component\Plugin\PluginManagerInterface;
+use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Entity\EntityStorageControllerInterface;
 use Drupal\custom_block\CustomBlockTypeInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 
-class CustomBlockController implements ContainerInjectionInterface {
+class CustomBlockController extends ControllerBase implements ContainerInjectionInterface {
 
   /**
    * The entity manager.
@@ -98,20 +99,29 @@ class CustomBlockController implements ContainerInjectionInterface {
    *   A form array as expected by drupal_render().
    */
   public function addForm(CustomBlockTypeInterface $custom_block_type, Request $request) {
-    // @todo Remove this when https://drupal.org/node/1981644 is in.
-    drupal_set_title(t('Add %type custom block', array(
-      '%type' => $custom_block_type->label()
-    )), PASS_THROUGH);
     $block = $this->customBlockStorage->create(array(
       'type' => $custom_block_type->id()
     ));
-    if (($theme = $request->attributes->get('theme')) && in_array($theme, array_keys(list_themes()))) {
+    if (($theme = $request->query->get('theme')) && in_array($theme, array_keys(list_themes()))) {
       // We have navigated to this page from the block library and will keep track
       // of the theme for redirecting the user to the configuration page for the
       // newly created block in the given theme.
       $block->setTheme($theme);
     }
     return $this->entityManager->getForm($block);
+  }
+
+  /**
+   * Provides the page title for this controller.
+   *
+   * @param \Drupal\custom_block\CustomBlockTypeInterface $custom_block_type
+   *   The custom block type being added.
+   *
+   * @return string
+   *   The page title.
+   */
+  public function getAddFormTitle(CustomBlockTypeInterface $custom_block_type) {
+    return $this->t('Add %type custom block', array('%type' => $custom_block_type->label()));
   }
 
 }

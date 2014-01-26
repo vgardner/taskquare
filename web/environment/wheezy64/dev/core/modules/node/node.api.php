@@ -1,6 +1,9 @@
 <?php
 
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\node\Entity\NodeInterface;
+use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\Xss;
 
 /**
  * @file
@@ -95,14 +98,14 @@ use Drupal\Core\Entity\EntityInterface;
  * - Validating a node during editing form submit (calling
  *   node_form_validate()):
  *   - hook_node_validate() (all)
- * - Searching (calling node_search_execute()):
+ * - Searching (using the 'node_search' plugin):
  *   - hook_ranking() (all)
  *   - Query is executed to find matching nodes
  *   - Resulting node is loaded (see Loading section above)
  *   - Resulting node is prepared for viewing (see Viewing a single node above)
- *   - comment_node_update_index() is called.
+ *   - comment_node_update_index() is called (this adds "N comments" text)
  *   - hook_node_search_result() (all)
- * - Search indexing (calling node_update_index()):
+ * - Search indexing (calling updateIndex() on the 'node_search' plugin):
  *   - Node is loaded (see Loading section above)
  *   - Node is prepared for viewing (see Viewing a single node above)
  *   - hook_node_update_index() (all)
@@ -370,7 +373,7 @@ function hook_node_grants_alter(&$grants, $account, $op) {
   // array for roles specified in our variable setting.
 
   // Get our list of banned roles.
-  $restricted = variable_get('example_restricted_roles', array());
+  $restricted = \Drupal::config('example.settings')->get('restricted_roles');
 
   if ($op != 'view' && !empty($restricted)) {
     // Now check the roles for this account against the restrictions.
@@ -499,19 +502,23 @@ function hook_node_create(\Drupal\Core\Entity\EntityInterface $node) {
  *
  * @param $nodes
  *   An array of the nodes being loaded, keyed by nid.
- * @param $types
- *   An array containing the node types present in $nodes. Allows for an early
- *   return for modules that only support certain node types.
  *
  * For a detailed usage example, see nodeapi_example.module.
  *
  * @ingroup node_api_hooks
  */
-function hook_node_load($nodes, $types) {
+function hook_node_load($nodes) {
   // Decide whether any of $types are relevant to our purposes.
-  if (count(array_intersect($types_we_want_to_process, $types))) {
+  $types_we_want_to_process = \Drupal::config('my_types')->get('types');
+  $nids = array();
+  foreach ($nodes as $node) {
+    if (in_array($node->bundle(), $types_we_want_to_process)) {
+      $nids = $node->id();
+    }
+  }
+  if ($nids) {
     // Gather our extra data for each of these nodes.
-    $result = db_query('SELECT nid, foo FROM {mytable} WHERE nid IN(:nids)', array(':nids' => array_keys($nodes)));
+    $result = db_query('SELECT nid, foo FROM {mytable} WHERE nid IN(:nids)', array(':nids' => $nids));
     // Add our extra data to the node objects.
     foreach ($result as $record) {
       $nodes[$record->nid]->foo = $record->foo;
@@ -539,7 +546,7 @@ function hook_node_load($nodes, $types) {
  * the default home page at path 'node', a recent content block, etc.) See
  * @link node_access Node access rights @endlink for a full explanation.
  *
- * @param Drupal\Core\Entity\EntityInterface|string $node
+ * @param \Drupal\Core\Entity\EntityInterface|string $node
  *   Either a node entity or the machine name of the content type on which to
  *   perform the access check.
  * @param string $op
@@ -604,16 +611,16 @@ function hook_node_access(\Drupal\node\NodeInterface $node, $op, $account, $lang
  * @ingroup node_api_hooks
  */
 function hook_node_prepare_form(\Drupal\node\NodeInterface $node, $form_display, $operation, array &$form_state) {
-  if (!isset($node->comment->value)) {
-    $node->comment = variable_get('comment_' . $node->getType(), COMMENT_NODE_OPEN);
+  if (!isset($node->my_rating)) {
+    $node->my_rating = \Drupal::config("my_rating_{$node->bundle()}")->get('enabled');
   }
 }
 
 /**
  * Act on a node being displayed as a search result.
  *
- * This hook is invoked from node_search_execute(), after node_load() and
- * node_view() have been called.
+ * This hook is invoked from the node search plugin during search execution,
+ * after loading and rendering the node.
  *
  * @param \Drupal\Core\Entity\EntityInterface $node
  *   The node being displayed in a search result.
@@ -627,13 +634,13 @@ function hook_node_prepare_form(\Drupal\node\NodeInterface $node, $form_display,
  *   theming.
  *
  * @see template_preprocess_search_result()
- * @see search-result.tpl.php
+ * @see search-result.html.twig
  *
  * @ingroup node_api_hooks
  */
 function hook_node_search_result(\Drupal\Core\Entity\EntityInterface $node, $langcode) {
-  $comments = db_query('SELECT comment_count FROM {node_comment_statistics} WHERE nid = :nid', array('nid' => $node->id()))->fetchField();
-  return array('comment' => format_plural($comments, '1 comment', '@count comments'));
+  $rating = db_query('SELECT SUM(points) FROM {my_rating} WHERE nid = :nid', array('nid' => $node->id()))->fetchField();
+  return array('rating' => format_plural($rating, '1 point', '@count points'));
 }
 
 /**
@@ -686,8 +693,8 @@ function hook_node_update(\Drupal\Core\Entity\EntityInterface $node) {
 /**
  * Act on a node being indexed for searching.
  *
- * This hook is invoked during search indexing, after node_load(), and after the
- * result of node_view() is added as $node->rendered to the node object.
+ * This hook is invoked during search indexing, after loading, and after the
+ * result of rendering is added as $node->rendered to the node object.
  *
  * @param \Drupal\Core\Entity\EntityInterface $node
  *   The node being indexed.
@@ -701,9 +708,9 @@ function hook_node_update(\Drupal\Core\Entity\EntityInterface $node) {
  */
 function hook_node_update_index(\Drupal\Core\Entity\EntityInterface $node, $langcode) {
   $text = '';
-  $comments = db_query('SELECT subject, comment, format FROM {comment} WHERE nid = :nid AND status = :status', array(':nid' => $node->id(), ':status' => COMMENT_PUBLISHED));
-  foreach ($comments as $comment) {
-    $text .= '<h2>' . check_plain($comment->subject->value) . '</h2>' . $comment->comment_body->processed;
+  $ratings = db_query('SELECT title, description FROM {my_ratings} WHERE nid = :nid', array(':nid' => $node->id()));
+  foreach ($ratings as $rating) {
+    $text .= '<h2>' . String::checkPlain($rating->title) . '</h2>' . Xss::filter($rating->description);
   }
   return $text;
 }
@@ -734,7 +741,7 @@ function hook_node_update_index(\Drupal\Core\Entity\EntityInterface $node, $lang
 function hook_node_validate(\Drupal\Core\Entity\EntityInterface $node, $form, &$form_state) {
   if (isset($node->end) && isset($node->start)) {
     if ($node->start > $node->end) {
-      form_set_error('time', t('An event may not end before it starts.'));
+      form_set_error('time', $form_state, t('An event may not end before it starts.'));
     }
   }
 }
@@ -781,7 +788,7 @@ function hook_node_submit(\Drupal\Core\Entity\EntityInterface $node, $form, &$fo
  *
  * @param \Drupal\Core\Entity\EntityInterface $node
  *   The node that is being assembled for rendering.
- * @param \Drupal\entity\Entity\EntityDisplay $display
+ * @param \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display
  *   The entity_display object holding the display options configured for the
  *   node components.
  * @param string $view_mode
@@ -790,12 +797,11 @@ function hook_node_submit(\Drupal\Core\Entity\EntityInterface $node, $form, &$fo
  *   The language code used for rendering.
  *
  * @see forum_node_view()
- * @see comment_node_view()
  * @see hook_entity_view()
  *
  * @ingroup node_api_hooks
  */
-function hook_node_view(\Drupal\Core\Entity\EntityInterface $node, \Drupal\entity\Entity\EntityDisplay $display, $view_mode, $langcode) {
+function hook_node_view(\Drupal\Core\Entity\EntityInterface $node, \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display, $view_mode, $langcode) {
   // Only do the extra work if the component is configured to be displayed.
   // This assumes a 'mymodule_addition' extra field has been defined for the
   // node type in hook_field_extra_fields().
@@ -824,7 +830,7 @@ function hook_node_view(\Drupal\Core\Entity\EntityInterface $node, \Drupal\entit
  *   A renderable array representing the node content.
  * @param \Drupal\Core\Entity\EntityInterface $node
  *   The node being rendered.
- * @param \Drupal\entity\Entity\EntityDisplay $display
+ * @param \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display
  *   The entity_display object holding the display options configured for the
  *   node components.
  *
@@ -833,7 +839,7 @@ function hook_node_view(\Drupal\Core\Entity\EntityInterface $node, \Drupal\entit
  *
  * @ingroup node_api_hooks
  */
-function hook_node_view_alter(&$build, \Drupal\Core\Entity\EntityInterface $node, \Drupal\entity\Entity\EntityDisplay $display) {
+function hook_node_view_alter(&$build, \Drupal\Core\Entity\EntityInterface $node, \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display) {
   if ($build['#view_mode'] == 'full' && isset($build['an_additional_field'])) {
     // Change its weight.
     $build['an_additional_field']['#weight'] = -10;
@@ -888,7 +894,7 @@ function hook_node_view_alter(&$build, \Drupal\Core\Entity\EntityInterface $node
  */
 function hook_ranking() {
   // If voting is disabled, we can avoid returning the array, no hard feelings.
-  if (variable_get('vote_node_enabled', TRUE)) {
+  if (\Drupal::config('vote.settings')->get('node_enabled')) {
     return array(
       'vote_average' => array(
         'title' => t('Average vote'),
@@ -899,7 +905,7 @@ function hook_ranking() {
         // always 0, should be 0.
         'score' => 'vote_node_data.average / CAST(%f AS DECIMAL)',
         // Pass in the highest possible voting score as a decimal argument.
-        'arguments' => array(variable_get('vote_score_max', 5)),
+        'arguments' => array(\Drupal::config('vote.settings').get('score_max')),
       ),
     );
   }
@@ -935,6 +941,37 @@ function hook_node_type_update(\Drupal\node\NodeTypeInterface $type) {
  */
 function hook_node_type_delete(\Drupal\node\NodeTypeInterface $type) {
   drupal_set_message(t('You have just deleted a content type with the machine name %type.', array('%type' => $type->id())));
+}
+
+/**
+ * Alter the links of a node.
+ *
+ * @param array &$links
+ *   A renderable array representing the node links.
+ * @param \Drupal\node\NodeInterface $entity
+ *   The node being rendered.
+ * @param array &$context
+ *   Various aspects of the context in which the node links are going to be
+ *   displayed, with the following keys:
+ *   - 'view_mode': the view mode in which the comment is being viewed
+ *   - 'langcode': the language in which the comment is being viewed
+ *
+ * @see \Drupal\node\NodeViewBuilder::renderLinks()
+ * @see \Drupal\node\NodeViewBuilder::buildLinks()
+ */
+function hook_node_links_alter(array &$links, NodeInterface $entity, array &$context) {
+  $links['mymodule'] = array(
+    '#theme' => 'links__node__mymodule',
+    '#attributes' => array('class' => array('links', 'inline')),
+    '#links' => array(
+      'node-report' => array(
+        'title' => t('Report'),
+        'href' => "node/{$entity->id()}/report",
+        'html' => TRUE,
+        'query' => array('token' => \Drupal::getContainer()->get('csrf_token')->get("node/{$entity->id()}/report")),
+      ),
+    ),
+  );
 }
 
 /**

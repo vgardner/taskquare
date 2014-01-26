@@ -8,7 +8,8 @@
 namespace Drupal\Core\Entity\Query\Sql;
 
 use Drupal\Core\Database\Query\SelectInterface;
-use Drupal\Core\Entity\DatabaseStorageController;
+use Drupal\Core\Entity\EntityStorageControllerInterface;
+use Drupal\Core\Entity\FieldableDatabaseStorageController;
 use Drupal\Core\Entity\Plugin\DataType\EntityReference;
 use Drupal\Core\Entity\Query\QueryException;
 use Drupal\field\Entity\Field;
@@ -82,7 +83,7 @@ class Tables implements TablesInterface {
     for ($key = 0; $key <= $count; $key ++) {
       // If there is revision support and only the current revision is being
       // queried then use the revision id. Otherwise, the entity id will do.
-      if (!empty($entity_info['entity_keys']['revision']) && $age == FIELD_LOAD_CURRENT) {
+      if (!empty($entity_info['entity_keys']['revision']) && $age == EntityStorageControllerInterface::FIELD_LOAD_CURRENT) {
         // This contains the relevant SQL field to be used when joining entity
         // tables.
         $entity_id_field = $entity_info['entity_keys']['revision'];
@@ -116,7 +117,8 @@ class Tables implements TablesInterface {
         if ($key < $count) {
           $next = $specifiers[$key + 1];
           // Is this a field column?
-          if (isset($field['columns'][$next]) || in_array($next, Field::getReservedColumns())) {
+          $columns = $field->getColumns();
+          if (isset($columns[$next]) || in_array($next, Field::getReservedColumns())) {
             // Use it.
             $column = $next;
             // Do not process it again.
@@ -134,15 +136,14 @@ class Tables implements TablesInterface {
 
             // Get the field definitions form a mocked entity.
             $values = array();
-            $field_name = $field->getFieldName();
+            $field_name = $field->getName();
             // If there are bundles, pick one.
             if (!empty($entity_info['entity_keys']['bundle'])) {
               $values[$entity_info['entity_keys']['bundle']] = reset($field_map[$entity_type][$field_name]['bundles']);
             }
             $entity = $entity_manager
               ->getStorageController($entity_type)
-              ->create($values)
-              ->getNGEntity();
+              ->create($values);
             $propertyDefinitions = $entity->$field_name->getPropertyDefinitions();
 
             // If the column is not yet known, ie. the
@@ -150,7 +151,7 @@ class Tables implements TablesInterface {
             // column, i.e. target_id or fid.
             // Otherwise, the code executing the relationship will throw an
             // exception anyways so no need to do it here.
-            if (!$column && isset($propertyDefinitions[$relationship_specifier]) && $entity->{$field['field_name']}->get('entity') instanceof EntityReference) {
+            if (!$column && isset($propertyDefinitions[$relationship_specifier]) && $entity->{$field->getName()}->get('entity') instanceof EntityReference) {
               $column = current(array_keys($propertyDefinitions));
             }
             // Prepare the next index prefix.
@@ -162,13 +163,13 @@ class Tables implements TablesInterface {
           $column = 'value';
         }
         $table = $this->ensureFieldTable($index_prefix, $field, $type, $langcode, $base_table, $entity_id_field, $field_id_field);
-        $sql_column = DatabaseStorageController::_fieldColumnName($field, $column);
+        $sql_column = FieldableDatabaseStorageController::_fieldColumnName($field, $column);
       }
       // This is an entity property (non-configurable field).
       else {
         // ensureEntityTable() decides whether an entity property will be
         // queried from the data table or the base table based on where it
-        // finds the property first. The data table is prefered, which is why
+        // finds the property first. The data table is preferred, which is why
         // it gets added before the base table.
         $entity_tables = array();
         if (isset($entity_info['data_table'])) {
@@ -195,8 +196,7 @@ class Tables implements TablesInterface {
           }
           $entity = $entity_manager
             ->getStorageController($entity_type)
-            ->create($values)
-            ->getNGEntity();
+            ->create($values);
           $propertyDefinitions = $entity->$specifier->getPropertyDefinitions();
           $relationship_specifier = $specifiers[$key + 1];
           $next_index_prefix = $relationship_specifier;
@@ -204,7 +204,7 @@ class Tables implements TablesInterface {
         // Check for a valid relationship.
         if (isset($propertyDefinitions[$relationship_specifier]) && $entity->{$specifier}->get('entity') instanceof EntityReference) {
           // If it is, use the entity type.
-          $entity_type = $propertyDefinitions[$relationship_specifier]['constraints']['EntityType'];
+          $entity_type = $propertyDefinitions[$relationship_specifier]->getConstraint('EntityType');
           $entity_info = $entity_manager->getDefinition($entity_type);
           // Add the new entity base table using the table and sql column.
           $join_condition= '%alias.' . $entity_info['entity_keys']['id'] . " = $table.$sql_column";
@@ -249,10 +249,10 @@ class Tables implements TablesInterface {
    * @throws \Drupal\Core\Entity\Query\QueryException
    */
   protected function ensureFieldTable($index_prefix, &$field, $type, $langcode, $base_table, $entity_id_field, $field_id_field) {
-    $field_name = $field['field_name'];
+    $field_name = $field->getName();
     if (!isset($this->fieldTables[$index_prefix . $field_name])) {
-      $table = $this->sqlQuery->getMetaData('age') == FIELD_LOAD_CURRENT ? DatabaseStorageController::_fieldTableName($field) : DatabaseStorageController::_fieldRevisionTableName($field);
-      if ($field['cardinality'] != 1) {
+      $table = $this->sqlQuery->getMetaData('age') == EntityStorageControllerInterface::FIELD_LOAD_CURRENT ? FieldableDatabaseStorageController::_fieldTableName($field) : FieldableDatabaseStorageController::_fieldRevisionTableName($field);
+      if ($field->getCardinality() != 1) {
         $this->sqlQuery->addMetaData('simple_query', FALSE);
       }
       $entity_type = $this->sqlQuery->getMetaData('entity_type');

@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\comment\Entity\CommentInterface.
+ * Contains \Drupal\comment\CommentInterface.
  */
 
 namespace Drupal\comment;
@@ -16,6 +16,16 @@ use Drupal\Core\Entity\EntityChangedInterface;
 interface CommentInterface extends ContentEntityInterface, EntityChangedInterface {
 
   /**
+   * Comment is awaiting approval.
+   */
+  const NOT_PUBLISHED = 0;
+
+  /**
+   * Comment is published.
+   */
+  const PUBLISHED = 1;
+
+  /**
    * Returns the permalink URL for this comment.
    *
    * @return array
@@ -24,4 +34,5 @@ interface CommentInterface extends ContentEntityInterface, EntityChangedInterfac
    *   UrlGenerator::generateFromPath().
    */
   public function permalink();
+
 }

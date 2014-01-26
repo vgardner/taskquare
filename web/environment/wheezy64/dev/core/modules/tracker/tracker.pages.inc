@@ -17,19 +17,12 @@
  *
  * @see tracker_menu()
  */
-function tracker_page($account = NULL, $set_title = FALSE) {
+function tracker_page($account = NULL) {
   if ($account) {
     $query = db_select('tracker_user', 't')
       ->extend('Drupal\Core\Database\Query\PagerSelectExtender')
       ->addMetaData('base_table', 'tracker_user')
       ->condition('t.uid', $account->id());
-
-    if ($set_title) {
-      // When viewed from user/%user/track, display the name of the user
-      // as page title -- the tab title remains Track so this needs to be done
-      // here and not in the menu definition.
-      drupal_set_title(user_format_name($account));
-    }
   }
   else {
     $query = db_select('tracker_node', 't', array('target' => 'slave'))
@@ -52,10 +45,23 @@ function tracker_page($account = NULL, $set_title = FALSE) {
   if (!empty($tracker_data)) {
     $nids = array_keys($tracker_data);
     $nodes = node_load_multiple($nids);
-    // Now, get the data and put into the placeholder array.
     // @todo This should be actually filtering on the desired language and just
     //   fall back to the default language.
-    $result = db_query('SELECT n.nid, l.comment_count FROM {node_field_data} n INNER JOIN {node_comment_statistics} l ON n.nid = l.nid WHERE n.nid IN (:nids) AND n.default_langcode = 1 ORDER BY n.changed DESC', array(':nids' => $nids), array('target' => 'slave'))->fetchAllKeyed();
+    $result = db_query("
+    SELECT
+      n.nid,
+      SUM(l.comment_count) AS comment_count
+    FROM {node_field_data} n
+      INNER JOIN {comment_entity_statistics} l
+        ON n.nid = l.entity_id AND l.entity_type = 'node'
+      INNER JOIN {users} u
+        ON n.uid = u.uid
+    WHERE n.nid IN (:nids)
+      AND n.default_langcode = 1
+    GROUP BY n.nid
+    ORDER BY n.changed DESC", array(
+      ':nids' => array_keys($nodes)
+    ), array('target' => 'slave'))->fetchAllKeyed();
     foreach ($result as $nid => $comment_count) {
       $nodes[$nid]->last_activity = $tracker_data[$nid]->changed;
       $nodes[$nid]->comment_count = $comment_count;
@@ -68,7 +74,7 @@ function tracker_page($account = NULL, $set_title = FALSE) {
       if ($node->comment_count) {
         $comments = $node->comment_count;
 
-        if ($new = comment_num_new($node->id())) {
+        if ($new = comment_num_new($node->id(), 'node')) {
           $comments .= '<br />';
           $comments .= l(format_plural($new, '1 new', '@count new'), 'node/' . $node->id(), array('fragment' => 'new'));
         }
@@ -88,7 +94,7 @@ function tracker_page($account = NULL, $set_title = FALSE) {
       );
 
       // Adds extra RDFa markup to the $row array if the RDF module is enabled.
-      if (module_exists('rdf')) {
+      if (\Drupal::moduleHandler()->moduleExists('rdf')) {
         $mapping = rdf_get_mapping('node', $node->getType());
         // Adds RDFa markup to the title of the node. Because the RDFa markup is
         // added to the td tag which might contain HTML code, we specify an

@@ -12,9 +12,6 @@ use Drupal\views\Plugin\Block\ViewsBlock;
 use Drupal\block\Plugin\views\display\Block;
 
 // @todo Remove this once the constant got converted.
-if (!defined('DRUPAL_CORE_COMPATIBILITY')) {
-  define('DRUPAL_CORE_COMPATIBILITY', '8.x');
-}
 if (!defined('BLOCK_LABEL_VISIBLE')) {
   define('BLOCK_LABEL_VISIBLE', 'visible');
 }
@@ -56,6 +53,13 @@ class ViewsBlockTest extends UnitTestCase {
    * @var \Drupal\Core\Entity\EntityStorageControllerInterface|\PHPUnit_Framework_MockObject_MockObject
    */
   protected $storageController;
+
+  /**
+   * The mocked user account.
+   *
+   * @var \Drupal\Core\Session\AccountInterface|\PHPUnit_Framework_MockObject_MockObject
+   */
+  protected $account;
 
   public static function getInfo() {
     return array(
@@ -104,6 +108,7 @@ class ViewsBlockTest extends UnitTestCase {
       ->method('load')
       ->with('test_view')
       ->will($this->returnValue($this->view));
+    $this->account = $this->getMock('Drupal\Core\Session\AccountInterface');
   }
 
   /**
@@ -123,7 +128,7 @@ class ViewsBlockTest extends UnitTestCase {
     $config = array();
     $definition = array();
     $definition['module'] = 'views';
-    $plugin = new ViewsBlock($config, $block_id, $definition, $this->executableFactory, $this->storageController);
+    $plugin = new ViewsBlock($config, $block_id, $definition, $this->executableFactory, $this->storageController, $this->account);
 
     $this->assertEquals($build, $plugin->build());
   }
@@ -144,7 +149,7 @@ class ViewsBlockTest extends UnitTestCase {
     $config = array();
     $definition = array();
     $definition['module'] = 'views';
-    $plugin = new ViewsBlock($config, $block_id, $definition, $this->executableFactory, $this->storageController);
+    $plugin = new ViewsBlock($config, $block_id, $definition, $this->executableFactory, $this->storageController, $this->account);
 
     $this->assertEquals(array(), $plugin->build());
   }
@@ -153,13 +158,7 @@ class ViewsBlockTest extends UnitTestCase {
 
 }
 
-// @todo Remove this once https://drupal.org/node/2018411 is in.
 namespace {
-  if (!function_exists('t')) {
-    function t($string) {
-      return $string;
-    }
-  }
   // @todo replace views_add_contextual_links()
   if (!function_exists('views_add_contextual_links')) {
     function views_add_contextual_links() {

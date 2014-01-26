@@ -110,7 +110,7 @@ class CssOptimizer implements AssetOptimizerInterface {
       $content = $this->processCss($contents, $_optimize);
     }
 
-    // Restore the parent base path as the file and its childen are processed.
+    // Restore the parent base path as the file and its children are processed.
     $basepath = $parent_base_path;
     return $content;
   }
@@ -127,7 +127,7 @@ class CssOptimizer implements AssetOptimizerInterface {
    * @return
    *   The contents of the CSS file at $matches[1], with corrected paths.
    *
-   * @see Drupal\Core\Asset\AssetOptimizerInterface::loadFile()
+   * @see \Drupal\Core\Asset\AssetOptimizerInterface::loadFile()
    */
   protected function loadNestedFile($matches) {
     $filename = $matches[1];

@@ -56,8 +56,8 @@ interface NodeGrantDatabaseStorageInterface {
    *
    * If a realm is provided, it will only delete grants from that realm, but
    * it will always delete a grant from the 'all' realm. Modules that use
-   * node_access() can use this method when doing mass updates due to
-   * widespread permission changes.
+   * node access can use this method when doing mass updates due to widespread
+   * permission changes.
    *
    * Note: Don't call this method directly from a contributed module. Call
    * node_access_write_grants() instead.
@@ -120,5 +120,14 @@ interface NodeGrantDatabaseStorageInterface {
    *   Returns the amount of node grants.
    */
   public function count();
+
+  /**
+   * Remove the access records belonging to certain nodes.
+   *
+   * @param array $nids
+   *   A list of node IDs. The grant records belonging to these nodes will be
+   *   deleted.
+   */
+  public function deleteNodeRecords(array $nids);
 
 }

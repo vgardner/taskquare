@@ -5,11 +5,14 @@
  * Allows entities to be translated into different languages.
  */
 
-use Drupal\Core\Language\Language;
-use Drupal\Core\Session\AccountInterface;
+use Drupal\content_translation\Plugin\Derivative\ContentTranslationLocalTasks;
+use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityFormControllerInterface;
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Entity\EntityNG;
+use Drupal\Core\Language\Language;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\TypedData\TranslatableInterface;
+use Drupal\node\NodeInterface;
 
 /**
  * Implements hook_help().
@@ -76,40 +79,23 @@ function content_translation_language_types_info_alter(array &$language_types) {
 function content_translation_entity_info_alter(array &$entity_info) {
   // Provide defaults for translation info.
   foreach ($entity_info as $entity_type => &$info) {
-    if (empty($info['translatable'])) {
-      continue;
+    if (!empty($info['translatable'])) {
+      $info['controllers'] += array('translation' => 'Drupal\content_translation\ContentTranslationController');
+
+      if (!isset($info['translation']['content_translation'])) {
+        $info['translation']['content_translation'] = array();
+      }
+
+      if (!empty($info['links']['canonical'])) {
+        // Provide default route names for the translation paths.
+        $info['links'] += array(
+          'drupal:content-translation-overview' => "content_translation.translation_overview_$entity_type",
+        );
+        $info['translation']['content_translation'] += array(
+          'access_callback' => 'content_translation_translate_access',
+        );
+      }
     }
-
-    if (!isset($info['translation']['content_translation'])) {
-      $info['translation']['content_translation'] = array();
-    }
-
-    // Every fieldable entity type must have a translation controller class, no
-    // matter if it is enabled for translation or not. As a matter of fact we
-    // might need it to correctly switch field translatability when a field is
-    // shared accross different entities.
-    $info['controllers'] += array('translation' => 'Drupal\content_translation\ContentTranslationController');
-
-    // If no menu base path is provided we default to the usual
-    // "entity_type/%entity_type" pattern.
-    if (!isset($info['menu_base_path'])) {
-      $path = "$entity_type/%$entity_type";
-      $info['menu_base_path'] = $path;
-    }
-
-    $path = $info['menu_base_path'];
-
-    $info += array(
-      'menu_view_path' => $path,
-      'menu_edit_path' => "$path/edit",
-      'menu_path_wildcard' => "%$entity_type",
-    );
-
-    $entity_position = count(explode('/', $path)) - 1;
-    $info['translation']['content_translation'] += array(
-      'access_callback' => 'content_translation_translate_access',
-      'access_arguments' => array($entity_position),
-    );
   }
 }
 
@@ -126,7 +112,52 @@ function content_translation_entity_bundle_info_alter(&$bundles) {
 }
 
 /**
+ * Implements hook_entity_field_info_alter().
+ */
+function content_translation_entity_field_info_alter(&$info, $entity_type) {
+  $translation_settings = config('content_translation.settings')->get($entity_type);
+
+  if ($translation_settings) {
+    // Currently field translatability is defined per-field but we may want to
+    // make it per-instance instead, so leaving the possibility open for further
+    // easier refactoring.
+    $fields = array();
+    foreach ($translation_settings as $bundle => $settings) {
+      $fields += !empty($settings['content_translation']['fields']) ? $settings['content_translation']['fields'] : array();
+    }
+
+    $keys = array('definitions', 'optional');
+    foreach ($fields as $name => $translatable) {
+      foreach ($keys as $key) {
+        if (isset($info[$key][$name])) {
+          $info[$key][$name]->setTranslatable((bool) $translatable);
+          break;
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_entity_operation_alter().
+ */
+function content_translation_entity_operation_alter(array &$operations, \Drupal\Core\Entity\EntityInterface $entity) {
+  // @todo Use an access permission.
+  if ($entity instanceof NodeInterface && $entity->isTranslatable()) {
+    $uri = $entity->uri();
+    $operations['translate'] = array(
+      'title' => t('Translate'),
+      'href' => $uri['path'] . '/translations',
+      'options' => $uri['options'],
+    );
+  }
+}
+
+/**
  * Implements hook_menu().
+ *
+ * @todo Split this into route definition and menu link definition. See
+ *   https://drupal.org/node/1987882 and https://drupal.org/node/2047633.
  */
 function content_translation_menu() {
   $items = array();
@@ -135,9 +166,9 @@ function content_translation_menu() {
   foreach (entity_get_info() as $entity_type => $info) {
     // Provide the translation UI only for enabled types.
     if (content_translation_enabled($entity_type)) {
-      $path = $info['menu_base_path'];
+      $path = _content_translation_link_to_router_path($entity_type, $info['links']['canonical']);
       $entity_position = count(explode('/', $path)) - 1;
-      $keys = array_flip(array('theme_callback', 'theme_arguments', 'access_callback', 'access_arguments', 'load_arguments'));
+      $keys = array_flip(array('load_arguments'));
       $menu_info = array_intersect_key($info['translation']['content_translation'], $keys) + array('file' => 'content_translation.pages.inc');
       $item = array();
 
@@ -147,21 +178,6 @@ function content_translation_menu() {
         $item[str_replace('_', ' ', $key)] = $value;
       }
 
-      $items["$path/translations"] = array(
-        'title' => 'Translate',
-        'page callback' => 'content_translation_overview',
-        'page arguments' => array($entity_position),
-        'type' => MENU_LOCAL_TASK,
-        'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
-        'weight' => 2,
-      ) + $item;
-
-      $items["$path/translations/overview"] = array(
-        'title' => 'Overview',
-        'type' => MENU_DEFAULT_LOCAL_TASK,
-        'weight' => 0,
-      );
-
       // Add translation callback.
       // @todo Add the access callback instead of replacing it as soon as the
       // routing system supports multiple callbacks.
@@ -169,54 +185,44 @@ function content_translation_menu() {
       $args = array($entity_position, $language_position, $language_position + 1);
       $items["$path/translations/add/%language/%language"] = array(
         'title' => 'Add',
-        'page callback' => 'content_translation_add_page',
-        'page arguments' => $args,
-        'access callback' => 'content_translation_add_access',
-        'access arguments' => $args,
-        'type' => MENU_LOCAL_TASK,
+        'route_name' => "content_translation.translation_add_$entity_type",
         'weight' => 1,
-      ) + $item;
+      );
 
       // Edit translation callback.
       $args = array($entity_position, $language_position);
       $items["$path/translations/edit/%language"] = array(
         'title' => 'Edit',
-        'page callback' => 'content_translation_edit_page',
-        'page arguments' => $args,
-        'access callback' => 'content_translation_edit_access',
-        'access arguments' => $args,
-        'type' => MENU_LOCAL_TASK,
+        'route_name' => "content_translation.translation_edit_$entity_type",
         'weight' => 1,
-      ) + $item;
+      );
 
       // Delete translation callback.
       $items["$path/translations/delete/%language"] = array(
         'title' => 'Delete',
-        'page callback' => 'drupal_get_form',
-        'page arguments' => array('content_translation_delete_confirm', $entity_position, $language_position),
-        'access callback' => 'content_translation_delete_access',
-        'access arguments' => $args,
+        'route_name' => "content_translation.delete_$entity_type",
       ) + $item;
     }
   }
-
-  $items['admin/config/regional/content_translation/translatable/%/%'] = array(
-    'title' => 'Confirm change in translatability.',
-    'description' => 'Confirm page for changing field translatability.',
-    'route_name' => 'content_translation_translatable',
-  );
 
   return $items;
 }
 
 /**
  * Implements hook_menu_alter().
+ *
+ * @todo Split this into route definition and menu link definition. See
+ *   https://drupal.org/node/1987882 and https://drupal.org/node/2047633.
  */
 function content_translation_menu_alter(array &$items) {
+  // Clarify where translation settings are located.
+  $items['admin/config/regional/content-language']['title'] = 'Content language and translation';
+  $items['admin/config/regional/content-language']['description'] = 'Configure language and translation support for content.';
+
   // Check that the declared menu base paths are actually valid.
   foreach (entity_get_info() as $entity_type => $info) {
     if (content_translation_enabled($entity_type)) {
-      $path = $info['menu_base_path'];
+      $path = _content_translation_link_to_router_path($entity_type, $info['links']['canonical']);
 
       // If the base path is not defined we cannot provide the translation UI
       // for this entity type. In some cases the actual base path might not have
@@ -233,8 +239,7 @@ function content_translation_menu_alter(array &$items) {
         watchdog('content translation', 'The entities of type @entity_type do not define a valid base path: it will not be possible to translate them.', $t_args, WATCHDOG_WARNING);
       }
       else {
-        $entity_position = count(explode('/', $path)) - 1;
-        $edit_path = $info['menu_edit_path'];
+        $edit_path = $path . '/edit';
 
         if (isset($items[$edit_path])) {
           // If the edit path is a default local task we need to find the parent
@@ -246,7 +251,7 @@ function content_translation_menu_alter(array &$items) {
           }
           while (!empty($entity_form_item['type']) && $entity_form_item['type'] == MENU_DEFAULT_LOCAL_TASK);
 
-          // Make the "Translate" tab follow the "Edit" one when possibile.
+          // Make the "Translate" tab follow the "Edit" one when possible.
           if (isset($entity_form_item['weight'])) {
             $items["$path/translations"]['weight'] = $entity_form_item['weight'] + 0.01;
           }
@@ -254,6 +259,33 @@ function content_translation_menu_alter(array &$items) {
       }
     }
   }
+}
+
+/**
+ * Implements hook_local_tasks_alter().
+ */
+function content_translation_local_tasks_alter(&$local_tasks) {
+  // Alters in tab_root_id onto the content translation local task.
+  $derivative = ContentTranslationLocalTasks::create(\Drupal::getContainer(), 'content_translation.local_tasks');
+  $derivative->alterLocalTasks($local_tasks);
+}
+
+/**
+ * Convert an entity canonical link to a router path.
+ *
+ * @param string $link
+ *   The entity link to be converted.
+ *
+ * @return string
+ *   The resulting router path. For instance "/node/{node}" is turned into
+ *   "node/%node".
+ *
+ * @todo Remove this and use the actual link values when all the Content
+ *   Translation code is adapted to the new routing system.
+ */
+function _content_translation_link_to_router_path($entity_type, $link) {
+  $path = preg_replace('|{([^}]+)}|', '%$1', trim($link, '/'));
+  return str_replace('%id', '%' . $entity_type, $path);
 }
 
 /**
@@ -276,8 +308,7 @@ function _content_translation_menu_strip_loaders($path) {
  *   The entity whose translation overview should be displayed.
  */
 function content_translation_translate_access(EntityInterface $entity) {
-  $entity_type = $entity->entityType();
-  return empty($entity->getUntranslated()->language()->locked) && language_multilingual() && $entity->isTranslatable() &&
+  return $entity instanceof ContentEntityInterface && empty($entity->getUntranslated()->language()->locked) && language_multilingual() && $entity->isTranslatable() &&
     (user_access('create content translations') || user_access('update content translations') || user_access('delete content translations'));
 }
 
@@ -294,7 +325,12 @@ function content_translation_translate_access(EntityInterface $entity) {
  */
 function content_translation_view_access(EntityInterface $entity, $langcode, AccountInterface $account = NULL) {
   $entity_type = $entity->entityType();
-  return !empty($entity->translation[$langcode]['status']) || user_access('translate any entity', $account) || user_access("translate $entity_type entities", $account);
+  $info = $entity->entityInfo();
+  $permission = "translate $entity_type";
+  if (!empty($info['permission_granularity']) && $info['permission_granularity'] == 'bundle') {
+    $permission = "translate {$entity->bundle()} $entity_type";
+  }
+  return !empty($entity->translation[$langcode]['status']) || user_access('translate any entity', $account) || user_access($permission, $account);
 }
 
 /**
@@ -356,7 +392,7 @@ function content_translation_library_info() {
   $path = drupal_get_path('module', 'content_translation');
   $libraries['drupal.content_translation.admin'] = array(
     'title' => 'Content translation UI',
-    'version' => VERSION,
+    'version' => \Drupal::VERSION,
     'js' => array(
       $path . '/content_translation.admin.js' => array(),
     ),
@@ -413,7 +449,7 @@ function content_translation_get_config_key($entity_type, $bundle, $setting) {
  */
 function content_translation_get_config($entity_type, $bundle, $setting) {
   $key = content_translation_get_config_key($entity_type, $bundle, $setting);
-  return Drupal::config('content_translation.settings')->get($key);
+  return \Drupal::config('content_translation.settings')->get($key);
 }
 
 /**
@@ -430,7 +466,7 @@ function content_translation_get_config($entity_type, $bundle, $setting) {
  */
 function content_translation_set_config($entity_type, $bundle, $setting, $value) {
   $key = content_translation_get_config_key($entity_type, $bundle, $setting);
-  return Drupal::config('content_translation.settings')->set($key, $value)->save();
+  return \Drupal::config('content_translation.settings')->set($key, $value)->save();
 }
 
 /**
@@ -445,12 +481,13 @@ function content_translation_set_config($entity_type, $bundle, $setting, $value)
  * @returns
  *   TRUE if the specified bundle is translatable. If no bundle is provided
  *   returns TRUE if at least one of the entity bundles is translatable.
+ *
+ * @todo Move to \Drupal\content_translation\ContentTranslationManager.
  */
 function content_translation_enabled($entity_type, $bundle = NULL) {
   $enabled = FALSE;
-  $info = entity_get_info($entity_type);
 
-  if (!empty($info['translatable'])) {
+  if (\Drupal::service('content_translation.manager')->isSupported($entity_type)) {
     $bundles = !empty($bundle) ? array($bundle) : array_keys(entity_get_bundles($entity_type));
     foreach ($bundles as $bundle) {
       if (content_translation_get_config($entity_type, $bundle, 'enabled')) {
@@ -464,34 +501,6 @@ function content_translation_enabled($entity_type, $bundle = NULL) {
 }
 
 /**
- * Returns all the translatable entity types.
- *
- * @return array
- *   An array of entity types keyed by entity type.
- */
-function content_translation_types_translatable() {
-  $entity_types = &drupal_static(__FUNCTION__, array());
-
-  foreach (entity_get_info() as $entity_type => $info) {
-    if (content_translation_enabled($entity_type)) {
-      // Lazy load router items.
-      if (!isset($items)) {
-        $items = menu_get_router();
-      }
-      // Check whether the required paths are defined. We need to strip out the
-      // menu loader and replace it with a plain "%" as router items have no
-      // menu loader in them.
-      $path = _content_translation_menu_strip_loaders($info['menu_base_path']);
-      if (!empty($items[$path]) && !empty($items[$path . '/translations'])) {
-        $entity_types[$entity_type] = $entity_type;
-      }
-    }
-  }
-
-  return $entity_types;
-}
-
-/**
  * Content translation controller factory.
  *
  * @param string $entity_type
@@ -499,6 +508,8 @@ function content_translation_types_translatable() {
  *
  * @return \Drupal\content_translation\ContentTranslationControllerInterface
  *   An instance of the content translation controller interface.
+ *
+ * @todo Move to \Drupal\content_translation\ContentTranslationManager.
  */
 function content_translation_controller($entity_type) {
   $entity_info = entity_get_info($entity_type);
@@ -515,6 +526,8 @@ function content_translation_controller($entity_type) {
  * @return \Drupal\Core\Entity\EntityFormControllerInterface;
  *   An instance of the content translation form interface or FALSE if not an
  *   entity form.
+ *
+ * @todo Move to \Drupal\content_translation\ContentTranslationManager.
  */
 function content_translation_form_controller(array $form_state) {
   return isset($form_state['controller']) && $form_state['controller'] instanceof EntityFormControllerInterface ? $form_state['controller'] : FALSE;
@@ -534,6 +547,8 @@ function content_translation_form_controller(array $form_state) {
  *
  * @return
  *   TRUE if the current user is allowed to view the translation.
+ *
+ * @todo Move to \Drupal\content_translation\ContentTranslationManager.
  */
 function content_translation_access(EntityInterface $entity, $op) {
   return content_translation_controller($entity->entityType())->getTranslationAccess($entity, $op) ;
@@ -598,7 +613,10 @@ function content_translation_permission() {
  * Implements hook_form_alter().
  */
 function content_translation_form_alter(array &$form, array &$form_state) {
-  if (($form_controller = content_translation_form_controller($form_state)) && ($entity = $form_controller->getEntity()) && !$entity->isNew() && $entity->isTranslatable()) {
+  $form_controller = content_translation_form_controller($form_state);
+  $entity = $form_controller ? $form_controller->getEntity() : NULL;
+
+  if ($entity instanceof ContentEntityInterface && $entity->isTranslatable() && count($entity->getTranslationLanguages()) > 1) {
     $controller = content_translation_controller($entity->entityType());
     $controller->entityFormAlter($form, $form_state, $entity);
 
@@ -610,19 +628,9 @@ function content_translation_form_alter(array &$form, array &$form_state) {
     // Handle fields shared between translations when there is at least one
     // translation available or a new one is being created.
     if (!$entity->isNew() && (!isset($translations[$form_langcode]) || count($translations) > 1)) {
-      $entity = $entity->getNGEntity();
-      if ($entity instanceof EntityNG) {
-        foreach ($entity->getPropertyDefinitions() as $property_name => $definition) {
-          if (isset($form[$property_name])) {
-            $form[$property_name]['#multilingual'] = !empty($definition['translatable']);
-          }
-        }
-      }
-      else {
-        foreach (field_info_instances($entity->entityType(), $entity->bundle()) as $instance) {
-          $field_name = $instance['field_name'];
-          $field = $instance->getField();
-          $form[$field_name]['#multilingual'] = !empty($field['translatable']);
+      foreach ($entity->getPropertyDefinitions() as $property_name => $definition) {
+        if (isset($form[$property_name])) {
+          $form[$property_name]['#multilingual'] = $definition->isTranslatable();
         }
       }
     }
@@ -631,39 +639,16 @@ function content_translation_form_alter(array &$form, array &$form_state) {
 }
 
 /**
- * Implements hook_field_language_alter().
+ * Implements hook_language_fallback_candidates_OPERATION_alter().
  *
  * Performs language fallback for unaccessible translations.
  */
-function content_translation_field_language_alter(&$display_language, $context) {
-  $entity = $context['entity'];
-  $entity_type = $entity->entityType();
-
-  if (isset($entity->translation[$context['langcode']]) && $entity->isTranslatable() && !content_translation_view_access($entity, $context['langcode'])) {
-    $instances = field_info_instances($entity_type, $entity->bundle());
-    // Avoid altering the real entity.
-    $entity = clone($entity);
-    $entity_langcode = $entity->getUntranslated()->language()->id;
-
-    foreach ($entity->translation as $langcode => $translation) {
-      if ($langcode == $context['langcode'] || !content_translation_view_access($entity, $langcode)) {
-        // Unset unaccessible field translations: if the field is untranslatable
-        // unsetting a language different from Language::LANGCODE_NOT_SPECIFIED has no
-        // effect.
-        foreach ($instances as $instance) {
-          // @todo BC entities have the same value accessibile both with the
-          //   entity language and with Language::LANGCODE_DEFAULT. We need need to unset
-          //   both until we remove the BC layer.
-          if ($langcode == $entity_langcode) {
-            unset($entity->{$instance['field_name']}[Language::LANGCODE_DEFAULT]);
-          }
-          unset($entity->{$instance['field_name']}[$langcode]);
-        }
-      }
+function content_translation_language_fallback_candidates_entity_view_alter(&$candidates, $context) {
+  $entity = $context['data'];
+  foreach ($entity->getTranslationLanguages() as $langcode => $language) {
+    if (!content_translation_view_access($entity, $langcode)) {
+      unset($candidates[$langcode]);
     }
-
-    // Find the new fallback values.
-    field_language_fallback($display_language, $entity, $context['langcode']);
   }
 }
 
@@ -675,7 +660,7 @@ function content_translation_entity_load(array $entities, $entity_type) {
 
   if (content_translation_enabled($entity_type)) {
     foreach ($entities as $entity) {
-      if ($entity->isTranslatable()) {
+      if ($entity instanceof ContentEntityInterface && $entity->isTranslatable()) {
         $enabled_entities[$entity->id()] = $entity;
       }
     }
@@ -718,7 +703,7 @@ function content_translation_load_translation_metadata(array $entities, $entity_
  */
 function content_translation_entity_insert(EntityInterface $entity) {
   // Only do something if translation support for the given entity is enabled.
-  if (!$entity->isTranslatable()) {
+  if (!($entity instanceof ContentEntityInterface) || !$entity->isTranslatable()) {
     return;
   }
 
@@ -758,7 +743,7 @@ function content_translation_entity_insert(EntityInterface $entity) {
  */
 function content_translation_entity_delete(EntityInterface $entity) {
   // Only do something if translation support for the given entity is enabled.
-  if (!$entity->isTranslatable()) {
+  if (!($entity instanceof ContentEntityInterface) || !$entity->isTranslatable()) {
     return;
   }
 
@@ -773,7 +758,7 @@ function content_translation_entity_delete(EntityInterface $entity) {
  */
 function content_translation_entity_update(EntityInterface $entity) {
   // Only do something if translation support for the given entity is enabled.
-  if (!$entity->isTranslatable()) {
+  if (!($entity instanceof ContentEntityInterface) || !$entity->isTranslatable()) {
     return;
   }
 
@@ -807,45 +792,39 @@ function content_translation_field_extra_fields() {
  * Implements hook_form_FORM_ID_alter() for 'field_ui_field_edit_form'.
  */
 function content_translation_form_field_ui_field_edit_form_alter(array &$form, array &$form_state, $form_id) {
-  $field = $form['#field'];
-  $entity_type = $field['entity_type'];
-  $field_name = $field['field_name'];
-  $translatable = $field['translatable'];
-  $label = t('Field translation');
+  $form['field']['translatable'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Users may translate this field.'),
+    '#default_value' => $form['#field']->isTranslatable(),
+    '#weight' => 20,
+  );
+  $form['#submit'][] = 'content_translation_form_field_ui_field_edit_form_submit';
+}
 
-  if ($field->hasData()) {
-    $form['field']['translatable'] = array(
-      '#type' => 'item',
-      '#title' => $label,
-      '#attributes' => array('class' => 'translatable'),
-      'link' => array(
-        '#type' => 'link',
-        '#prefix' => t('This field has data in existing content.') . ' ',
-        '#title' => !$translatable ? t('Enable translation') : t('Disable translation'),
-        '#href' => "admin/config/regional/content_translation/translatable/$entity_type/$field_name",
-        '#options' => array('query' => drupal_get_destination()),
-        '#access' => user_access('administer content translation'),
-      ),
-    );
+/**
+ * Form submission handler for 'field_ui_field_edit_form'.
+ */
+function content_translation_form_field_ui_field_edit_form_submit($form, array &$form_state) {
+  $instance = $form_state['instance'];
+  $value = content_translation_get_config($instance->entity_type, $instance->bundle, 'fields');
+  if (!isset($value)) {
+    $value = array();
   }
-  else {
-    $form['field']['translatable'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Users may translate this field.'),
-      '#default_value' => $translatable,
-    );
+  $value[$instance->getField()->getName()] = $form_state['values']['field']['translatable'];
+  // Store the same value for all bundles as translatability is tracked per
+  // field.
+  foreach (entity_get_bundles($instance->entity_type) as $bundle => $info) {
+    content_translation_set_config($instance->entity_type, $bundle, 'fields', $value);
   }
-
-  $form['field']['translatable']['#weight'] = 20;
 }
 
 /**
  * Implements hook_form_FORM_ID_alter() for 'field_ui_field_instance_edit_form'.
  */
 function content_translation_form_field_ui_field_instance_edit_form_alter(array &$form, array &$form_state, $form_id) {
-  if ($form['#field']['translatable']) {
+  if ($form['#field']->isTranslatable()) {
     module_load_include('inc', 'content_translation', 'content_translation.admin');
-    $element = content_translation_field_sync_widget($form['#field'], $form['#instance']);
+    $element = content_translation_field_sync_widget($form['#field']);
     if ($element) {
       $form['instance']['settings']['translation_sync'] = $element;
     }
@@ -856,7 +835,7 @@ function content_translation_form_field_ui_field_instance_edit_form_alter(array 
  * Implements hook_field_info_alter().
  */
 function content_translation_field_info_alter(&$info) {
-  foreach ($info as $field_type => &$field_type_info) {
+  foreach ($info as &$field_type_info) {
     // By default no column has to be synchronized.
     $field_type_info['settings'] += array('translation_sync' => FALSE);
     // Synchronization can be enabled per instance.
@@ -868,11 +847,11 @@ function content_translation_field_info_alter(&$info) {
  * Implements hook_entity_presave().
  */
 function content_translation_entity_presave(EntityInterface $entity) {
-  if ($entity->isTranslatable()) {
+  if ($entity instanceof ContentEntityInterface && $entity->isTranslatable()) {
     // @todo Avoid using request attributes once translation metadata become
     //   regular fields.
-    $attributes = Drupal::request()->attributes;
-    Drupal::service('content_translation.synchronizer')->synchronizeFields($entity, $entity->language()->id, $attributes->get('source_langcode'));
+    $attributes = \Drupal::request()->attributes;
+    \Drupal::service('content_translation.synchronizer')->synchronizeFields($entity, $entity->language()->id, $attributes->get('source_langcode'));
   }
 }
 
@@ -959,7 +938,7 @@ function content_translation_language_configuration_element_validate($element, a
     // @todo Set the correct form element name as soon as the element parents
     //   are correctly set. We should be using NestedArray::getValue() but for
     //   now we cannot.
-    form_set_error('', t('"Show language selector" is not compatible with translating content that has default language: %choice. Either do not hide the language selector or pick a specific language.', array('%choice' => $locked_languages[$values['langcode']])));
+    form_set_error('', $form_state, t('"Show language selector" is not compatible with translating content that has default language: %choice. Either do not hide the language selector or pick a specific language.', array('%choice' => $locked_languages[$values['langcode']])));
   }
 }
 
@@ -1020,18 +999,22 @@ function content_translation_save_settings($settings) {
         // Store whether a bundle has translation enabled or not.
         content_translation_set_config($entity_type, $bundle, 'enabled', $bundle_settings['translatable']);
 
+        // Store whether fields are translatable or not.
+        if (!empty($bundle_settings['fields'])) {
+          content_translation_set_config($entity_type, $bundle, 'fields', $bundle_settings['fields']);
+        }
+
         // Store whether fields have translation enabled or not.
         if (!empty($bundle_settings['columns'])) {
           foreach ($bundle_settings['columns'] as $field_name => $column_settings) {
-            $field = field_info_field($entity_type, $field_name);
             $instance = field_info_instance($entity_type, $field_name, $bundle);
-            if ($field['translatable']) {
-              $instance['settings']['translation_sync'] = $column_settings;
+            if ($instance->isTranslatable()) {
+              $instance->settings['translation_sync'] = $column_settings;
             }
             // If the field does not have translatable enabled we need to reset
             // the sync settings to their defaults.
             else {
-              unset($instance['settings']['translation_sync']);
+              unset($instance->settings['translation_sync']);
             }
             $instance->save();
           }

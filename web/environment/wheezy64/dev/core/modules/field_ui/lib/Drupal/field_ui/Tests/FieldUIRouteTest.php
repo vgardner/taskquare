@@ -51,7 +51,11 @@ class FieldUIRouteTest extends WebTestBase {
     //$this->assertText('No fields are present yet.');
 
     $this->drupalGet('admin/structure/types/manage/article/fields');
-    $this->assertTitle('Article | Drupal');
+    $this->assertTitle('Manage fields | Drupal');
+
+    $this->drupalGet('admin/structure/types/manage/article');
+    $this->assertLink('Manage display');
+    $this->assertLink('Manage form display');
   }
 
 }

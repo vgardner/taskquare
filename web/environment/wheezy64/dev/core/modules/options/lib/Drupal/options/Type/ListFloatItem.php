@@ -7,7 +7,8 @@
 
 namespace Drupal\options\Type;
 
-use Drupal\field\Plugin\field\field_type\LegacyConfigFieldItem;
+use Drupal\Core\Field\Plugin\Field\FieldType\LegacyConfigFieldItem;
+use Drupal\Core\TypedData\DataDefinition;
 
 /**
  * Defines the 'list_float' entity field item.
@@ -29,10 +30,8 @@ class ListFloatItem extends LegacyConfigFieldItem {
   public function getPropertyDefinitions() {
 
     if (!isset(static::$propertyDefinitions)) {
-      static::$propertyDefinitions['value'] = array(
-        'type' => 'float',
-        'label' => t('Float value'),
-      );
+      static::$propertyDefinitions['value'] = DataDefinition::create('float')
+        ->setLabel(t('Float value'));
     }
     return static::$propertyDefinitions;
   }

@@ -29,16 +29,6 @@ use Drupal\Core\Session\UserSession;
  */
 
 /**
- * The current system version.
- */
-const VERSION = '8.0-dev';
-
-/**
- * Core API compatibility.
- */
-const DRUPAL_CORE_COMPATIBILITY = '8.x';
-
-/**
  * Minimum supported version of PHP.
  */
 const DRUPAL_MINIMUM_PHP = '5.3.10';
@@ -461,31 +451,34 @@ function config_get_config_directory($type = CONFIG_ACTIVE_DIRECTORY) {
  * return the expected values.
  *
  * Most other parameters do not need to be passed in, but may be necessary in
- * some cases; for example, if Drupal::request()->getClientIP()
+ * some cases; for example, if \Drupal::request()->getClientIP()
  * needs to return anything but the standard localhost value ('127.0.0.1'),
  * the command line script should pass in the desired value via the
  * 'REMOTE_ADDR' key.
  *
  * @param $variables
- *   (optional) An associative array of variables within $_SERVER that should
- *   be replaced. If the special element 'url' is provided in this array, it
- *   will be used to populate some of the server defaults; it should be set to
- *   the URL of the current page request, excluding any $_GET request but
- *   including the script name (e.g., http://www.example.com/mysite/index.php).
+ *   (optional) An associative array of variables within
+ *   \Drupal::request()->server that should be replaced. If the special element
+ *   'url' is provided in this array, it will be used to populate some of the
+ *   server defaults; it should be set to the URL of the current page request,
+ *   excluding any GET request but including the script name
+ *   (e.g., http://www.example.com/mysite/index.php).
  *
  * @see conf_path()
  * @see request_uri()
  * @see \Symfony\Component\HttpFoundation\Request::getClientIP()
  */
 function drupal_override_server_variables($variables = array()) {
+  $request = \Drupal::request();
+  $server_vars = $request->server->all();
   // Allow the provided URL to override any existing values in $_SERVER.
   if (isset($variables['url'])) {
     $url = parse_url($variables['url']);
     if (isset($url['host'])) {
-      $_SERVER['HTTP_HOST'] = $url['host'];
+      $server_vars['HTTP_HOST'] = $url['host'];
     }
     if (isset($url['path'])) {
-      $_SERVER['SCRIPT_NAME'] = $url['path'];
+      $server_vars['SCRIPT_NAME'] = $url['path'];
     }
     unset($variables['url']);
   }
@@ -502,7 +495,10 @@ function drupal_override_server_variables($variables = array()) {
     'HTTP_USER_AGENT' => NULL,
   );
   // Replace elements of the $_SERVER array, as appropriate.
-  $_SERVER = $variables + $_SERVER + $defaults;
+  $request->server->replace($variables + $server_vars + $defaults);
+
+  // @todo remove once conf_path() no longer uses $_SERVER.
+  $_SERVER = $request->server->all();
 }
 
 /**
@@ -744,7 +740,7 @@ function drupal_get_filename($type, $name, $filename = NULL) {
     $files[$type] = array();
   }
 
-  if (!empty($filename) && file_exists($filename)) {
+  if (!empty($filename)) {
     $files[$type][$name] = $filename;
   }
   elseif (isset($files[$type][$name])) {
@@ -754,17 +750,17 @@ function drupal_get_filename($type, $name, $filename = NULL) {
     // Verify that we have an keyvalue service before using it. This is required
     // because this function is called during installation.
     // @todo Inject database connection into KeyValueStore\DatabaseStorage.
-    if (($container = Drupal::getContainer()) && $container->has('keyvalue') && function_exists('db_query')) {
+    if (($container = \Drupal::getContainer()) && $container->has('keyvalue') && function_exists('db_query')) {
       if ($type == 'module') {
         if (empty($files[$type])) {
-          $files[$type] = Drupal::moduleHandler()->getModuleList();
+          $files[$type] = \Drupal::moduleHandler()->getModuleList();
         }
         if (isset($files[$type][$name])) {
           return $files[$type][$name];
         }
       }
       try {
-        $file_list = Drupal::state()->get('system.' . $type . '.files');
+        $file_list = \Drupal::state()->get('system.' . $type . '.files');
         if ($file_list && isset($file_list[$name]) && file_exists(DRUPAL_ROOT . '/' . $file_list[$name])) {
           $files[$type][$name] = $file_list[$name];
         }
@@ -849,7 +845,7 @@ function variable_initialize($conf = array()) {
   else {
     // Cache miss. Avoid a stampede.
     $name = 'variable_init';
-    $lock = Drupal::lock();
+    $lock = \Drupal::lock();
     if (!$lock->acquire($name, 1)) {
       // Another request is building the variable cache.
       // Wait, then re-run this function.
@@ -963,7 +959,7 @@ function variable_del($name) {
 function drupal_page_cache_get_cid(Request $request) {
   $cid_parts = array(
     $request->getUri(),
-    Drupal::service('content_negotiation')->getContentType($request),
+    \Drupal::service('content_negotiation')->getContentType($request),
   );
   return sha1(implode(':', $cid_parts));
 }
@@ -984,7 +980,7 @@ function drupal_page_cache_get_cid(Request $request) {
  */
 function drupal_page_get_cache(Request $request) {
   if (drupal_page_is_cacheable()) {
-    return Drupal::cache('page')->get(drupal_page_cache_get_cid($request));
+    return \Drupal::cache('page')->get(drupal_page_cache_get_cid($request));
   }
 }
 
@@ -1021,8 +1017,8 @@ function drupal_page_is_cacheable($allow_caching = NULL) {
  *   TRUE if the item is loaded or has already been loaded.
  */
 function drupal_load($type, $name) {
-  if ($type == 'module' && Drupal::moduleHandler()->moduleExists($name)) {
-    return Drupal::moduleHandler()->load($name);
+  if ($type == 'module' && \Drupal::moduleHandler()->moduleExists($name)) {
+    return \Drupal::moduleHandler()->load($name);
   }
 
   // Once a file is included this can't be reversed during a request so do not
@@ -1221,7 +1217,7 @@ function drupal_page_header() {
  * response is sent.
  */
 function drupal_serve_page_from_cache(stdClass $cache, Response $response, Request $request) {
-  $config = Drupal::config('system.performance');
+  $config = \Drupal::config('system.performance');
 
   // First half: we must determine if we should be returning a 304.
 
@@ -1364,7 +1360,7 @@ function drupal_serve_page_from_cache(stdClass $cache, Response $response, Reque
  * @ingroup sanitization
  */
 function t($string, array $args = array(), array $options = array()) {
-  return Drupal::translation()->translate($string, $args, $options);
+  return \Drupal::translation()->translate($string, $args, $options);
 }
 
 /**
@@ -1384,6 +1380,9 @@ function format_string($string, array $args = array()) {
  * @see \Drupal\Component\Utility\String::checkPlain()
  * @see drupal_validate_utf8()
  * @ingroup sanitization
+ *
+ * @deprecated as of Drupal 8.0. Use
+ *   Drupal\Component\Utility\String::checkPlain() directly instead.
  */
 function check_plain($text) {
   return String::checkPlain($text);
@@ -1477,7 +1476,9 @@ function watchdog_exception($type, Exception $exception, $message = NULL, $varia
 
    // Use a default value if $message is not set.
    if (empty($message)) {
-     // The exception message is run through check_plain() by _drupal_decode_exception().
+     // The exception message is run through
+     // \Drupal\Component\Utility\String::checkPlain() by
+     // _drupal_decode_exception().
      $message = '%type: !message in %function (line %line of %file).';
    }
    // $variables must be an array so that we can add the exception information.
@@ -1552,17 +1553,17 @@ function watchdog($type, $message, array $variables = NULL, $severity = WATCHDOG
     );
 
     try {
-      $request = Drupal::request();
+      $request = \Drupal::request();
       $log_entry['request_uri'] = $request->getUri();
       $log_entry['referer'] = $request->headers->get('Referer', '');
       $log_entry['ip'] = $request->getClientIP();
     }
-    catch (\InvalidArgumentException $e) {
+    catch (DependencyInjectionRuntimeException $e) {
       // We are not in a request context.
     }
 
     // Call the logging hooks to log/process the message
-    foreach (Drupal::moduleHandler()->getImplementations('watchdog') as $module) {
+    foreach (\Drupal::moduleHandler()->getImplementations('watchdog') as $module) {
       $function = $module . '_watchdog';
       $function($log_entry);
     }
@@ -1682,7 +1683,7 @@ function drupal_get_title() {
 
   // During a bootstrap, menu.inc is not included and thus we cannot provide a title.
   if (!isset($title) && function_exists('menu_get_active_title')) {
-    $title = check_plain(menu_get_active_title());
+    $title = String::checkPlain(menu_get_active_title());
   }
 
   return $title;
@@ -1699,7 +1700,8 @@ function drupal_get_title() {
  * @param $output
  *   Optional flag - normally should be left as Title::CHECK_PLAIN. Only set to
  *   PASS_THROUGH if you have already removed any possibly dangerous code
- *   from $title using a function like check_plain() or filter_xss(). With this
+ *   from $title using a function like
+ *   \Drupal\Component\Utility\String::checkPlain() or filter_xss(). With this
  *   flag the string will be passed through unchanged.
  *
  * @return
@@ -1709,7 +1711,7 @@ function drupal_set_title($title = NULL, $output = Title::CHECK_PLAIN) {
   $stored_title = &drupal_static(__FUNCTION__);
 
   if (isset($title)) {
-    $stored_title = ($output == PASS_THROUGH) ? $title : check_plain($title);
+    $stored_title = ($output == PASS_THROUGH) ? $title : String::checkPlain($title);
   }
 
   return $stored_title;
@@ -1722,9 +1724,18 @@ function drupal_set_title($title = NULL, $output = Title::CHECK_PLAIN) {
  *   The user session object.
  */
 function drupal_anonymous_user() {
+  try {
+    $request = \Drupal::request();
+    $hostname = $request->getClientIP();
+  }
+  catch (DependencyInjectionRuntimeException $e) {
+    // We are not in a request context.
+    $hostname = '';
+  }
+
   $values = array(
     'uid' => 0,
-    'hostname' => Drupal::request()->getClientIP(),
+    'hostname' => $hostname,
     'roles' => array(DRUPAL_ANONYMOUS_RID),
   );
   return new UserSession($values);
@@ -1865,10 +1876,13 @@ function drupal_handle_request($test_only = FALSE) {
   // @todo Remove this once everything in the bootstrap has been
   //   converted to services in the DIC.
   $kernel->boot();
-  drupal_bootstrap(DRUPAL_BOOTSTRAP_CODE);
 
   // Create a request object from the HttpFoundation.
   $request = Request::createFromGlobals();
+  \Drupal::getContainer()->set('request', $request);
+
+  drupal_bootstrap(DRUPAL_BOOTSTRAP_CODE);
+
   $response = $kernel->handle($request)->prepare($request)->send();
 
   $kernel->terminate($request, $response);
@@ -1879,7 +1893,7 @@ function drupal_handle_request($test_only = FALSE) {
  */
 function drupal_get_user_timezone() {
   global $user;
-  $config = Drupal::config('system.date');
+  $config = \Drupal::config('system.date');
 
   if ($user && $config->get('timezone.user.configurable') && $user->isAuthenticated() && $user->getTimezone()) {
     return $user->getTimezone();
@@ -1976,14 +1990,14 @@ function _drupal_bootstrap_configuration() {
   // Load the procedural configuration system helper functions.
   require_once __DIR__ . '/config.inc';
 
-  // Set the Drupal custom error handler. (requires Drupal::config())
+  // Set the Drupal custom error handler. (requires \Drupal::config())
   set_error_handler('_drupal_error_handler');
   set_exception_handler('_drupal_exception_handler');
 
   // Redirect the user to the installation script if Drupal has not been
   // installed yet (i.e., if no $databases array has been defined in the
   // settings.php file) and we are not already installing.
-  if (empty($GLOBALS['databases']) && !drupal_installation_attempted()) {
+  if (empty($GLOBALS['databases']) && !drupal_installation_attempted() && !drupal_is_cli()) {
     include_once __DIR__ . '/install.inc';
     install_goto('core/install.php');
   }
@@ -1995,9 +2009,11 @@ function _drupal_bootstrap_configuration() {
 function _drupal_bootstrap_kernel() {
   // Normally, index.php puts a container in the Drupal class by creating a
   // kernel. If there is no container yet, create one.
-  if (!Drupal::getContainer()) {
+  if (!\Drupal::getContainer()) {
     $kernel = new DrupalKernel('prod', drupal_classloader());
     $kernel->boot();
+    $request = Request::createFromGlobals();
+    \Drupal::getContainer()->set('request', $request);
   }
 }
 
@@ -2014,7 +2030,7 @@ function _drupal_bootstrap_page_cache() {
   }
   else {
     drupal_bootstrap(DRUPAL_BOOTSTRAP_VARIABLES, FALSE);
-    $config = Drupal::config('system.performance');
+    $config = \Drupal::config('system.performance');
     $cache_enabled = $config->get('cache.page.use_internal');
   }
 
@@ -2122,19 +2138,19 @@ function drupal_get_bootstrap_phase() {
  *   object instances or FALSE if none exist yet.
  */
 function drupal_container() {
-  return Drupal::getContainer();
+  return \Drupal::getContainer();
 }
 
 /**
  * Returns the list of enabled modules.
  *
  * @deprecated as of Drupal 8.0. Use
- *   Drupal::moduleHandler()->getModuleList().
+ *   \Drupal::moduleHandler()->getModuleList().
  *
  * @see \Drupal\Core\Extension\ModuleHandler::getModuleList()
  */
 function module_list() {
-  $modules = array_keys(Drupal::moduleHandler()->getModuleList());
+  $modules = array_keys(\Drupal::moduleHandler()->getModuleList());
   return array_combine($modules, $modules);
 }
 
@@ -2142,12 +2158,12 @@ function module_list() {
  * Determines which modules are implementing a hook.
  *
  * @deprecated as of Drupal 8.0. Use
- *   Drupal::moduleHandler()->getImplementations($hook).
+ *   \Drupal::moduleHandler()->getImplementations($hook).
  *
  * @see \Drupal\Core\Extension\ModuleHandler::getImplementations()
  */
 function module_implements($hook) {
-  return Drupal::moduleHandler()->getImplementations($hook);
+  return \Drupal::moduleHandler()->getImplementations($hook);
 }
 
 /**
@@ -2157,7 +2173,7 @@ function module_implements($hook) {
  * arguments by reference.
  *
  * @deprecated as of Drupal 8.0. Use
- *   Drupal::moduleHandler()->invoke($module, $hook, $args = array()).
+ *   \Drupal::moduleHandler()->invoke($module, $hook, $args = array()).
  *
  * @see drupal_alter()
  * @see \Drupal\Core\Extension\ModuleHandler::invoke()
@@ -2166,7 +2182,7 @@ function module_invoke($module, $hook) {
   $args = func_get_args();
   // Remove $module and $hook from the arguments.
   unset($args[0], $args[1]);
-  return Drupal::moduleHandler()->invoke($module, $hook, $args);
+  return \Drupal::moduleHandler()->invoke($module, $hook, $args);
 }
 
 /**
@@ -2176,7 +2192,7 @@ function module_invoke($module, $hook) {
  * arguments by reference.
  *
  * @deprecated as of Drupal 8.0. Use
- *   Drupal::moduleHandler()->invokeAll($hook).
+ *   \Drupal::moduleHandler()->invokeAll($hook).
  *
  * @see drupal_alter()
  * @see \Drupal\Core\Extension\ModuleHandler::invokeAll()
@@ -2185,43 +2201,43 @@ function module_invoke_all($hook) {
   $args = func_get_args();
   // Remove $hook from the arguments.
   array_shift($args);
-  return Drupal::moduleHandler()->invokeAll($hook, $args);
+  return \Drupal::moduleHandler()->invokeAll($hook, $args);
 }
 
 /**
  * Passes alterable variables to specific hook_TYPE_alter() implementations.
  *
  * @deprecated as of Drupal 8.0. Use
- *   Drupal::moduleHandler()->alter($hook).
+ *   \Drupal::moduleHandler()->alter($hook).
  *
  * @see \Drupal\Core\Extension\ModuleHandler::alter()
  */
 function drupal_alter($type, &$data, &$context1 = NULL, &$context2 = NULL) {
-  return Drupal::moduleHandler()->alter($type, $data, $context1, $context2);
+  return \Drupal::moduleHandler()->alter($type, $data, $context1, $context2);
 }
 
 /**
  * Determines whether a given module exists.
  *
  * @deprecated as of Drupal 8.0. Use
- *   Drupal::moduleHandler()->moduleExists($module).
+ *   \Drupal::moduleHandler()->moduleExists($module).
  *
  * @see \Drupal\Core\Extension\ModuleHandler::moduleExists()
  */
 function module_exists($module) {
-  return Drupal::moduleHandler()->moduleExists($module);
+  return \Drupal::moduleHandler()->moduleExists($module);
 }
 
 /**
  * Determines whether a module implements a hook.
  *
  * @deprecated as of Drupal 8.0. Use
- *   Drupal::moduleHandler()->implementsHook($module, $hook).
+ *   \Drupal::moduleHandler()->implementsHook($module, $hook).
  *
  * @see \Drupal\Core\Extension\ModuleHandler::implementsHook()
  */
 function module_hook($module, $hook) {
-  return Drupal::moduleHandler()->implementsHook($module, $hook);
+  return \Drupal::moduleHandler()->implementsHook($module, $hook);
 }
 
 /**
@@ -2254,7 +2270,7 @@ function drupal_valid_test_ua($new_prefix = NULL) {
     // The file properties add more entropy not easily accessible to others.
     $key = drupal_get_hash_salt() . filectime(__FILE__) . fileinode(__FILE__);
     $time_diff = REQUEST_TIME - $time;
-    // We cant use Crypt::hmacBase64() yet because this can be called in very
+    // We can't use Crypt::hmacBase64() yet because this can be called in very
     // early bootstrap when autoloader has not been initialized yet.
     $test_hmac = base64_encode(hash_hmac('sha256', $check_string, $key, TRUE));
     $test_hmac = strtr($test_hmac, array('+' => '-', '/' => '_', '=' => ''));
@@ -2287,7 +2303,7 @@ function _drupal_load_test_overrides($test_prefix) {
   global $conf, $config_directories;
 
   // Do not use the parent site's config directories. Use only the child site's.
-  // @see Drupal\simpletest\TestBase::prepareConfigDirectories()
+  // @see \Drupal\simpletest\TestBase::prepareConfigDirectories()
   $path_prefix = 'simpletest/' . substr($test_prefix, 10);
   $config_directories = array();
   foreach (array(CONFIG_ACTIVE_DIRECTORY, CONFIG_STAGING_DIRECTORY) as $type) {
@@ -2355,24 +2371,24 @@ function drupal_installation_attempted() {
  * Initializes all the defined language types and sets the default langcode.
  */
 function drupal_language_initialize() {
-  $language_manager = Drupal::languageManager();
+  $language_manager = \Drupal::languageManager();
   $language_manager->init();
-  Drupal::translation()->setDefaultLangcode($language_manager->getLanguage(Language::TYPE_INTERFACE)->id);
+  \Drupal::translation()->setDefaultLangcode($language_manager->getLanguage(Language::TYPE_INTERFACE)->id);
 }
 
 /**
  * Returns the language object for a given language type.
  *
- * @see Drupal\Core\Language\LanguageManager
+ * @see \Drupal\Core\Language\LanguageManager
  *
  * @param string $type
  *   The type of language object needed, e.g. Language::TYPE_INTERFACE.
  *
  * @deprecated as of Drupal 8.0. Use
- *   Drupal::languageManager()->getLanguage($type).
+ *   \Drupal::languageManager()->getLanguage($type).
  */
 function language($type) {
-  return Drupal::languageManager()->getLanguage($type);
+  return \Drupal::languageManager()->getLanguage($type);
 }
 
 /**
@@ -2383,7 +2399,7 @@ function language($type) {
  *   name and its value is its configurability (TRUE/FALSE).
  */
 function language_types_get_all() {
-  $types = Drupal::config('system.language.types')->get('all');
+  $types = \Drupal::config('system.language.types')->get('all');
   return $types ? $types : array_keys(language_types_get_default());
 }
 
@@ -2409,7 +2425,7 @@ function language_types_get_default() {
  *   TRUE if more than one language is enabled.
  */
 function language_multilingual() {
-  return Drupal::languageManager()->isMultilingual();
+  return \Drupal::languageManager()->isMultilingual();
 }
 
 /**
@@ -2435,7 +2451,7 @@ function language_list($flags = Language::STATE_CONFIGURABLE) {
 
     // Fill in master language list based on current configuration.
     $default = language_default();
-    if (language_multilingual() || module_exists('language')) {
+    if (language_multilingual() || \Drupal::moduleHandler()->moduleExists('language')) {
       // Use language module configuration if available.
       $language_entities = config_get_storage_names_with_prefix('language.entity');
 
@@ -2443,7 +2459,7 @@ function language_list($flags = Language::STATE_CONFIGURABLE) {
       // save the same object without data loss.
       foreach ($language_entities as $langcode_config_name) {
         $langcode = substr($langcode_config_name, strlen('language.entity.'));
-        $info = Drupal::config($langcode_config_name)->get();
+        $info = \Drupal::config($langcode_config_name)->get();
         $languages[$langcode] = new Language(array(
           'default' => ($info['id'] == $default->id),
           'name' => $info['label'],
@@ -2571,7 +2587,7 @@ function language_is_locked($langcode) {
 /**
  * Returns the default language used on the site.
  *
- * @return Drupal\Core\Language\Language
+ * @return \Drupal\Core\Language\Language
  *   A language object.
  */
 function language_default() {
@@ -3093,13 +3109,13 @@ function drupal_check_memory_limit($required, $memory_limit = NULL) {
 /**
  * Get locking layer instance.
  *
- * @deprecated Use Drupal::lock() instead, or even better have the lock service
+ * @deprecated Use \Drupal::lock() instead, or even better have the lock service
  *   injected into your object.
  *
- * @return Drupal\Core\Lock\LockBackendInterface
+ * @return \Drupal\Core\Lock\LockBackendInterface
  */
 function lock() {
-  return Drupal::lock();
+  return \Drupal::lock();
 }
 
 /**

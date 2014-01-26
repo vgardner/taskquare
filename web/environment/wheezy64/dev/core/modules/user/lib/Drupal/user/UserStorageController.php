@@ -7,14 +7,14 @@
 
 namespace Drupal\user;
 
-use Drupal\Core\Entity\EntityBCDecorator;
+use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Password\PasswordInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\field\FieldInfo;
 use Drupal\user\UserDataInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Drupal\Core\Entity\DatabaseStorageControllerNG;
+use Drupal\Core\Entity\FieldableDatabaseStorageController;
 
 /**
  * Controller class for users.
@@ -22,7 +22,7 @@ use Drupal\Core\Entity\DatabaseStorageControllerNG;
  * This extends the Drupal\Core\Entity\DatabaseStorageController class, adding
  * required special handling for user objects.
  */
-class UserStorageController extends DatabaseStorageControllerNG implements UserStorageControllerInterface {
+class UserStorageController extends FieldableDatabaseStorageController implements UserStorageControllerInterface {
 
   /**
    * Provides the password hashing service object.
@@ -41,21 +41,23 @@ class UserStorageController extends DatabaseStorageControllerNG implements UserS
   /**
    * Constructs a new UserStorageController object.
    *
-   * @param string $entityType
-   *   The entity type for which the instance is created.
+   * @param string $entity_type
+   *  The entity type for which the instance is created.
    * @param array $entity_info
    *   An array of entity info for the entity type.
    * @param \Drupal\Core\Database\Connection $database
    *   The database connection to be used.
    * @param \Drupal\field\FieldInfo $field_info
    *   The field info service.
+   * @param \Drupal\Component\Uuid\UuidInterface $uuid_service
+   *   The UUID Service.
    * @param \Drupal\Core\Password\PasswordInterface $password
    *   The password hashing service.
    * @param \Drupal\user\UserDataInterface $user_data
    *   The user data service.
    */
-  public function __construct($entity_type, $entity_info, Connection $database, FieldInfo $field_info, PasswordInterface $password, UserDataInterface $user_data) {
-    parent::__construct($entity_type, $entity_info, $database, $field_info);
+  public function __construct($entity_type, $entity_info, Connection $database, FieldInfo $field_info, UuidInterface $uuid_service, PasswordInterface $password, UserDataInterface $user_data) {
+    parent::__construct($entity_type, $entity_info, $database, $field_info, $uuid_service);
 
     $this->password = $password;
     $this->userData = $user_data;
@@ -70,15 +72,16 @@ class UserStorageController extends DatabaseStorageControllerNG implements UserS
       $entity_info,
       $container->get('database'),
       $container->get('field.info'),
+      $container->get('uuid'),
       $container->get('password'),
       $container->get('user.data')
     );
   }
 
   /**
-   * Overrides Drupal\Core\Entity\DatabaseStorageController::attachLoad().
+   * {@inheritdoc}
    */
-  function attachLoad(&$queried_users, $load_revision = FALSE) {
+  function postLoad(array &$queried_users) {
     foreach ($queried_users as $key => $record) {
       $queried_users[$key]->roles = array();
       if ($record->uid) {
@@ -92,9 +95,9 @@ class UserStorageController extends DatabaseStorageControllerNG implements UserS
     // Add any additional roles from the database.
     $this->addRoles($queried_users);
 
-    // Call the default attachLoad() method. This will add fields and call
+    // Call the default postLoad() method. This will add fields and call
     // hook_user_load().
-    parent::attachLoad($queried_users, $load_revision);
+    parent::postLoad($queried_users);
   }
 
   /**

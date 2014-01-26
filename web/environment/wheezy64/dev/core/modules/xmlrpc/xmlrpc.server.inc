@@ -13,10 +13,12 @@ use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
  *
  * @return \Symfony\Component\HttpFoundation\Response
  *   A Response object.
+ *
+ * @deprecated Use \Drupal\xmlrpc\Controller\XmlrpcController::php()
  */
 function xmlrpc_server_page() {
   module_load_include('inc', 'xmlrpc');
-  return xmlrpc_server(Drupal::moduleHandler()->invokeAll('xmlrpc'));
+  return xmlrpc_server(\Drupal::moduleHandler()->invokeAll('xmlrpc'));
 }
 
 /**
@@ -213,7 +215,8 @@ function xmlrpc_server_call($xmlrpc_server, $methodname, $args) {
   // If the method has a signature, validate the request against the signature
   if (is_array($signature)) {
     $ok = TRUE;
-    $return_type = array_shift($signature);
+    // Remove first element of $signature which is the unused 'return type'.
+    array_shift($signature);
     // Check the number of arguments
     if (count($args) != count($signature)) {
       return xmlrpc_error(-32602, t('Server error. Wrong number of method parameters.'));

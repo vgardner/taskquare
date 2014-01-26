@@ -15,7 +15,7 @@ use Drupal\Core\Entity\EntityStorageControllerInterface;
 /**
  * Provides an interface defining a menu link entity.
  */
-interface MenuLinkInterface extends ContentEntityInterface {
+interface MenuLinkInterface extends EntityInterface {
 
   /**
    * Returns the Route object associated with this link, if any.
@@ -54,18 +54,6 @@ interface MenuLinkInterface extends ContentEntityInterface {
    *   A menu link entity.
    */
   public static function buildFromRouterItem(array $item);
-
-  /**
-   * Returns the route_name and route parameters matching a system path.
-   *
-   * @param string $link_path
-   *   The link path to find a route name for.
-   *
-   * @return array
-   *   Returns an array with both the route name and parameters, or an empty
-   *   array if no route was matched.
-   */
-  public static function findRouteNameParameters($link_path);
 
   /**
    * Sets the p1 through p9 properties for a menu link entity being saved.

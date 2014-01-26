@@ -9,6 +9,7 @@ namespace Drupal\comment\Plugin\entity_reference\selection;
 
 use Drupal\Core\Annotation\Translation;
 use Drupal\Core\Database\Query\SelectInterface;
+use Drupal\comment\CommentInterface;
 use Drupal\entity_reference\Annotation\EntityReferenceSelection;
 use Drupal\entity_reference\Plugin\entity_reference\selection\SelectionBase;
 
@@ -35,7 +36,7 @@ class CommentSelection extends SelectionBase {
     // core requires us to also know about the concept of 'published' and
     // 'unpublished'.
     if (!user_access('administer comments')) {
-      $query->condition('status', COMMENT_PUBLISHED);
+      $query->condition('status', CommentInterface::PUBLISHED);
     }
     return $query;
   }
@@ -50,7 +51,7 @@ class CommentSelection extends SelectionBase {
     // The Comment module doesn't implement any proper comment access,
     // and as a consequence doesn't make sure that comments cannot be viewed
     // when the user doesn't have access to the node.
-    $node_alias = $query->innerJoin('node_field_data', 'n', '%alias.nid = ' . $base_table . '.nid');
+    $node_alias = $query->innerJoin('node_field_data', 'n', '%alias.nid = ' . $base_table . '.entity_id AND ' . $base_table . ".entity_type = 'node'");
     // Pass the query to the node access control.
     $this->reAlterQuery($query, 'node_access', $node_alias);
 

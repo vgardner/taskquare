@@ -46,7 +46,7 @@ class ConfigImportForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'config_import_form';
   }
 
@@ -59,9 +59,10 @@ class ConfigImportForm extends FormBase {
     );
     $form['import_tarball'] = array(
       '#type' => 'file',
-      '#value' => $this->t('Select your configuration export file'),
+      '#title' => $this->t('Select your configuration export file'),
       '#description' => $this->t('This form will redirect you to the import configuration screen.'),
     );
+
     $form['submit'] = array(
       '#type' => 'submit',
       '#value' => $this->t('Upload'),
@@ -73,11 +74,12 @@ class ConfigImportForm extends FormBase {
    * {@inheritdoc}
    */
   public function validateForm(array &$form, array &$form_state) {
-    if (!empty($_FILES['files']['error']['import_tarball'])) {
-      form_set_error('import_tarball', $this->t('The import tarball could not be uploaded.'));
+    $file_upload = $this->getRequest()->files->get('files[import_tarball]', NULL, TRUE);
+    if ($file_upload && $file_upload->isValid()) {
+      $form_state['values']['import_tarball'] = $file_upload->getRealPath();
     }
     else {
-      $form_state['values']['import_tarball'] = $_FILES['files']['tmp_name']['import_tarball'];
+      $this->setFormError('import_tarball', $form_state, $this->t('The import tarball could not be uploaded.'));
     }
   }
 
@@ -95,10 +97,10 @@ class ConfigImportForm extends FormBase {
         }
         $archiver->extractList($files, config_get_config_directory(CONFIG_STAGING_DIRECTORY));
         drupal_set_message($this->t('Your configuration files were successfully uploaded, ready for import.'));
-        $form_state['redirect'] = 'admin/config/development/sync';
+        $form_state['redirect_route']['route_name'] = 'config.sync';
       }
       catch (\Exception $e) {
-        form_set_error('import_tarball', $this->t('Could not extract the contents of the tar file. The error message is <em>@message</em>', array('@message' => $e->getMessage())));
+        $this->setFormError('import_tarball', $form_state, $this->t('Could not extract the contents of the tar file. The error message is <em>@message</em>', array('@message' => $e->getMessage())));
       }
       drupal_unlink($path);
     }

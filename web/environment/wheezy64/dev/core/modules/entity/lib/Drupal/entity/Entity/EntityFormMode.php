@@ -32,10 +32,8 @@ use Drupal\entity\EntityFormModeInterface;
  * @EntityType(
  *   id = "form_mode",
  *   label = @Translation("Form mode"),
- *   module = "entity",
  *   controllers = {
  *     "list" = "Drupal\entity\EntityFormModeListController",
- *     "access" = "Drupal\entity\EntityDisplayModeAccessController",
  *     "form" = {
  *       "add" = "Drupal\entity\Form\EntityFormModeAddForm",
  *       "edit" = "Drupal\entity\Form\EntityDisplayModeEditForm",
@@ -43,27 +41,18 @@ use Drupal\entity\EntityFormModeInterface;
  *     },
  *     "storage" = "Drupal\entity\EntityDisplayModeStorageController"
  *   },
+ *   admin_permission = "administer display modes",
  *   config_prefix = "entity.form_mode",
  *   entity_keys = {
  *     "id" = "id",
  *     "label" = "label",
  *     "uuid" = "uuid"
+ *   },
+ *   links = {
+ *     "edit-form" = "entity.form_mode_edit"
  *   }
  * )
  */
 class EntityFormMode extends EntityDisplayModeBase implements EntityFormModeInterface {
-
-  /**
-   * {@inheritdoc}
-   */
-  public function uri() {
-    return array(
-      'path' => 'admin/structure/display-modes/form/manage/' . $this->id(),
-      'options' => array(
-        'entity_type' => $this->entityType,
-        'entity' => $this,
-      ),
-    );
-  }
 
 }

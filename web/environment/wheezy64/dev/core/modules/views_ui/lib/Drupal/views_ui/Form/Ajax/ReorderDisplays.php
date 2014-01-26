@@ -24,7 +24,7 @@ class ReorderDisplays extends ViewsFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'views_ui_reorder_displays_form';
   }
 
@@ -63,7 +63,7 @@ class ReorderDisplays extends ViewsFormBase {
         array('order', 'sibling', 'weight'),
       ),
       '#tree' => TRUE,
-      '#prefix' => '<div class="scroll">',
+      '#prefix' => '<div class="scroll" data-drupal-views-scroll>',
       '#suffix' => '</div>',
     );
 
@@ -98,6 +98,8 @@ class ReorderDisplays extends ViewsFormBase {
 
       $form['displays'][$id]['removed'] = array(
         'checkbox' => array(
+          '#title' => t('Remove @id', array('@id' => $id)),
+          '#title_display' => 'invisible',
           '#type' => 'checkbox',
           '#id' => 'display-removed-' . $id,
           '#attributes' => array(
@@ -184,7 +186,11 @@ class ReorderDisplays extends ViewsFormBase {
 
     // Store in cache.
     $view->cacheSet();
-    $form_state['redirect'] = array('admin/structure/views/view/' . $view->id() . '/edit', array('fragment' => 'views-tab-default'));
+    $form_state['redirect_route'] = array(
+      'route_name' => 'views_ui.operation',
+      'route_parameters' => array('view' => $view->id(), 'operation' => 'edit'),
+      'options' => array('fragment' => 'views-tab-default'),
+    );
   }
 
 }

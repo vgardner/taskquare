@@ -121,7 +121,7 @@ class EntityListController implements EntityListControllerInterface, EntityContr
     $operations = array();
     if ($entity->access('update')) {
       $operations['edit'] = array(
-        'title' => t('Edit'),
+        'title' => $this->t('Edit'),
         'href' => $uri['path'] . '/edit',
         'options' => $uri['options'],
         'weight' => 10,
@@ -129,7 +129,7 @@ class EntityListController implements EntityListControllerInterface, EntityContr
     }
     if ($entity->access('delete')) {
       $operations['delete'] = array(
-        'title' => t('Delete'),
+        'title' => $this->t('Delete'),
         'href' => $uri['path'] . '/delete',
         'options' => $uri['options'],
         'weight' => 100,
@@ -145,10 +145,10 @@ class EntityListController implements EntityListControllerInterface, EntityContr
    * @return array
    *   A render array structure of header strings.
    *
-   * @see Drupal\Core\Entity\EntityListController::render()
+   * @see \Drupal\Core\Entity\EntityListController::render()
    */
   public function buildHeader() {
-    $row['operations'] = t('Operations');
+    $row['operations'] = $this->t('Operations');
     return $row;
   }
 
@@ -161,7 +161,7 @@ class EntityListController implements EntityListControllerInterface, EntityContr
    * @return array
    *   A render array structure of fields for this entity.
    *
-   * @see Drupal\Core\Entity\EntityListController::render()
+   * @see \Drupal\Core\Entity\EntityListController::render()
    */
   public function buildRow(EntityInterface $entity) {
     $row['operations']['data'] = $this->buildOperations($entity);
@@ -177,7 +177,7 @@ class EntityListController implements EntityListControllerInterface, EntityContr
    * @return array
    *   A renderable array of operation links.
    *
-   * @see Drupal\Core\Entity\EntityListController::render()
+   * @see \Drupal\Core\Entity\EntityListController::render()
    */
   public function buildOperations(EntityInterface $entity) {
     // Retrieve and sort operations.
@@ -202,8 +202,9 @@ class EntityListController implements EntityListControllerInterface, EntityContr
     $build = array(
       '#theme' => 'table',
       '#header' => $this->buildHeader(),
+      '#title' => $this->getTitle(),
       '#rows' => array(),
-      '#empty' => t('There is no @label yet.', array('@label' => $this->entityInfo['label'])),
+      '#empty' => $this->t('There is no @label yet.', array('@label' => $this->entityInfo['label'])),
     );
     foreach ($this->load() as $entity) {
       if ($row = $this->buildRow($entity)) {
@@ -219,7 +220,7 @@ class EntityListController implements EntityListControllerInterface, EntityContr
    * See the t() documentation for details.
    */
   protected function t($string, array $args = array(), array $options = array()) {
-    return $this->getTranslationManager()->translate($string, $args, $options);
+    return $this->translationManager()->translate($string, $args, $options);
   }
 
   /**
@@ -228,7 +229,7 @@ class EntityListController implements EntityListControllerInterface, EntityContr
    * @return \Drupal\Core\StringTranslation\TranslationInterface
    *   The translation manager.
    */
-  protected function getTranslationManager() {
+  protected function translationManager() {
     if (!$this->translationManager) {
       $this->translationManager = \Drupal::translation();
     }
@@ -247,6 +248,17 @@ class EntityListController implements EntityListControllerInterface, EntityContr
   public function setTranslationManager(TranslationInterface $translation_manager) {
     $this->translationManager = $translation_manager;
     return $this;
+  }
+
+  /**
+   * Returns the title of the page.
+   *
+   * @return string
+   *   A string title of the page.
+   *
+   */
+  protected function getTitle() {
+    return;
   }
 
 }

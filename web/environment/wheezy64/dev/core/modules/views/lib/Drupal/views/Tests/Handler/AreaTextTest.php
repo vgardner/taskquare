@@ -12,7 +12,7 @@ use Drupal\views\Tests\ViewUnitTestBase;
 /**
  * Tests the text area handler.
  *
- * @see Drupal\views\Plugin\views\area\Text
+ * @see \Drupal\views\Plugin\views\area\Text
  */
 class AreaTextTest extends ViewUnitTestBase {
 
@@ -59,7 +59,7 @@ class AreaTextTest extends ViewUnitTestBase {
     $this->executeView($view);
 
     $view->display_handler->handlers['header']['area']->options['format'] = $this->randomString();
-    $this->assertEqual(array('#markup' => ''), $view->display_handler->handlers['header']['area']->render(), 'Non existant format should return empty markup.');
+    $this->assertEqual(array('#markup' => ''), $view->display_handler->handlers['header']['area']->render(), 'Nonexistent format should return empty markup.');
 
     $view->display_handler->handlers['header']['area']->options['format'] = filter_default_format();
     $this->assertEqual(array('#markup' => check_markup($string)), $view->display_handler->handlers['header']['area']->render(), 'Existant format should return something');

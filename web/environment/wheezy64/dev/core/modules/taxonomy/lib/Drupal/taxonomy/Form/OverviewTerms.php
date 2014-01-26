@@ -8,7 +8,6 @@
 namespace Drupal\taxonomy\Form;
 
 use Drupal\Core\Form\FormBase;
-use Drupal\Core\Config\ConfigFactory;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\taxonomy\VocabularyInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -17,13 +16,6 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * Provides terms overview form for a taxonomy vocabulary.
  */
 class OverviewTerms extends FormBase {
-
-  /**
-   * Taxonomy config.
-   *
-   * @var \Drupal\Core\Config\Config
-   */
-  protected $config;
 
   /**
    * The module handler service.
@@ -35,13 +27,10 @@ class OverviewTerms extends FormBase {
   /**
    * Constructs an OverviewTerms object.
    *
-   * @param \Drupal\Core\Config\ConfigFactory $config_factory
-   *   The config factory service.
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
    *   The module handler service.
    */
-  public function __construct(ConfigFactory $config_factory, ModuleHandlerInterface $module_handler) {
-    $this->config = $config_factory->get('taxonomy.settings');
+  public function __construct(ModuleHandlerInterface $module_handler) {
     $this->moduleHandler = $module_handler;
   }
 
@@ -50,7 +39,6 @@ class OverviewTerms extends FormBase {
    */
   public static function create(ContainerInterface $container) {
     return new static(
-      $container->get('config.factory'),
       $container->get('module_handler')
     );
   }
@@ -87,7 +75,7 @@ class OverviewTerms extends FormBase {
 
     $page = $this->getRequest()->query->get('page') ?: 0;
     // Number of terms per page.
-    $page_increment = $this->config->get('terms_per_page_admin');
+    $page_increment = $this->config('taxonomy.settings')->get('terms_per_page_admin');
     // Elements shown on this page.
     $page_entries = 0;
     // Elements at the root level before this page.
@@ -182,7 +170,7 @@ class OverviewTerms extends FormBase {
     // error. Ensure the form is rebuilt in the same order as the user
     // submitted.
     if (!empty($form_state['input'])) {
-      // Get the $_POST order.
+      // Get the POST order.
       $order = array_flip(array_keys($form_state['input']['terms']));
       // Update our form with the new order.
       $current_page = array_merge($order, $current_page);
@@ -198,7 +186,7 @@ class OverviewTerms extends FormBase {
       }
     }
 
-    $errors = form_get_errors() != FALSE ? form_get_errors() : array();
+    $errors = form_get_errors($form_state);
     $destination = drupal_get_destination();
     $row_position = 0;
     // Build the actual form.
@@ -240,7 +228,7 @@ class OverviewTerms extends FormBase {
           '#type' => 'hidden',
           // Yes, default_value on a hidden. It needs to be changeable by the
           // javascript.
-          '#default_value' => $term->parent->value,
+          '#default_value' => $term->parents[0],
           '#attributes' => array(
             'class' => array('term-parent'),
           ),
@@ -258,8 +246,8 @@ class OverviewTerms extends FormBase {
       $form['terms'][$key]['weight'] = array(
         '#type' => 'weight',
         '#delta' => $delta,
-        '#title_display' => 'invisible',
         '#title' => $this->t('Weight for added term'),
+        '#title_display' => 'invisible',
         '#default_value' => $term->weight->value,
         '#attributes' => array(
           'class' => array('term-weight'),
@@ -399,12 +387,12 @@ class OverviewTerms extends FormBase {
     $weight = 0;
     $term = $tree[0];
     while ($term->id() != $form['#first_tid']) {
-      if ($term->parent->value == 0 && $term->weight->value != $weight) {
+      if ($term->parents[0] == 0 && $term->weight->value != $weight) {
         $term->weight->value = $weight;
         $changed_terms[$term->id()] = $term;
       }
       $weight++;
-      $hierarchy = $term->parent->value != 0 ? TAXONOMY_HIERARCHY_SINGLE : $hierarchy;
+      $hierarchy = $term->parents[0] != 0 ? TAXONOMY_HIERARCHY_SINGLE : $hierarchy;
       $term = $tree[$weight];
     }
 
@@ -420,18 +408,18 @@ class OverviewTerms extends FormBase {
         }
         // Terms not at the root level can safely start from 0 because they're all on this page.
         elseif ($values['term']['parent'] > 0) {
-          $level_weights[$values['term']['parent']] = isset($level_weights[$values['term']['parent']]) ? $level_weights[$values['term']->parent->value] + 1 : 0;
+          $level_weights[$values['term']['parent']] = isset($level_weights[$values['term']['parent']]) ? $level_weights[$values['term']['parent']] + 1 : 0;
           if ($level_weights[$values['term']['parent']] != $term->weight->value) {
             $term->weight->value = $level_weights[$values['term']['parent']];
             $changed_terms[$term->id()] = $term;
           }
         }
         // Update any changed parents.
-        if ($values['term']['parent'] != $term->parent->value) {
+        if ($values['term']['parent'] != $term->parents[0]) {
           $term->parent->value = $values['term']['parent'];
           $changed_terms[$term->id()] = $term;
         }
-        $hierarchy = $term->parent->value != 0 ? TAXONOMY_HIERARCHY_SINGLE : $hierarchy;
+        $hierarchy = $term->parents[0] != 0 ? TAXONOMY_HIERARCHY_SINGLE : $hierarchy;
         $weight++;
       }
     }
@@ -439,12 +427,12 @@ class OverviewTerms extends FormBase {
     // Build a list of all terms that need to be updated on following pages.
     for ($weight; $weight < count($tree); $weight++) {
       $term = $tree[$weight];
-      if ($term->parent->value == 0 && $term->weight->value != $weight) {
-        $term->parent->value = $term->parent->value;
+      if ($term->parents[0] == 0 && $term->weight->value != $weight) {
+        $term->parent->value = $term->parents[0];
         $term->weight->value = $weight;
         $changed_terms[$term->id()] = $term;
       }
-      $hierarchy = $term->parent->value != 0 ? TAXONOMY_HIERARCHY_SINGLE : $hierarchy;
+      $hierarchy = $term->parents[0] != 0 ? TAXONOMY_HIERARCHY_SINGLE : $hierarchy;
     }
 
     // Save all updated terms.
@@ -464,7 +452,10 @@ class OverviewTerms extends FormBase {
    * Redirects to confirmation form for the reset action.
    */
   public function submitReset(array &$form, array &$form_state) {
-    $form_state['redirect'] = 'admin/structure/taxonomy/manage/' . $form_state['taxonomy']['vocabulary']->id() . '/reset';
+    $form_state['redirect_route'] = array(
+      'route_name' => 'taxonomy.vocabulary_reset',
+      'route_parameters' => array('taxonomy_vocabulary' => $form_state['taxonomy']['vocabulary']->id()),
+    );
   }
 
 }

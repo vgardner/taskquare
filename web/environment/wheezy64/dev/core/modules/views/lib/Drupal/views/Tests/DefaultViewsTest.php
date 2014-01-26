@@ -7,6 +7,7 @@
 
 namespace Drupal\views\Tests;
 
+use Drupal\comment\CommentInterface;
 use Drupal\Core\Language\Language;
 use Drupal\simpletest\WebTestBase;
 use Drupal\views\ViewExecutable;
@@ -83,6 +84,10 @@ class DefaultViewsTest extends ViewTestBase {
     // Create a time in the past for the archive.
     $time = REQUEST_TIME - 3600;
 
+    $this->container->get('comment.manager')->addDefaultField('node', 'page');
+
+    $this->container->get('views.views_data')->clear();
+
     for ($i = 0; $i <= 10; $i++) {
       $user = $this->drupalCreateUser();
       $term = $this->createTerm($this->vocabulary);
@@ -102,11 +107,18 @@ class DefaultViewsTest extends ViewTestBase {
 
       $comment = array(
         'uid' => $user->id(),
-        'nid' => $node->id(),
-        'node_type' => 'node_type_' . $node->bundle(),
+        'status' => CommentInterface::PUBLISHED,
+        'entity_id' => $node->id(),
+        'entity_type' => 'node',
+        'field_name' => 'comment'
       );
       entity_create('comment', $comment)->save();
     }
+
+    // Some views, such as the "Who's Online" view, only return results if at
+    // least one user is logged in.
+    $account = $this->drupalCreateUser(array());
+    $this->drupalLogin($account);
   }
 
   /**

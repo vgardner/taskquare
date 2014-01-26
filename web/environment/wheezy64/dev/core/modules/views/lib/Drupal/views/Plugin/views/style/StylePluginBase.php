@@ -248,7 +248,8 @@ abstract class StylePluginBase extends PluginBase {
       $options += $field_labels;
       // If there are no fields, we can't group on them.
       if (count($options) > 1) {
-        // This is for backward compability, when there was just a single select form.
+        // This is for backward compatibility, when there was just a single
+        // select form.
         if (is_string($this->options['grouping'])) {
           $grouping = $this->options['grouping'];
           $this->options['grouping'] = array();
@@ -364,7 +365,7 @@ abstract class StylePluginBase extends PluginBase {
    *   An associative array containing the structure of the form.
    * @param array $form_state
    *   An associative array containing the current state of the form.
-   * @param Drupal\views\Plugin\views\wizard\WizardInterface $wizard
+   * @param \Drupal\views\Plugin\views\wizard\WizardInterface $wizard
    *   The current used wizard.
    * @param array $display_options
    *   The options which will be used on the view. The style plugin should
@@ -527,8 +528,8 @@ abstract class StylePluginBase extends PluginBase {
    *   @endcode
    */
   public function renderGrouping($records, $groupings = array(), $group_rendered = NULL) {
-    // This is for backward compability, when $groupings was a string containing
-    // the ID of a single field.
+    // This is for backward compatibility, when $groupings was a string
+    // containing the ID of a single field.
     if (is_string($groupings)) {
       $rendered = $group_rendered === NULL ? TRUE : $group_rendered;
       $groupings = array(array('field' => $groupings, 'rendered' => $rendered));

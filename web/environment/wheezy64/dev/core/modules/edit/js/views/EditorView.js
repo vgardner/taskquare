@@ -1,4 +1,9 @@
-(function ($, _, Backbone, Drupal) {
+/**
+ * @file
+ * An abstract Backbone View that controls an in-place editor.
+ */
+
+(function ($, Backbone, Drupal) {
 
 "use strict";
 
@@ -8,8 +13,10 @@
  * Specific in-place editor implementations should subclass (extend) this View
  * and override whichever method they deem necessary to override.
  *
- * Look at Drupal.edit.editors.form and Drupal.edit.editors.direct for
+ * Look at Drupal.edit.editors.form and Drupal.edit.editors.plain_text for
  * examples.
+ *
+ * @see Drupal.edit.EditorModel
  */
 Drupal.edit.EditorView = Backbone.View.extend({
 
@@ -24,7 +31,7 @@ Drupal.edit.EditorView = Backbone.View.extend({
    * class' initialize()) first, like this:
    *   Drupal.edit.EditorView.prototype.initialize.call(this, options);
    *
-   * For an example, @see Drupal.edit.editors.direct.
+   * For an example, @see Drupal.edit.editors.plain_text.
    *
    * @param Object options
    *   An object with the following keys:
@@ -52,12 +59,12 @@ Drupal.edit.EditorView = Backbone.View.extend({
    *
    * For some single cardinality fields, it may be necessary or useful to
    * not in-place edit (and hence decorate) the DOM element with the
-   * data-edit-id attribute (which is the field's wrapper), but a specific
+   * data-edit-field-id attribute (which is the field's wrapper), but a specific
    * element within the field's wrapper.
    * e.g. using a WYSIWYG editor on a body field should happen on the DOM
    * element containing the text itself, not on the field wrapper.
    *
-   * For example, @see Drupal.edit.editors.direct.
+   * For example, @see Drupal.edit.editors.plain_text.
    *
    * @return jQuery
    *   A jQuery-wrapped DOM element.
@@ -74,10 +81,10 @@ Drupal.edit.EditorView = Backbone.View.extend({
    *    insert its own toolbar UI into Edit's tightly integrated toolbar.
    *  - Boolean fullWidthToolbar: indicates whether Edit's tightly integrated
    *    toolbar should consume the full width of the element, rather than being
-   *    just long enough to accomodate a label.
+   *    just long enough to accommodate a label.
    */
   getEditUISettings: function () {
-    return { padding: false, unifiedToolbar: false, fullWidthToolbar: false };
+    return { padding: false, unifiedToolbar: false, fullWidthToolbar: false, popup: false };
   },
 
   /**
@@ -172,7 +179,7 @@ Drupal.edit.EditorView = Backbone.View.extend({
   save: function () {
     var fieldModel = this.fieldModel;
     var editorModel = this.model;
-    var backstageId = 'edit_backstage-' + this.fieldModel.id.replace(/[\/\_\s]/g, '-');
+    var backstageId = 'edit_backstage-' + this.fieldModel.id.replace(/[\/\[\]\_\s]/g, '-');
 
     function fillAndSubmitForm (value) {
       var $form = $('#' + backstageId).find('form');
@@ -186,9 +193,10 @@ Drupal.edit.EditorView = Backbone.View.extend({
     }
 
     var formOptions = {
-      fieldID: this.fieldModel.id,
+      fieldID: this.fieldModel.get('fieldID'),
       $el: this.$el,
       nocssjs: true,
+      other_view_modes: fieldModel.findOtherViewModes(),
       // Reset an existing entry for this entity in the TempStore (if any) when
       // saving the field. Logically speaking, this should happen in a separate
       // request because this is an entity-level operation, not a field-level
@@ -204,7 +212,7 @@ Drupal.edit.EditorView = Backbone.View.extend({
       // (hence "backstage" — since the editing doesn't happen in the form, it
       // happens "directly" in the content, the form is only used for saving).
       var $backstage = $(Drupal.theme('editBackstage', { id: backstageId })).appendTo('body');
-      // Direct forms are stuffed into the backstage container for this field.
+      // Hidden forms are stuffed into the backstage container for this field.
       var $form = $(form).appendTo($backstage);
       // Disable the browser's HTML5 validation; we only care about server-
       // side validation. (Not disabling this will actually cause problems
@@ -225,7 +233,11 @@ Drupal.edit.EditorView = Backbone.View.extend({
         removeHiddenForm();
         // First, transition the state to 'saved'.
         fieldModel.set('state', 'saved');
-        // Then, set the 'html' attribute on the field model. This will cause
+        // Second, set the 'htmlForOtherViewModes' attribute, so that when this
+        // field is rerendered, the change can be propagated to other instances of
+        // this field, which may be displayed in different view modes.
+        fieldModel.set('htmlForOtherViewModes', response.other_view_modes);
+        // Finally, set the 'html' attribute on the field model. This will cause
         // the field to be rerendered.
         fieldModel.set('html', response.data);
       };
@@ -278,4 +290,4 @@ Drupal.edit.EditorView = Backbone.View.extend({
 
 });
 
-}(jQuery, _, Backbone, Drupal));
+}(jQuery, Backbone, Drupal));

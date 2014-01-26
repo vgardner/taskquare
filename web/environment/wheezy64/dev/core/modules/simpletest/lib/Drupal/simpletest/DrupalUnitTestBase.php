@@ -13,6 +13,7 @@ use Drupal\Core\KeyValueStore\KeyValueMemoryFactory;
 use Symfony\Component\DependencyInjection\Reference;
 use Drupal\Core\Database\Database;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Base test case class for Drupal unit tests.
@@ -25,8 +26,8 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * Additional modules needed in a test may be loaded and added to the fixed
  * module list.
  *
- * @see DrupalUnitTestBase::$modules
- * @see DrupalUnitTestBase::enableModules()
+ * @see \DrupalUnitTestBase::$modules
+ * @see \DrupalUnitTestBase::enableModules()
  */
 abstract class DrupalUnitTestBase extends UnitTestBase {
 
@@ -44,8 +45,8 @@ abstract class DrupalUnitTestBase extends UnitTestBase {
    * Unlike WebTestBase::setUp(), the specified modules are loaded only, but not
    * automatically installed. Modules need to be installed manually, if needed.
    *
-   * @see DrupalUnitTestBase::enableModules()
-   * @see DrupalUnitTestBase::setUp()
+   * @see \DrupalUnitTestBase::enableModules()
+   * @see \DrupalUnitTestBase::setUp()
    *
    * @var array
    */
@@ -73,8 +74,8 @@ abstract class DrupalUnitTestBase extends UnitTestBase {
   /**
    * Sets up Drupal unit test environment.
    *
-   * @see DrupalUnitTestBase::$modules
-   * @see DrupalUnitTestBase
+   * @see \DrupalUnitTestBase::$modules
+   * @see \DrupalUnitTestBase
    */
   protected function setUp() {
     // Copy/prime extension file lists once to avoid filesystem scans.
@@ -88,7 +89,7 @@ abstract class DrupalUnitTestBase extends UnitTestBase {
 
     parent::setUp();
     // Build a minimal, partially mocked environment for unit tests.
-    $this->containerBuild(drupal_container());
+    $this->containerBuild(\Drupal::getContainer());
     // Make sure it survives kernel rebuilds.
     $GLOBALS['conf']['container_service_providers']['TestServiceProvider'] = 'Drupal\simpletest\TestServiceProvider';
 
@@ -136,9 +137,9 @@ abstract class DrupalUnitTestBase extends UnitTestBase {
    * that need to persist a DrupalKernel reboot. This method is called whenever
    * the kernel is rebuilt.
    *
-   * @see DrupalUnitTestBase::setUp()
-   * @see DrupalUnitTestBase::enableModules()
-   * @see DrupalUnitTestBase::disableModules()
+   * @see \DrupalUnitTestBase::setUp()
+   * @see \DrupalUnitTestBase::enableModules()
+   * @see \DrupalUnitTestBase::disableModules()
    */
   public function containerBuild(ContainerBuilder $container) {
     global $conf;
@@ -152,27 +153,30 @@ abstract class DrupalUnitTestBase extends UnitTestBase {
       ->register('config.storage', 'Drupal\Core\Config\FileStorage')
       ->addArgument($this->configDirectories[CONFIG_ACTIVE_DIRECTORY]);
 
-    $conf['keyvalue_default'] = 'keyvalue.memory';
+    $this->settingsSet('keyvalue_default', 'keyvalue.memory');
     $container->set('keyvalue.memory', $this->keyValueFactory);
     if (!$container->has('keyvalue')) {
       // TestBase::setUp puts a completely empty container in
-      // drupal_container() which is somewhat the mirror of the empty
+      // $this->container which is somewhat the mirror of the empty
       // environment being set up. Unit tests need not to waste time with
       // getting a container set up for them. Drupal Unit Tests might just get
       // away with a simple container holding the absolute bare minimum. When
       // a kernel is overridden then there's no need to re-register the keyvalue
       // service but when a test is happy with the superminimal container put
-      // together here, it still might a keyvalue storage for anything (for
-      // eg. module_enable) using \Drupal::state() -- that's why a memory
-      // service was added in the first place.
+      // together here, it still might a keyvalue storage for anything using
+      // \Drupal::state() -- that's why a memory service was added in the first
+      // place.
+      $container->register('settings', 'Drupal\Component\Utility\Settings')
+        ->setFactoryClass('Drupal\Component\Utility\Settings')
+        ->setFactoryMethod('getSingleton');
+
       $container
         ->register('keyvalue', 'Drupal\Core\KeyValueStore\KeyValueFactory')
-        ->addArgument(new Reference('service_container'));
+        ->addArgument(new Reference('service_container'))
+        ->addArgument(new Reference('settings'));
 
-      $container->register('state', 'Drupal\Core\KeyValueStore\KeyValueStoreInterface')
-        ->setFactoryService(new Reference('keyvalue'))
-        ->setFactoryMethod('get')
-        ->addArgument('state');
+      $container->register('state', 'Drupal\Core\KeyValueStore\State')
+        ->addArgument(new Reference('keyvalue'));
     }
 
     if ($container->hasDefinition('path_processor_alias')) {
@@ -183,7 +187,8 @@ abstract class DrupalUnitTestBase extends UnitTestBase {
       $definition = $container->getDefinition('path_processor_alias');
       $definition->clearTag('path_processor_inbound')->clearTag('path_processor_outbound');
     }
-
+    $request = Request::create('/');
+    $this->container->set('request', $request);
   }
 
   /**

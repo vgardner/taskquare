@@ -8,7 +8,7 @@
 namespace Drupal\Core\Entity\Query\Sql;
 
 use Drupal\Core\Database\Connection;
-use Drupal\Core\Entity\EntityManager;
+use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Entity\Query\QueryBase;
 use Drupal\Core\Entity\Query\QueryFactoryInterface;
 
@@ -28,6 +28,13 @@ class QueryFactory implements QueryFactoryInterface {
   protected $connection;
 
   /**
+   * The namespace of this class, the parent class etc.
+   *
+   * @var array
+   */
+  protected $namespaces;
+
+  /**
    * Constructs a QueryFactory object.
    *
    * @param \Drupal\Core\Database\Connection $connection
@@ -35,6 +42,7 @@ class QueryFactory implements QueryFactoryInterface {
    */
   public function __construct(Connection $connection) {
     $this->connection = $connection;
+    $this->namespaces = QueryBase::getNamespaces($this);
   }
 
   /**
@@ -49,9 +57,9 @@ class QueryFactory implements QueryFactoryInterface {
    * @return \Drupal\Core\Entity\Query\Sql\Query
    *   The factored query.
    */
-  public function get($entity_type, $conjunction, EntityManager $entity_manager) {
-    $class = QueryBase::getNamespace($this) . '\\Query';
-    return new $class($entity_type, $entity_manager, $conjunction, $this->connection);
+  public function get($entity_type, $conjunction, EntityManagerInterface $entity_manager) {
+    $class = QueryBase::getClass($this->namespaces, 'Query');
+    return new $class($entity_type, $entity_manager, $conjunction, $this->connection, $this->namespaces);
   }
 
   /**
@@ -66,9 +74,9 @@ class QueryFactory implements QueryFactoryInterface {
    * @return \Drupal\Core\Entity\Query\Sql\QueryAggregate
    *   The factored aggregation query.
    */
-  public function getAggregate($entity_type, $conjunction, EntityManager $entity_manager) {
-    $class = QueryBase::getNamespace($this) . '\\QueryAggregate';
-    return new $class($entity_type, $entity_manager, $conjunction, $this->connection);
+  public function getAggregate($entity_type, $conjunction, EntityManagerInterface $entity_manager) {
+    $class = QueryBase::getClass($this->namespaces, 'QueryAggregate');
+    return new $class($entity_type, $entity_manager, $conjunction, $this->connection, $this->namespaces);
   }
 
 }

@@ -25,7 +25,7 @@ class DeleteForm extends ConfirmFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'forum_confirm_delete';
   }
 
@@ -39,8 +39,7 @@ class DeleteForm extends ConfirmFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getCancelPath() {
-    return 'admin/structure/forum';
+  public function getCancelRoute() {
   }
 
   /**
@@ -56,7 +55,11 @@ class DeleteForm extends ConfirmFormBase {
   public function buildForm(array $form, array &$form_state, TermInterface $taxonomy_term = NULL) {
     $this->taxonomyTerm = $taxonomy_term;
 
-    return parent::buildForm($form, $form_state);
+    $form = parent::buildForm($form, $form_state);
+
+    // @todo Convert to getCancelRoute() after http://drupal.org/node/1974210.
+    $form['actions']['cancel']['#href'] = 'admin/structure/forum';
+    return $form;
   }
 
   /**
@@ -66,7 +69,7 @@ class DeleteForm extends ConfirmFormBase {
     $this->taxonomyTerm->delete();
     drupal_set_message($this->t('The forum %label and all sub-forums have been deleted.', array('%label' => $this->taxonomyTerm->label())));
     watchdog('forum', 'forum: deleted %label and all its sub-forums.', array('%label' => $this->taxonomyTerm->label()), WATCHDOG_NOTICE);
-    $form_state['redirect'] = 'admin/structure/forum';
+    $form_state['redirect_route']['route_name'] = 'forum.overview';
   }
 
 }

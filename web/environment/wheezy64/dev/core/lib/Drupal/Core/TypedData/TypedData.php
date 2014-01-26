@@ -20,7 +20,7 @@ abstract class TypedData implements TypedDataInterface, PluginInspectionInterfac
   /**
    * The data definition.
    *
-   * @var array
+   * @var \Drupal\Core\TypedData\DataDefinitionInterface
    */
   protected $definition;
 
@@ -41,7 +41,7 @@ abstract class TypedData implements TypedDataInterface, PluginInspectionInterfac
   /**
    * Constructs a TypedData object given its definition and context.
    *
-   * @param array $definition
+   * @param \Drupal\Core\TypedData\DataDefinitionInterface $definition
    *   The data definition.
    * @param string $name
    *   (optional) The name of the created property, or NULL if it is the root
@@ -50,9 +50,13 @@ abstract class TypedData implements TypedDataInterface, PluginInspectionInterfac
    *   (optional) The parent object of the data property, or NULL if it is the
    *   root of a typed data tree. Defaults to NULL.
    *
-   * @see Drupal\Core\TypedData\TypedDataManager::create()
+   * @see \Drupal\Core\TypedData\TypedDataManager::create()
+   *
+   * @todo When \Drupal\Core\Config\TypedConfigManager has been fixed to use
+   *   class-based definitions, type-hint $definition to
+   *   DataDefinitionInterface. https://drupal.org/node/1928868
    */
-  public function __construct(array $definition, $name = NULL, TypedDataInterface $parent = NULL) {
+  public function __construct($definition, $name = NULL, TypedDataInterface $parent = NULL) {
     $this->definition = $definition;
     $this->parent = $parent;
     $this->name = $name;
@@ -69,25 +73,25 @@ abstract class TypedData implements TypedDataInterface, PluginInspectionInterfac
    * {@inheritdoc}
    */
   public function getPluginDefinition() {
-    return \Drupal::typedData()->getDefinition($this->definition['type']);
+    return \Drupal::typedData()->getDefinition($this->definition->getDataType());
   }
 
   /**
-   * Implements \Drupal\Core\TypedData\TypedDataInterface::getDefinition().
+   * {@inheritdoc}
    */
   public function getDefinition() {
     return $this->definition;
   }
 
   /**
-   * Implements \Drupal\Core\TypedData\TypedDataInterface::getValue().
+   * {@inheritdoc}
    */
   public function getValue() {
     return $this->value;
   }
 
   /**
-   * Implements \Drupal\Core\TypedData\TypedDataInterface::setValue().
+   * {@inheritdoc}
    */
   public function setValue($value, $notify = TRUE) {
     $this->value = $value;
@@ -98,14 +102,14 @@ abstract class TypedData implements TypedDataInterface, PluginInspectionInterfac
   }
 
   /**
-   * Implements \Drupal\Core\TypedData\TypedDataInterface::getString().
+   * {@inheritdoc}
    */
   public function getString() {
     return (string) $this->getValue();
   }
 
   /**
-   * Implements \Drupal\Core\TypedData\TypedDataInterface::getConstraints().
+   * {@inheritdoc}
    */
   public function getConstraints() {
     // @todo: Add the typed data manager as proper dependency.
@@ -113,7 +117,7 @@ abstract class TypedData implements TypedDataInterface, PluginInspectionInterfac
   }
 
   /**
-   * Implements \Drupal\Core\TypedData\TypedDataInterface::validate().
+   * {@inheritdoc}
    */
   public function validate() {
     // @todo: Add the typed data manager as proper dependency.
@@ -130,7 +134,7 @@ abstract class TypedData implements TypedDataInterface, PluginInspectionInterfac
   }
 
   /**
-   * Implements \Drupal\Core\TypedData\TypedDataInterface::setContext().
+   * {@inheritdoc}
    */
   public function setContext($name = NULL, TypedDataInterface $parent = NULL) {
     $this->parent = $parent;
@@ -138,14 +142,14 @@ abstract class TypedData implements TypedDataInterface, PluginInspectionInterfac
   }
 
   /**
-   * Implements \Drupal\Core\TypedData\TypedDataInterface::getName().
+   * {@inheritdoc}
    */
   public function getName() {
     return $this->name;
   }
 
   /**
-   * Implements \Drupal\Core\TypedData\TypedDataInterface::getRoot().
+   * {@inheritdoc}
    */
   public function getRoot() {
     if (isset($this->parent)) {
@@ -156,7 +160,7 @@ abstract class TypedData implements TypedDataInterface, PluginInspectionInterfac
   }
 
   /**
-   * Implements \Drupal\Core\TypedData\TypedDataInterface::getPropertyPath().
+   * {@inheritdoc}
    */
   public function getPropertyPath() {
     if (isset($this->parent)) {
@@ -174,9 +178,7 @@ abstract class TypedData implements TypedDataInterface, PluginInspectionInterfac
   }
 
   /**
-   * Implements \Drupal\Core\TypedData\TypedDataInterface::getParent().
-   *
-   * @return \Drupal\Core\Entity\Field\FieldInterface
+   * {@inheritdoc}
    */
   public function getParent() {
     return $this->parent;

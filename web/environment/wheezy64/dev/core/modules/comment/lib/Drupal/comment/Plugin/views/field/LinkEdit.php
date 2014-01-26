@@ -37,6 +37,17 @@ class LinkEdit extends Link {
     );
   }
 
+  /**
+   * Prepare the link for editing the comment.
+   *
+   * @param \Drupal\Core\Entity\EntityInterface $data
+   *   The comment entity.
+   * @param \Drupal\views\ResultRow $values
+   *   The values retrieved from a single row of a view's query result.
+   *
+   * @return string
+   *   Returns a string for the link text.
+   */
   protected function renderLink($data, ResultRow $values) {
     parent::renderLink($data, $values);
     // Ensure user has access to edit this comment.
@@ -45,7 +56,7 @@ class LinkEdit extends Link {
       return;
     }
 
-    $text = !empty($this->options['text']) ? $this->options['text'] : t('edit');
+    $text = !empty($this->options['text']) ? $this->options['text'] : t('Edit');
     unset($this->options['alter']['fragment']);
 
     if (!empty($this->options['destination'])) {

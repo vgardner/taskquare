@@ -7,12 +7,14 @@
 
 namespace Drupal\comment\Entity;
 
-use Drupal\Core\Entity\EntityNG;
+use Drupal\Core\Entity\ContentEntityBase;
 use Drupal\Core\Entity\Annotation\EntityType;
 use Drupal\Core\Annotation\Translation;
 use Drupal\comment\CommentInterface;
 use Drupal\Core\Entity\EntityStorageControllerInterface;
+use Drupal\Core\Field\FieldDefinition;
 use Drupal\Core\Language\Language;
+use Drupal\Core\TypedData\DataDefinition;
 
 /**
  * Defines the comment entity class.
@@ -21,11 +23,10 @@ use Drupal\Core\Language\Language;
  *   id = "comment",
  *   label = @Translation("Comment"),
  *   bundle_label = @Translation("Content type"),
- *   module = "comment",
  *   controllers = {
  *     "storage" = "Drupal\comment\CommentStorageController",
  *     "access" = "Drupal\comment\CommentAccessController",
- *     "render" = "Drupal\comment\CommentRenderController",
+ *     "view_builder" = "Drupal\comment\CommentViewBuilder",
  *     "form" = {
  *       "default" = "Drupal\comment\CommentFormController",
  *       "delete" = "Drupal\comment\Form\DeleteForm"
@@ -36,72 +37,85 @@ use Drupal\Core\Language\Language;
  *   uri_callback = "comment_uri",
  *   fieldable = TRUE,
  *   translatable = TRUE,
- *   route_base_path = "admin/structure/types/manage/{bundle}/comment",
- *   bundle_prefix = "comment_node_",
+ *   render_cache = FALSE,
  *   entity_keys = {
  *     "id" = "cid",
- *     "bundle" = "node_type",
+ *     "bundle" = "field_id",
  *     "label" = "subject",
  *     "uuid" = "uuid"
  *   },
+ *   bundle_keys = {
+ *     "bundle" = "field_id"
+ *   },
  *   links = {
- *     "canonical" = "/comment/{comment}",
- *     "edit-form" = "/comment/{comment}/edit"
+ *     "canonical" = "comment.permalink",
+ *     "edit-form" = "comment.edit_page",
+ *     "admin-form" = "comment.bundle"
  *   }
  * )
  */
-class Comment extends EntityNG implements CommentInterface {
+class Comment extends ContentEntityBase implements CommentInterface {
 
   /**
    * The comment ID.
    *
-   * @todo Rename to 'id'.
-   *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $cid;
 
   /**
    * The comment UUID.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $uuid;
 
   /**
-   * The parent comment ID if this is a reply to a comment.
+   * The parent comment ID if this is a reply to another comment.
    *
-   * @todo: Rename to 'parent_id'.
-   *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $pid;
 
   /**
-   * The ID of the node to which the comment is attached.
+   * The entity ID for the entity to which this comment is attached.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
-  public $nid;
+  public $entity_id;
+
+  /**
+   * The entity type of the entity to which this comment is attached.
+   *
+   * @var \Drupal\Core\Field\FieldItemListInterface
+   */
+  public $entity_type;
+
+  /**
+   * The field to which this comment is attached.
+   *
+   * @var \Drupal\Core\Field\FieldItemListInterface
+   */
+  public $field_id;
 
   /**
    * The comment language code.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $langcode;
 
   /**
    * The comment title.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $subject;
 
   /**
    * The comment author ID.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $uid;
 
@@ -110,7 +124,7 @@ class Comment extends EntityNG implements CommentInterface {
    *
    * For anonymous authors, this is the value as typed in the comment form.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $name;
 
@@ -119,7 +133,7 @@ class Comment extends EntityNG implements CommentInterface {
    *
    * For anonymous authors, this is the value as typed in the comment form.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $mail;
 
@@ -128,58 +142,44 @@ class Comment extends EntityNG implements CommentInterface {
    *
    * For anonymous authors, this is the value as typed in the comment form.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $homepage;
 
   /**
    * The comment author's hostname.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $hostname;
 
   /**
    * The time that the comment was created.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $created;
 
   /**
    * The time that the comment was last edited.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $changed;
 
   /**
    * A boolean field indicating whether the comment is published.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $status;
 
   /**
    * The alphadecimal representation of the comment's place in a thread.
    *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
+   * @var \Drupal\Core\Field\FieldItemListInterface
    */
   public $thread;
-
-  /**
-   * The comment node type.
-   *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
-   */
-  public $node_type;
-
-  /**
-   * The comment 'new' marker for the current user.
-   *
-   * @var \Drupal\Core\Entity\Field\FieldInterface
-   */
-  public $new;
 
   /**
    * Initialize the object. Invoked upon construction and wake up.
@@ -190,7 +190,8 @@ class Comment extends EntityNG implements CommentInterface {
     unset($this->cid);
     unset($this->uuid);
     unset($this->pid);
-    unset($this->nid);
+    unset($this->entity_id);
+    unset($this->field_id);
     unset($this->subject);
     unset($this->uid);
     unset($this->name);
@@ -201,8 +202,7 @@ class Comment extends EntityNG implements CommentInterface {
     unset($this->changed);
     unset($this->status);
     unset($this->thread);
-    unset($this->node_type);
-    unset($this->new);
+    unset($this->entity_type);
   }
 
   /**
@@ -215,25 +215,11 @@ class Comment extends EntityNG implements CommentInterface {
   /**
    * {@inheritdoc}
    */
-  public static function preCreate(EntityStorageControllerInterface $storage_controller, array &$values) {
-    if (empty($values['node_type']) && !empty($values['nid'])) {
-      $node = node_load(is_object($values['nid']) ? $values['nid']->value : $values['nid']);
-      $values['node_type'] = 'comment_node_' . $node->getType();
-    }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function preSave(EntityStorageControllerInterface $storage_controller) {
-    global $user;
+    parent::preSave($storage_controller);
 
     if (!isset($this->status->value)) {
-      $this->status->value = user_access('skip comment approval') ? COMMENT_PUBLISHED : COMMENT_NOT_PUBLISHED;
-    }
-    // Make sure we have a proper bundle name.
-    if (!isset($this->node_type->value)) {
-      $this->node_type->value = 'comment_node_' . $this->nid->entity->type;
+      $this->status->value = \Drupal::currentUser()->hasPermission('skip comment approval') ? CommentInterface::PUBLISHED : CommentInterface::NOT_PUBLISHED;
     }
     if ($this->isNew()) {
       // Add the comment to database. This next section builds the thread field.
@@ -291,7 +277,7 @@ class Comment extends EntityNG implements CommentInterface {
         // has the lock, just move to the next integer.
         do {
           $thread = $prefix . comment_int_to_alphadecimal(++$n) . '/';
-        } while (!lock()->acquire("comment:{$this->nid->target_id}:$thread"));
+        } while (!lock()->acquire("comment:{$this->entity_id->value}:$thread"));
         $this->threadLock = $thread;
       }
       if (empty($this->created->value)) {
@@ -302,8 +288,8 @@ class Comment extends EntityNG implements CommentInterface {
       }
       // We test the value with '===' because we need to modify anonymous
       // users as well.
-      if ($this->uid->target_id === $user->id() && $user->isAuthenticated()) {
-        $this->name->value = $user->getUsername();
+      if ($this->uid->target_id === \Drupal::currentUser()->id() && \Drupal::currentUser()->isAuthenticated()) {
+        $this->name->value = \Drupal::currentUser()->getUsername();
       }
       // Add the values which aren't passed into the function.
       $this->thread->value = $thread;
@@ -315,10 +301,12 @@ class Comment extends EntityNG implements CommentInterface {
    * {@inheritdoc}
    */
   public function postSave(EntityStorageControllerInterface $storage_controller, $update = TRUE) {
+    parent::postSave($storage_controller, $update);
+
     $this->releaseThreadLock();
-    // Update the {node_comment_statistics} table prior to executing the hook.
-    $storage_controller->updateNodeStatistics($this->nid->target_id);
-    if ($this->status->value == COMMENT_PUBLISHED) {
+    // Update the {comment_entity_statistics} table prior to executing the hook.
+    $storage_controller->updateEntityStatistics($this);
+    if ($this->status->value == CommentInterface::PUBLISHED) {
       module_invoke_all('comment_publish', $this);
     }
   }
@@ -337,11 +325,13 @@ class Comment extends EntityNG implements CommentInterface {
    * {@inheritdoc}
    */
   public static function postDelete(EntityStorageControllerInterface $storage_controller, array $entities) {
+    parent::postDelete($storage_controller, $entities);
+
     $child_cids = $storage_controller->getChildCids($entities);
     entity_delete_multiple('comment', $child_cids);
 
     foreach ($entities as $id => $entity) {
-      $storage_controller->updateNodeStatistics($entity->nid->target_id);
+      $storage_controller->updateEntityStatistics($entity);
     }
   }
 
@@ -349,8 +339,9 @@ class Comment extends EntityNG implements CommentInterface {
    * {@inheritdoc}
    */
   public function permalink() {
-
-    $url['path'] = 'node/' . $this->nid->value;
+    $entity = entity_load($this->get('entity_type')->value, $this->get('entity_id')->value);
+    $uri = $entity->uri();
+    $url['path'] = $uri['path'];
     $url['options'] = array('fragment' => 'comment-' . $this->id());
 
     return $url;
@@ -360,105 +351,99 @@ class Comment extends EntityNG implements CommentInterface {
    * {@inheritdoc}
    */
   public static function baseFieldDefinitions($entity_type) {
-    $properties['cid'] = array(
-      'label' => t('ID'),
-      'description' => t('The comment ID.'),
-      'type' => 'integer_field',
-      'read-only' => TRUE,
-    );
-    $properties['uuid'] = array(
-      'label' => t('UUID'),
-      'description' => t('The comment UUID.'),
-      'type' => 'uuid_field',
-    );
-    $properties['pid'] = array(
-      'label' => t('Parent ID'),
-      'description' => t('The parent comment ID if this is a reply to a comment.'),
-      'type' => 'entity_reference_field',
-      'settings' => array('target_type' => 'comment'),
-    );
-    $properties['nid'] = array(
-      'label' => t('Node ID'),
-      'description' => t('The ID of the node of which this comment is a reply.'),
-      'type' => 'entity_reference_field',
-      'settings' => array('target_type' => 'node'),
-      'required' => TRUE,
-    );
-    $properties['langcode'] = array(
-      'label' => t('Language code'),
-      'description' => t('The comment language code.'),
-      'type' => 'language_field',
-    );
-    $properties['subject'] = array(
-      'label' => t('Subject'),
-      'description' => t('The comment title or subject.'),
-      'type' => 'string_field',
-    );
-    $properties['uid'] = array(
-      'label' => t('User ID'),
-      'description' => t('The user ID of the comment author.'),
-      'type' => 'entity_reference_field',
-      'settings' => array(
+    $fields['cid'] = FieldDefinition::create('integer')
+      ->setLabel(t('Comment ID'))
+      ->setDescription(t('The comment ID.'))
+      ->setReadOnly(TRUE);
+
+    $fields['uuid'] = FieldDefinition::create('uuid')
+      ->setLabel(t('UUID'))
+      ->setDescription(t('The comment UUID.'))
+      ->setReadOnly(TRUE);
+
+    $fields['pid'] = FieldDefinition::create('entity_reference')
+      ->setLabel(t('Parent ID'))
+      ->setDescription(t('The parent comment ID if this is a reply to a comment.'))
+      ->setSetting('target_type', 'comment');
+
+    $fields['entity_id'] = FieldDefinition::create('entity_reference')
+      ->setLabel(t('Entity ID'))
+      ->setDescription(t('The ID of the entity of which this comment is a reply.'))
+      ->setSetting('target_type', 'node')
+      ->setRequired(TRUE);
+
+    $fields['langcode'] = FieldDefinition::create('language')
+      ->setLabel(t('Language code'))
+      ->setDescription(t('The comment language code.'));
+
+    $fields['subject'] = FieldDefinition::create('string')
+      ->setLabel(t('Subject'))
+      ->setDescription(t('The comment title or subject.'));
+
+    $fields['uid'] = FieldDefinition::create('entity_reference')
+      ->setLabel(t('User ID'))
+      ->setDescription(t('The user ID of the comment author.'))
+      ->setSettings(array(
         'target_type' => 'user',
         'default_value' => 0,
-      ),
-    );
-    $properties['name'] = array(
-      'label' => t('Name'),
-      'description' => t("The comment author's name."),
-      'type' => 'string_field',
-      'settings' => array('default_value' => ''),
-    );
-    $properties['mail'] = array(
-      'label' => t('e-mail'),
-      'description' => t("The comment author's e-mail address."),
-      'type' => 'string_field',
-    );
-    $properties['homepage'] = array(
-      'label' => t('Homepage'),
-      'description' => t("The comment author's home page address."),
-      'type' => 'string_field',
-    );
-    $properties['hostname'] = array(
-      'label' => t('Hostname'),
-      'description' => t("The comment author's hostname."),
-      'type' => 'string_field',
-    );
-    $properties['created'] = array(
-      'label' => t('Created'),
-      'description' => t('The time that the comment was created.'),
-      'type' => 'integer_field',
-    );
-    $properties['changed'] = array(
-      'label' => t('Changed'),
-      'description' => t('The time that the comment was last edited.'),
-      'type' => 'integer_field',
-    );
-    $properties['status'] = array(
-      'label' => t('Publishing status'),
-      'description' => t('A boolean indicating whether the comment is published.'),
-      'type' => 'boolean_field',
-    );
-    $properties['thread'] = array(
-      'label' => t('Thread place'),
-      'description' => t("The alphadecimal representation of the comment's place in a thread, consisting of a base 36 string prefixed by an integer indicating its length."),
-      'type' => 'string_field',
-    );
-    $properties['node_type'] = array(
-      // @todo: The bundle property should be stored so it's queryable.
-      'label' => t('Node type'),
-      'description' => t("The comment node type."),
-      'type' => 'string_field',
-      'queryable' => FALSE,
-    );
-    $properties['new'] = array(
-      'label' => t('Comment new marker'),
-      'description' => t("The comment 'new' marker for the current user (0 read, 1 new, 2 updated)."),
-      'type' => 'integer_field',
-      'computed' => TRUE,
-      'class' => '\Drupal\comment\CommentNewItem',
-    );
-    return $properties;
+      ));
+
+    $fields['name'] = FieldDefinition::create('string')
+      ->setLabel(t('Name'))
+      ->setDescription(t("The comment author's name."))
+      ->setSetting('default_value', '');
+
+    $fields['mail'] = FieldDefinition::create('email')
+      ->setLabel(t('Email'))
+      ->setDescription(t("The comment author's e-mail address."));
+
+    $fields['homepage'] = FieldDefinition::create('string')
+      ->setLabel(t('Homepage'))
+      ->setDescription(t("The comment author's home page address."));
+
+    $fields['hostname'] = FieldDefinition::create('string')
+      ->setLabel(t('Hostname'))
+      ->setDescription(t("The comment author's hostname."));
+
+    // @todo Convert to a "created" field in https://drupal.org/node/2145103.
+    $fields['created'] = FieldDefinition::create('integer')
+      ->setLabel(t('Created'))
+      ->setDescription(t('The time that the comment was created.'));
+
+    // @todo Convert to a "changed" field in https://drupal.org/node/2145103.
+    $fields['changed'] = FieldDefinition::create('integer')
+      ->setLabel(t('Changed'))
+      ->setDescription(t('The time that the comment was last edited.'))
+      ->setPropertyConstraints('value', array('EntityChanged' => array()));
+
+    $fields['status'] = FieldDefinition::create('boolean')
+      ->setLabel(t('Publishing status'))
+      ->setDescription(t('A boolean indicating whether the comment is published.'));
+
+    $fields['thread'] = FieldDefinition::create('string')
+      ->setLabel(t('Thread place'))
+      ->setDescription(t("The alphadecimal representation of the comment's place in a thread, consisting of a base 36 string prefixed by an integer indicating its length."));
+
+    $fields['entity_type'] = FieldDefinition::create('string')
+      ->setLabel(t('Entity type'))
+      ->setDescription(t('The entity type to which this comment is attached.'));
+
+    // @todo Convert to aa entity_reference field in
+    // https://drupal.org/node/2149859.
+    $fields['field_id'] = FieldDefinition::create('string')
+      ->setLabel(t('Field ID'))
+      ->setDescription(t('The comment field id.'));
+
+    $fields['field_name'] = FieldDefinition::create('string')
+      ->setLabel(t('Comment field name'))
+      ->setDescription(t('The field name through which this comment was added.'))
+      ->setComputed(TRUE);
+
+    $item_definition = $fields['field_name']->getItemDefinition();
+    $item_definition->setClass('\Drupal\comment\CommentFieldName');
+    $fields['field_name']->setItemDefinition($item_definition);
+
+    return $fields;
   }
 
   /**
@@ -466,6 +451,15 @@ class Comment extends EntityNG implements CommentInterface {
    */
   public function getChangedTime() {
     return $this->changed->value;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function preCreate(EntityStorageControllerInterface $storage_controller, array &$values) {
+    if (empty($values['field_id']) && !empty($values['field_name']) && !empty($values['entity_type'])) {
+      $values['field_id'] = $values['entity_type'] . '__' . $values['field_name'];
+    }
   }
 
 }

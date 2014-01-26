@@ -78,7 +78,7 @@ class NodeRevisionDeleteForm extends ConfirmFormBase implements ContainerInjecti
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'node_revision_delete_confirm';
   }
 
@@ -92,8 +92,7 @@ class NodeRevisionDeleteForm extends ConfirmFormBase implements ContainerInjecti
   /**
    * {@inheritdoc}
    */
-  public function getCancelPath() {
-    return 'node/' . $this->revision->id() . '/revisions';
+  public function getCancelRoute() {
   }
 
   /**
@@ -108,7 +107,11 @@ class NodeRevisionDeleteForm extends ConfirmFormBase implements ContainerInjecti
    */
   public function buildForm(array $form, array &$form_state, $node_revision = NULL) {
     $this->revision = $this->nodeStorage->loadRevision($node_revision);
-    return parent::buildForm($form, $form_state);
+    $form = parent::buildForm($form, $form_state);
+
+    // @todo Convert to getCancelRoute() after http://drupal.org/node/1863906.
+    $form['actions']['cancel']['#href'] = 'node/' . $this->revision->id() . '/revisions';
+    return $form;
   }
 
   /**
@@ -120,9 +123,14 @@ class NodeRevisionDeleteForm extends ConfirmFormBase implements ContainerInjecti
     watchdog('content', '@type: deleted %title revision %revision.', array('@type' => $this->revision->bundle(), '%title' => $this->revision->label(), '%revision' => $this->revision->getRevisionId()));
     $node_type = $this->nodeTypeStorage->load($this->revision->bundle())->label();
     drupal_set_message(t('Revision from %revision-date of @type %title has been deleted.', array('%revision-date' => format_date($this->revision->getRevisionCreationTime()), '@type' => $node_type, '%title' => $this->revision->label())));
-    $form_state['redirect'] = 'node/' . $this->revision->id();
+    $form_state['redirect_route'] = array(
+      'route_name' => 'node.view',
+      'route_parameters' => array(
+        'node' => $this->revision->id(),
+      ),
+    );
     if ($this->connection->query('SELECT COUNT(DISTINCT vid) FROM {node_field_revision} WHERE nid = :nid', array(':nid' => $this->revision->id()))->fetchField() > 1) {
-      $form_state['redirect'] .= '/revisions';
+      $form_state['redirect_route']['route_name'] = 'node.revision_overview';
     }
   }
 

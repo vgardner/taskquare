@@ -75,9 +75,8 @@ Drupal.behaviors.password = {
       };
 
       // Monitor input events.
-      $.each([passwordInput, confirmInput], function () {
-        this.bind('input', passwordCheck);
-      });
+      passwordInput.on('input', passwordCheck);
+      confirmInput.on('input', passwordCheck);
     });
   }
 };
@@ -181,7 +180,7 @@ Drupal.behaviors.fieldUserRegistration = {
 
     if ($checkbox.length) {
       $(context).find('input#edit-instance-required').once('user-register-form-checkbox', function () {
-        $(this).bind('change', function (e) {
+        $(this).on('change', function (e) {
           if ($(this).prop('checked')) {
             $checkbox.prop('checked', true);
           }

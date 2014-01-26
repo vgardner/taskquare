@@ -2,12 +2,10 @@
 
 /**
  * @file
- * Provide views data and handlers for file.module.
- *
- * @ingroup views_module_handlers
+ * Provide views data for file.module.
  */
 
-use Drupal\Core\Entity\DatabaseStorageController;
+use Drupal\Core\Entity\FieldableDatabaseStorageController;
 use Drupal\field\FieldInterface;
 
 /**
@@ -49,6 +47,15 @@ function file_views_data() {
     ),
     'sort' => array(
       'id' => 'standard',
+    ),
+    'relationship' => array(
+      'title' => t('File usage'),
+      'help' => t('Relate file entities to their usage.'),
+      'id' => 'standard',
+      'base' => 'file_usage',
+      'base field' => 'fid',
+      'field' => 'fid',
+      'label' => t('File usage'),
     ),
   );
 
@@ -182,11 +189,6 @@ function file_views_data() {
   // that we can create relationships from files to entities, and then on each core entity type base
   // table so that we can provide general relationships between entities and files.
   $data['file_usage']['table']['join'] = array(
-    // Link ourself to the {file_managed} table so we can provide file->entity relationships.
-    'file_managed' => array(
-      'field' => 'fid',
-      'left_field' => 'fid',
-    ),
     // Link ourself to the {node} table so we can provide node->file relationships.
     'node' => array(
       'field' => 'id',
@@ -467,12 +469,12 @@ function file_field_views_data(FieldInterface $field) {
   $data = field_views_field_default_views_data($field);
   foreach ($data as $table_name => $table_data) {
     // Add the relationship only on the fid field.
-    $data[$table_name][$field['field_name'] . '_target_id']['relationship'] = array(
+    $data[$table_name][$field->getName() . '_target_id']['relationship'] = array(
       'id' => 'standard',
       'base' => 'file_managed',
       'entity type' => 'file',
       'base field' => 'target_id',
-      'label' => t('file from !field_name', array('!field_name' => $field['field_name'])),
+      'label' => t('file from !field_name', array('!field_name' => $field->getName())),
     );
   }
 
@@ -485,24 +487,24 @@ function file_field_views_data(FieldInterface $field) {
  * Views integration to provide reverse relationships on file fields.
  */
 function file_field_views_data_views_data_alter(array &$data, FieldInterface $field) {
-  $entity_type = $field['entity_type'];
+  $entity_type = $field->entity_type;
   $entity_info = entity_get_info($entity_type);
-  $pseudo_field_name = 'reverse_' . $field['field_name'] . '_' . $entity_type;
+  $field_name = $field->getName();
+  $pseudo_field_name = 'reverse_' . $field_name . '_' . $entity_type;
 
-  list($label,) = field_views_field_label($entity_type, $field['field_name']);
-  $entity_label = ($entity_info['label'] == t('Node')) ? t('Content') : $entity_info['label'];
+  list($label) = field_views_field_label($entity_type, $field_name);
 
   $data['file_managed'][$pseudo_field_name]['relationship'] = array(
-    'title' => t('@entity using @field', array('@entity' => $entity_label, '@field' => $label)),
-    'help' => t('Relate each @entity with a @field set to the file.', array('@entity' => $entity_label, '@field' => $label)),
+    'title' => t('@entity using @field', array('@entity' => $entity_info['label'], '@field' => $label)),
+    'help' => t('Relate each @entity with a @field set to the file.', array('@entity' => $entity_info['label'], '@field' => $label)),
     'id' => 'entity_reverse',
-    'field_name' => $field['field_name'],
-    'entity_type' => $field['entity_type'],
-    'field table' => DatabaseStorageController::_fieldTableName($field),
-    'field field' => $field['field_name'] . '_target_id',
+    'field_name' => $field_name,
+    'entity_type' => $entity_type,
+    'field table' => FieldableDatabaseStorageController::_fieldTableName($field),
+    'field field' => $field_name . '_target_id',
     'base' => $entity_info['base_table'],
     'base field' => $entity_info['entity_keys']['id'],
-    'label' => t('!field_name', array('!field_name' => $field['field_name'])),
+    'label' => t('!field_name', array('!field_name' => $field_name)),
     'join_extra' => array(
       0 => array(
         'field' => 'deleted',

@@ -20,11 +20,10 @@ use Drupal\Core\Entity\EntityStorageControllerInterface;
  * @EntityType(
  *   id = "block",
  *   label = @Translation("Block"),
- *   module = "block",
  *   controllers = {
- *     "storage" = "Drupal\block\BlockStorageController",
+ *     "storage" = "Drupal\Core\Config\Entity\ConfigStorageController",
  *     "access" = "Drupal\block\BlockAccessController",
- *     "render" = "Drupal\block\BlockRenderController",
+ *     "view_builder" = "Drupal\block\BlockViewBuilder",
  *     "list" = "Drupal\block\BlockListController",
  *     "form" = {
  *       "default" = "Drupal\block\BlockFormController",
@@ -37,6 +36,9 @@ use Drupal\Core\Entity\EntityStorageControllerInterface;
  *     "id" = "id",
  *     "label" = "label",
  *     "uuid" = "uuid"
+ *   },
+ *   links = {
+ *     "edit-form" = "block.admin_edit"
  *   }
  * )
  */
@@ -68,7 +70,7 @@ class Block extends ConfigEntityBase implements BlockInterface {
    *
    * @var string
    */
-  protected $region = BLOCK_REGION_NONE;
+  protected $region = self::BLOCK_REGION_NONE;
 
   /**
    * The block weight.
@@ -115,35 +117,17 @@ class Block extends ConfigEntityBase implements BlockInterface {
   }
 
   /**
-   * Overrides \Drupal\Core\Entity\Entity::uri();
-   */
-  public function uri() {
-    return array(
-      'path' => 'admin/structure/block/manage/' . $this->id(),
-      'options' => array(
-        'entity_type' => $this->entityType,
-        'entity' => $this,
-      ),
-    );
-  }
-  /**
    * Overrides \Drupal\Core\Entity\Entity::label();
    */
   public function label($langcode = NULL) {
     $settings = $this->get('settings');
-    return $settings['label'];
-  }
-
-  /**
-   * Overrides \Drupal\Core\Config\Entity\ConfigEntityBase::get();
-   */
-  public function get($property_name, $langcode = NULL) {
-    // The theme is stored in the entity ID.
-    $value = parent::get($property_name, $langcode);
-    if ($property_name == 'theme' && !$value) {
-      list($value) = explode('.', $this->id());
+    if ($settings['label']) {
+      return $settings['label'];
     }
-    return $value;
+    else {
+      $definition = $this->getPlugin()->getPluginDefinition();
+      return $definition['admin_label'];
+    }
   }
 
   /**
@@ -152,6 +136,7 @@ class Block extends ConfigEntityBase implements BlockInterface {
   public function getExportProperties() {
     $properties = parent::getExportProperties();
     $names = array(
+      'theme',
       'region',
       'weight',
       'plugin',
@@ -168,6 +153,8 @@ class Block extends ConfigEntityBase implements BlockInterface {
    * {@inheritdoc}
    */
   public function preSave(EntityStorageControllerInterface $storage_controller) {
+    parent::preSave($storage_controller);
+
     $this->set('settings', $this->getPlugin()->getConfiguration());
   }
 
@@ -181,7 +168,7 @@ class Block extends ConfigEntityBase implements BlockInterface {
       return $status;
     }
     // Sort by weight, unless disabled.
-    if ($a->get('region') != BLOCK_REGION_NONE) {
+    if ($a->get('region') != static::BLOCK_REGION_NONE) {
       $weight = $a->get('weight') - $b->get('weight');
       if ($weight) {
         return $weight;

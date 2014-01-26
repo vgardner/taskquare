@@ -32,14 +32,13 @@ class NegotiationBrowserDeleteForm extends ConfirmFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getCancelPath() {
-    return 'admin/config/regional/language/detection/browser';
+  public function getCancelRoute() {
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'language_negotiation_configure_browser_delete_form';
   }
 
@@ -49,7 +48,11 @@ class NegotiationBrowserDeleteForm extends ConfirmFormBase {
   public function buildForm(array $form, array &$form_state, $browser_langcode = NULL) {
     $this->browserLangcode = $browser_langcode;
 
-    return parent::buildForm($form, $form_state);
+    $form = parent::buildForm($form, $form_state);
+
+    // @todo Convert to getCancelRoute() after http://drupal.org/node/2082071.
+    $form['actions']['cancel']['#href'] = 'admin/config/regional/language/detection/browser';
+    return $form;
   }
 
   /**
@@ -63,7 +66,7 @@ class NegotiationBrowserDeleteForm extends ConfirmFormBase {
       language_set_browser_drupal_langcode_mappings($mappings);
     }
 
-    $form_state['redirect'] = 'admin/config/regional/language/detection/browser';
+    $form_state['redirect_route']['route_name'] = 'language.negotiation_browser';
   }
 
 }

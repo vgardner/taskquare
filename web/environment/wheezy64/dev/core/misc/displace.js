@@ -13,14 +13,10 @@
   };
 
   /**
-   * Registers a resize hanlder on the window.
+   * Registers a resize handler on the window.
    */
   Drupal.behaviors.drupalDisplace = {
     attach: function () {
-      // Do not process the window of the overlay.
-      if (parent.Drupal.overlay && parent.Drupal.overlay.iframeWindow === window) {
-        return;
-      }
       // Mark this behavior as processed on the first pass.
       if (this.displaceProcessed) {
         return;

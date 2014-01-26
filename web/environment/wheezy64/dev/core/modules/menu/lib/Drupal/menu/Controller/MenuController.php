@@ -7,8 +7,9 @@
 
 namespace Drupal\menu\Controller;
 
+use Drupal\Component\Utility\Xss;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
-use Drupal\Core\Entity\EntityManager;
+use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\menu_link\MenuLinkStorageControllerInterface;
 use Drupal\system\MenuInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -30,7 +31,7 @@ class MenuController implements ContainerInjectionInterface {
   /**
    * The entity manager.
    *
-   * @var \Drupal\Core\Entity\EntityManager
+   * @var \Drupal\Core\Entity\EntityManagerInterface
    */
   protected $entityManager;
 
@@ -39,10 +40,10 @@ class MenuController implements ContainerInjectionInterface {
    *
    * @param \Drupal\menu_link\MenuLinkStorageControllerInterface $menu_link_storage
    *   The storage controller.
-   * @param \Drupal\Core\Entity\EntityManager $entity_manager
+   * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
    *   The entity manager.
    */
-  public function __construct(MenuLinkStorageControllerInterface $menu_link_storage, EntityManager $entity_manager) {
+  public function __construct(MenuLinkStorageControllerInterface $menu_link_storage, EntityManagerInterface $entity_manager) {
     $this->menuLinkStorage = $menu_link_storage;
     $this->entityManager = $entity_manager;
   }
@@ -88,14 +89,25 @@ class MenuController implements ContainerInjectionInterface {
    *   Returns the menu link submission form.
    */
   public function addLink(MenuInterface $menu) {
-    // @todo Remove this when https://drupal.org/node/1981644 is in.
-    drupal_set_title(t('Add menu link'));
     $menu_link = $this->menuLinkStorage->create(array(
       'mlid' => 0,
       'plid' => 0,
       'menu_name' => $menu->id(),
     ));
     return $this->entityManager->getForm($menu_link);
+  }
+
+  /**
+   * Route title callback.
+   *
+   * @param \Drupal\system\MenuInterface $menu
+   *   The menu entity.
+   *
+   * @return string
+   *   The menu label.
+   */
+  public function menuTitle(MenuInterface $menu) {
+    return Xss::filter($menu->label());
   }
 
 }

@@ -29,6 +29,7 @@ public class DummyContent {
         addItem(new DummyItem("2", "Item 2"));
         addItem(new DummyItem("3", "Item 3"));
         addItem(new DummyItem("3", "Item 4"));
+        addItem(new DummyItem("4", "Item 5"));
     }
 
     private static void addItem(DummyItem item) {

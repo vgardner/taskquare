@@ -10,7 +10,8 @@ local.properties
 .classpath
 .settings/
 .loadpath
-
+.metadata
+.metadata/
 # External tool builders
 .externalToolBuilders/
 

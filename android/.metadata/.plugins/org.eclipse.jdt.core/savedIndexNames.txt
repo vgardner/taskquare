@@ -1,0 +1,4 @@
+INDEX VERSION 1.126+/Users/vgardner/sandbox/taskquare/android/.metadata/.plugins/org.eclipse.jdt.core
+1746450105.index
+2734064029.index
+552865783.index

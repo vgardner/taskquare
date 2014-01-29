@@ -18,7 +18,7 @@ import com.charcade.taskquare.dummy.DummyContent;
  * Activities containing this fragment MUST implement the {@link Callbacks}
  * interface.
  */
-public class taskListFragment extends ListFragment {
+public class TaskListFragment extends ListFragment {
 
     /**
      * The serialization (saved instance state) Bundle key representing the
@@ -63,7 +63,7 @@ public class taskListFragment extends ListFragment {
      * Mandatory empty constructor for the fragment manager to instantiate the
      * fragment (e.g. upon screen orientation changes).
      */
-    public taskListFragment() {
+    public TaskListFragment() {
     }
 
     @Override

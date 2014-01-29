@@ -8,7 +8,7 @@
     android:divider="?android:attr/dividerHorizontal"
     android:orientation="horizontal"
     android:showDividers="middle"
-    tools:context=".taskListActivity" >
+    tools:context=".TaskListActivity" >
 
     <!--
     This layout is a two-pane layout for the tasks
@@ -23,7 +23,7 @@
 
     <fragment
         android:id="@+id/task_list"
-        android:name="com.charcade.taskquare.taskListFragment"
+        android:name="com.charcade.taskquare.TaskListFragment"
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"

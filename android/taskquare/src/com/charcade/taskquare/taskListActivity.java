@@ -15,14 +15,14 @@ import android.support.v4.app.FragmentActivity;
  * <p>
  * The activity makes heavy use of fragments. The list of items is a
  * {@link taskListFragment} and the item details
- * (if present) is a {@link taskDetailFragment}.
+ * (if present) is a {@link TaskDetailFragment}.
  * <p>
  * This activity also implements the required
  * {@link taskListFragment.Callbacks} interface
  * to listen for item selections.
  */
-public class taskListActivity extends FragmentActivity
-        implements taskListFragment.Callbacks {
+public class TaskListActivity extends FragmentActivity
+        implements TaskListFragment.Callbacks {
 
     /**
      * Whether or not the activity is in two-pane mode, i.e. running on a tablet
@@ -44,7 +44,7 @@ public class taskListActivity extends FragmentActivity
 
             // In two-pane mode, list items should be given the
             // 'activated' state when touched.
-            ((taskListFragment) getSupportFragmentManager()
+            ((TaskListFragment) getSupportFragmentManager()
                     .findFragmentById(R.id.task_list))
                     .setActivateOnItemClick(true);
         }
@@ -63,8 +63,8 @@ public class taskListActivity extends FragmentActivity
             // adding or replacing the detail fragment using a
             // fragment transaction.
             Bundle arguments = new Bundle();
-            arguments.putString(taskDetailFragment.ARG_ITEM_ID, id);
-            taskDetailFragment fragment = new taskDetailFragment();
+            arguments.putString(TaskDetailFragment.ARG_ITEM_ID, id);
+            TaskDetailFragment fragment = new TaskDetailFragment();
             fragment.setArguments(arguments);
             getSupportFragmentManager().beginTransaction()
                     .replace(R.id.task_detail_container, fragment)
@@ -73,8 +73,8 @@ public class taskListActivity extends FragmentActivity
         } else {
             // In single-pane mode, simply start the detail activity
             // for the selected item ID.
-            Intent detailIntent = new Intent(this, taskDetailActivity.class);
-            detailIntent.putExtra(taskDetailFragment.ARG_ITEM_ID, id);
+            Intent detailIntent = new Intent(this, TaskDetailActivity.class);
+            detailIntent.putExtra(TaskDetailFragment.ARG_ITEM_ID, id);
             startActivity(detailIntent);
         }
     }

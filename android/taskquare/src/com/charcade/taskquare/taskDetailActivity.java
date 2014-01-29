@@ -13,9 +13,9 @@ import android.view.MenuItem;
  * in a {@link taskListActivity}.
  * <p>
  * This activity is mostly just a 'shell' activity containing nothing
- * more than a {@link taskDetailFragment}.
+ * more than a {@link TaskDetailFragment}.
  */
-public class taskDetailActivity extends FragmentActivity {
+public class TaskDetailActivity extends FragmentActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,9 +38,9 @@ public class taskDetailActivity extends FragmentActivity {
             // Create the detail fragment and add it to the activity
             // using a fragment transaction.
             Bundle arguments = new Bundle();
-            arguments.putString(taskDetailFragment.ARG_ITEM_ID,
-                    getIntent().getStringExtra(taskDetailFragment.ARG_ITEM_ID));
-            taskDetailFragment fragment = new taskDetailFragment();
+            arguments.putString(TaskDetailFragment.ARG_ITEM_ID,
+                    getIntent().getStringExtra(TaskDetailFragment.ARG_ITEM_ID));
+            TaskDetailFragment fragment = new TaskDetailFragment();
             fragment.setArguments(arguments);
             getSupportFragmentManager().beginTransaction()
                     .add(R.id.task_detail_container, fragment)
@@ -59,7 +59,7 @@ public class taskDetailActivity extends FragmentActivity {
                 //
                 // http://developer.android.com/design/patterns/navigation.html#up-vs-back
                 //
-                NavUtils.navigateUpTo(this, new Intent(this, taskListActivity.class));
+                NavUtils.navigateUpTo(this, new Intent(this, TaskListActivity.class));
                 return true;
         }
         return super.onOptionsItemSelected(item);
